@@ -1,0 +1,16 @@
+{
+  "name": "new-social-sim",
+  "private": true,
+  "version": "0.1.0",
+  "description": "本地社交媒体模拟器：先做一个真实可用的仿 X 网站，再在其 API 之上构建多世界模拟引擎",
+  "workspaces": [
+    "shared",
+    "server",
+    "client",
+    "simulator"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  }
+}

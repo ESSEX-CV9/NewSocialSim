@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/
+*.log
+.env
+
+# 与本项目无关的旧项目
+image_searcher/
