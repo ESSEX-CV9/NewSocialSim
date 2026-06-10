@@ -1,11 +1,12 @@
 import { buildApp } from './app.js';
 import { config } from './config.js';
+import { loadOrCreateJwtSecret } from './core/auth/jwt-secret.js';
 import { WorldManager } from './core/world/world-manager.js';
 
 const worldManager = new WorldManager(config.worldsDir, config.stateFile);
 worldManager.init();
 
-const app = buildApp({ worldManager });
+const app = buildApp({ worldManager, jwtSecret: loadOrCreateJwtSecret(config.jwtSecretFile) });
 
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {

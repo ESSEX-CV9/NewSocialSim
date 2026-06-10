@@ -12,4 +12,6 @@ export const config = {
   worldsDir: path.join(dataDir, 'worlds'),
   /** 记录活动世界 id 等跨世界的服务器状态 */
   stateFile: path.join(dataDir, 'state.json'),
+  /** JWT 签名密钥文件（首次启动自动生成） */
+  jwtSecretFile: path.join(dataDir, 'jwt.secret'),
 } as const;
