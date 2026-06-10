@@ -1,0 +1,15 @@
+/** 帖子实体（贫血模型：纯数据，无行为） */
+export interface Post {
+  id: number;
+  authorId: number;
+  content: string;
+  /** 若为回复，指向被回复的帖子 */
+  replyToId: number | null;
+  /** 若为引用转发，指向被引用的帖子 */
+  quoteOfId: number | null;
+  /** 模拟时间（unix 毫秒形式） */
+  createdAt: number;
+  likeCount: number;
+  repostCount: number;
+  replyCount: number;
+}
