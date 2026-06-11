@@ -48,6 +48,7 @@ export const messages = {
     'post.unrepost': '取消转发',
     'post.quote': '引用',
     'post.viewParent': '查看上文',
+    'post.replyingTo': '回复 @{handle}',
 
     'timeline.following': '关注',
     'timeline.forYou': '为你推荐',
@@ -190,6 +191,7 @@ export const messages = {
     'post.unrepost': 'Undo repost',
     'post.quote': 'Quote',
     'post.viewParent': 'View parent',
+    'post.replyingTo': 'Replying to @{handle}',
 
     'timeline.following': 'Following',
     'timeline.forYou': 'For you',

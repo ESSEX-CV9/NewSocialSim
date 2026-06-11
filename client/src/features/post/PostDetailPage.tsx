@@ -1,7 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
+import { Avatar } from '../../components/Avatar';
 import { Composer } from '../../components/Composer';
 import { ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
@@ -16,6 +18,7 @@ export function PostDetailPage() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const [composerOpen, setComposerOpen] = useState(false);
 
   const post = useQuery({
     queryKey: ['post', id],
@@ -54,17 +57,41 @@ export function PostDetailPage() {
 
       <PostCard post={view} large onDeleted={() => navigate('/')} />
 
-      {user && !view.deleted && (
-        <Composer
-          replyToId={id}
-          placeholder={t('composer.replyPlaceholder')}
-          buttonText={t('composer.reply')}
-          onPosted={() => {
-            void queryClient.invalidateQueries({ queryKey: ['replies', id] });
-            void queryClient.invalidateQueries({ queryKey: ['post', id] });
-          }}
-        />
-      )}
+      {/* 回复区：默认收起为窄条，点击展开为完整回复框（与 X 一致） */}
+      {user &&
+        !view.deleted &&
+        (composerOpen ? (
+          <div className="border-b border-x-border">
+            <div className="px-4 pt-3 pl-17 text-[14px] text-x-dim">
+              {t('post.replyingTo', { handle: view.author.handle })}
+            </div>
+            <Composer
+              replyToId={id}
+              placeholder={t('composer.replyPlaceholder')}
+              buttonText={t('composer.reply')}
+              autoFocus
+              bordered={false}
+              onPosted={() => {
+                setComposerOpen(false);
+                void queryClient.invalidateQueries({ queryKey: ['replies', id] });
+                void queryClient.invalidateQueries({ queryKey: ['post', id] });
+              }}
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setComposerOpen(true)}
+            className="flex w-full cursor-text items-center gap-3 border-b border-x-border px-4 py-2.5 transition-colors duration-200 hover:bg-x-hover"
+          >
+            <Avatar handle={user.handle} size={40} />
+            <span className="flex-1 text-left text-[17px] text-x-dim">
+              {t('composer.replyPlaceholder')}
+            </span>
+            <span className="rounded-full bg-x-blue px-4 py-1.5 text-[15px] font-bold text-white opacity-50">
+              {t('composer.reply')}
+            </span>
+          </button>
+        ))}
 
       {replies.items.map((reply) => (
         <PostCard key={reply.id} post={reply} />
