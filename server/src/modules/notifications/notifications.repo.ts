@@ -18,6 +18,10 @@ export interface NotificationRow {
   post_deleted: number | null;
 }
 
+/** 被屏蔽用户产生的通知（含历史）不再展示 */
+const NOT_BLOCKED_ACTOR =
+  'AND n.actor_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = @userId)';
+
 export const notificationsRepo = {
   insert(
     db: WorldDb,
@@ -60,7 +64,7 @@ export const notificationsRepo = {
          FROM notifications n
          JOIN users u ON u.id = n.actor_id
          LEFT JOIN posts p ON p.id = n.post_id
-         WHERE n.user_id = @userId ${filterClause} ${cursorClause}
+         WHERE n.user_id = @userId ${NOT_BLOCKED_ACTOR} ${filterClause} ${cursorClause}
          ORDER BY n.id DESC
          LIMIT @limit`,
       )
@@ -69,8 +73,11 @@ export const notificationsRepo = {
 
   unreadCount(db: WorldDb, userId: number): number {
     const row = db
-      .prepare('SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND read = 0')
-      .get(userId) as { c: number };
+      .prepare(
+        `SELECT COUNT(*) AS c FROM notifications n
+         WHERE n.user_id = @userId AND n.read = 0 ${NOT_BLOCKED_ACTOR}`,
+      )
+      .get({ userId }) as { c: number };
     return row.c;
   },
 

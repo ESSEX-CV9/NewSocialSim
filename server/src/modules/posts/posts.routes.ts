@@ -96,6 +96,16 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
     { preHandler: deps.requireAuth, schema: { params: idParamsSchema } },
     controller.delete,
   );
+  app.post<{ Params: { id: number } }>(
+    '/api/posts/:id/pin',
+    { preHandler: deps.requireAuth, schema: { params: idParamsSchema } },
+    controller.pin,
+  );
+  app.delete<{ Params: { id: number } }>(
+    '/api/posts/:id/pin',
+    { preHandler: deps.requireAuth, schema: { params: idParamsSchema } },
+    controller.unpin,
+  );
   // 曝光上报：匿名也计数（optionalAuth 同时兼容不带 Authorization 头的 sendBeacon）
   app.post<{ Body: { ids: number[] } }>(
     '/api/posts/views',

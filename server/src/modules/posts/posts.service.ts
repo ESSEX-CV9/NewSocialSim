@@ -99,7 +99,7 @@ export class PostsService {
     this.getLiveRow(postId);
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = postsRepo.listReplies(db, postId, decodeTsIdCursor(cursor), pageSize + 1);
+    const rows = postsRepo.listReplies(db, postId, viewerId, decodeTsIdCursor(cursor), pageSize + 1);
     return this.toPage(rows, pageSize, viewerId);
   }
 
@@ -156,7 +156,23 @@ export class PostsService {
       if (row.quote_of_id !== null) {
         postsRepo.adjustCounts(db, row.quote_of_id, { quote: -1 });
       }
+      this.usersService.clearPinnedPost(row.author_id, postId);
     })();
+  }
+
+  /** 置顶到个人主页：每用户最多一条，新置顶直接替换旧的 */
+  pin(viewerId: number, postId: number): { pinnedPostId: number | null } {
+    const row = this.getLiveRow(postId);
+    if (row.author_id !== viewerId) throw new ForbiddenError('只能置顶自己的帖子');
+    this.usersService.setPinnedPost(viewerId, postId);
+    return { pinnedPostId: postId };
+  }
+
+  unpin(viewerId: number, postId: number): { pinnedPostId: number | null } {
+    const row = this.getLiveRow(postId);
+    if (row.author_id !== viewerId) throw new ForbiddenError('只能操作自己的帖子');
+    this.usersService.clearPinnedPost(viewerId, postId);
+    return { pinnedPostId: null };
   }
 
   // ---- 以下为供本模块及 timeline/search 等模块复用的内部能力 ----
@@ -209,6 +225,10 @@ export class PostsService {
       viewerId !== null ? postsRepo.repostedSet(db, viewerId, allIds) : new Set<number>();
     const bookmarked =
       viewerId !== null ? postsRepo.bookmarkedSet(db, viewerId, allIds) : new Set<number>();
+    const followedAuthors =
+      viewerId !== null
+        ? postsRepo.followedAuthorSet(db, viewerId, [...new Set(allRows.map((r) => r.author_id))])
+        : new Set<number>();
     const byId = new Map(allRows.map((r) => [r.id, r]));
 
     const toView = (row: PostRow, embedQuote: boolean): PostView => ({
@@ -228,6 +248,7 @@ export class PostsService {
       likedByViewer: liked.has(row.id),
       repostedByViewer: reposted.has(row.id),
       bookmarkedByViewer: bookmarked.has(row.id),
+      authorFollowedByViewer: followedAuthors.has(row.author_id),
       quoted:
         embedQuote && row.quote_of_id !== null
           ? (() => {

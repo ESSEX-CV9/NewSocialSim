@@ -49,6 +49,14 @@ export const messages = {
     'post.quote': '引用',
     'post.viewParent': '查看上文',
     'post.replyingTo': '回复 @{handle}',
+    'post.pin': '置顶到个人主页',
+    'post.unpin': '取消置顶',
+    'post.pinned': '已置顶',
+    'post.hide': '隐藏这个帖子',
+    'post.followAuthor': '关注 @{handle}',
+    'post.unfollowAuthor': '取消关注 @{handle}',
+    'post.blockAuthor': '屏蔽 @{handle}',
+    'post.blockConfirm': '屏蔽 @{handle}？对方的帖子将从你的时间线消失，你也会取消对其的关注。',
 
     'timeline.following': '关注',
     'timeline.forYou': '为你推荐',
@@ -71,6 +79,8 @@ export const messages = {
 
     'profile.follow': '关注',
     'profile.unfollow': '取消关注',
+    'profile.unblock': '解除屏蔽',
+    'profile.blockedNotice': '你已屏蔽该用户',
     'profile.editProfile': '编辑个人资料',
     'profile.followers': '粉丝',
     'profile.following': '正在关注',
@@ -201,6 +211,15 @@ export const messages = {
     'post.quote': 'Quote',
     'post.viewParent': 'View parent',
     'post.replyingTo': 'Replying to @{handle}',
+    'post.pin': 'Pin to your profile',
+    'post.unpin': 'Unpin from profile',
+    'post.pinned': 'Pinned',
+    'post.hide': 'Hide this post',
+    'post.followAuthor': 'Follow @{handle}',
+    'post.unfollowAuthor': 'Unfollow @{handle}',
+    'post.blockAuthor': 'Block @{handle}',
+    'post.blockConfirm':
+      'Block @{handle}? Their posts will disappear from your timelines and you will unfollow them.',
 
     'timeline.following': 'Following',
     'timeline.forYou': 'For you',
@@ -223,6 +242,8 @@ export const messages = {
 
     'profile.follow': 'Follow',
     'profile.unfollow': 'Unfollow',
+    'profile.unblock': 'Unblock',
+    'profile.blockedNotice': 'You have blocked this user',
     'profile.editProfile': 'Edit profile',
     'profile.followers': 'Followers',
     'profile.following': 'Following',

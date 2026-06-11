@@ -50,6 +50,18 @@ export class UsersService {
     return this.getProfileById(userId);
   }
 
+  /** 置顶帖写入（校验在 posts.service 完成；新置顶天然替换旧值） */
+  setPinnedPost(userId: number, postId: number): void {
+    const { db } = this.worldManager.current();
+    usersRepo.setPinnedPostId(db, userId, postId);
+  }
+
+  /** 取消置顶/删除帖子时清除；仅当当前置顶正是该帖时生效 */
+  clearPinnedPost(userId: number, postId: number): void {
+    const { db } = this.worldManager.current();
+    usersRepo.clearPinnedIfMatches(db, userId, postId);
+  }
+
   private buildProfile(row: UserRow, viewerId: number | null = null): UserProfile {
     const { db } = this.worldManager.current();
     return {
@@ -57,6 +69,9 @@ export class UsersService {
       ...usersRepo.counts(db, row.id),
       followedByViewer:
         viewerId !== null && viewerId !== row.id && usersRepo.isFollowedBy(db, row.id, viewerId),
+      blockedByViewer:
+        viewerId !== null && viewerId !== row.id && usersRepo.isBlocking(db, viewerId, row.id),
+      pinnedPostId: row.pinned_post_id,
     };
   }
 }

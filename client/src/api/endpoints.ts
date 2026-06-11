@@ -46,6 +46,11 @@ export const api = {
     http<Page<PostView>>('GET', withPage(`/api/users/${handle}/likes`, cursor)),
   deletePost: (id: number) => http<void>('DELETE', `/api/posts/${id}`),
   recordViews: (ids: number[]) => http<void>('POST', '/api/posts/views', { ids }),
+  pinPost: (id: number) => http<{ pinnedPostId: number | null }>('POST', `/api/posts/${id}/pin`),
+  unpinPost: (id: number) =>
+    http<{ pinnedPostId: number | null }>('DELETE', `/api/posts/${id}/pin`),
+  hidePost: (id: number) => http<{ active: boolean }>('POST', `/api/posts/${id}/hide`),
+  unhidePost: (id: number) => http<{ active: boolean }>('DELETE', `/api/posts/${id}/hide`),
 
   // interactions
   like: (id: number) => http<{ active: boolean; count: number }>('POST', `/api/posts/${id}/like`),
@@ -64,6 +69,11 @@ export const api = {
     http<Page<UserSummary>>('GET', withPage(`/api/users/${handle}/followers`, cursor)),
   following: (handle: string, cursor?: string) =>
     http<Page<UserSummary>>('GET', withPage(`/api/users/${handle}/following`, cursor)),
+
+  // blocks
+  blockUser: (handle: string) => http<{ blocked: boolean }>('POST', `/api/users/${handle}/block`),
+  unblockUser: (handle: string) =>
+    http<{ blocked: boolean }>('DELETE', `/api/users/${handle}/block`),
 
   // timeline
   homeTimeline: (cursor?: string, sort: 'latest' | 'hot' = 'latest') =>

@@ -5,6 +5,8 @@ import { AppError } from './core/errors/app-error.js';
 import type { WorldManager } from './core/world/world-manager.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { AuthService } from './modules/auth/auth.service.js';
+import { registerBlocksRoutes } from './modules/blocks/blocks.routes.js';
+import { BlocksService } from './modules/blocks/blocks.service.js';
 import { registerFollowsRoutes } from './modules/follows/follows.routes.js';
 import { FollowsService } from './modules/follows/follows.service.js';
 import { registerInteractionsRoutes } from './modules/interactions/interactions.routes.js';
@@ -60,6 +62,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const postsService = new PostsService(worldManager, usersService, notificationsService);
   const interactionsService = new InteractionsService(worldManager, postsService, notificationsService);
   const followsService = new FollowsService(worldManager, usersService, notificationsService);
+  const blocksService = new BlocksService(worldManager, usersService, followsService);
   const timelineService = new TimelineService(worldManager, postsService, usersService);
   const searchService = new SearchService(worldManager, postsService);
 
@@ -71,6 +74,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });
   registerInteractionsRoutes(app, { interactionsService, requireAuth });
   registerFollowsRoutes(app, { followsService, requireAuth });
+  registerBlocksRoutes(app, { blocksService, requireAuth });
   registerNotificationsRoutes(app, { notificationsService, requireAuth });
   registerTimelineRoutes(app, { timelineService, requireAuth, optionalAuth });
   registerSearchRoutes(app, { searchService, optionalAuth });

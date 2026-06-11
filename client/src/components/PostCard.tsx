@@ -1,4 +1,5 @@
 import type { PostView, UserSummary } from '@socialsim/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/endpoints';
@@ -131,13 +132,16 @@ interface PostCardProps {
   repostedBy?: UserSummary | null;
   /** 详情页大字号模式 */
   large?: boolean;
+  /** 个人主页置顶帖标记 */
+  pinned?: boolean;
   onDeleted?: (id: number) => void;
 }
 
-export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) {
-  const { user } = useAuth();
+export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCardProps) {
+  const { user, setUser } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [liked, setLiked] = useState(post.likedByViewer);
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -145,8 +149,10 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
   const [repostCount, setRepostCount] = useState(post.repostCount);
   const [quoteCount, setQuoteCount] = useState(post.quoteCount);
   const [bookmarked, setBookmarked] = useState(post.bookmarkedByViewer);
+  const [authorFollowed, setAuthorFollowed] = useState(post.authorFollowedByViewer);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [repostMenuOpen, setRepostMenuOpen] = useState(false);
+  const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [gone, setGone] = useState(false);
   const viewRef = useViewTracking(post.id, !post.deleted && !gone);
 
@@ -182,13 +188,78 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
     setBookmarked(res.active);
   };
 
-  const remove = async (e: MouseEvent) => {
-    stop(e);
+  const remove = async () => {
     if (!window.confirm(t('post.deleteConfirm'))) return;
     await api.deletePost(post.id);
     setGone(true);
     onDeleted?.(post.id);
   };
+
+  const isPinned = user?.pinnedPostId === post.id;
+
+  const togglePin = async () => {
+    if (!user) return;
+    const res = isPinned ? await api.unpinPost(post.id) : await api.pinPost(post.id);
+    setUser({ ...user, pinnedPostId: res.pinnedPostId });
+    void queryClient.invalidateQueries({ queryKey: ['user-timeline', user.handle] });
+    void queryClient.invalidateQueries({ queryKey: ['user', user.handle] });
+  };
+
+  const toggleAuthorFollow = async () => {
+    const res = authorFollowed
+      ? await api.unfollow(post.author.handle)
+      : await api.follow(post.author.handle);
+    setAuthorFollowed(res.following);
+    void queryClient.invalidateQueries({ queryKey: ['user', post.author.handle] });
+    void queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
+  };
+
+  const blockAuthor = async () => {
+    if (!window.confirm(t('post.blockConfirm', { handle: post.author.handle }))) return;
+    await api.blockUser(post.author.handle);
+    setGone(true);
+    onDeleted?.(post.id);
+    for (const key of [
+      ['timeline'],
+      ['user-timeline'],
+      ['user-posts'],
+      ['user-likes'],
+      ['replies'],
+      ['notifications'],
+      ['unread-count'],
+      ['search-posts'],
+      ['suggested-users'],
+      ['user', post.author.handle],
+    ]) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
+
+  const hidePost = async () => {
+    await api.hidePost(post.id);
+    setGone(true);
+    onDeleted?.(post.id);
+    for (const key of [['timeline'], ['replies'], ['search-posts']]) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
+  };
+
+  /** 菜单项统一外观；点击后关菜单再执行 */
+  const menuItem = (icon: string, label: string, action: () => void, danger = false) => (
+    <button
+      onClick={(e) => {
+        stop(e);
+        setMoreMenuOpen(false);
+        action();
+      }}
+      className={`flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold transition-colors duration-200 hover:bg-x-input ${
+        danger ? 'text-x-red' : 'text-x-text'
+      }`}
+    >
+      <i className={icon} />
+      <span className="truncate">{label}</span>
+    </button>
+  );
 
   return (
     <article
@@ -198,6 +269,12 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
         large ? '' : 'cursor-pointer transition-colors duration-200 hover:bg-x-hover'
       }`}
     >
+      {pinned && (
+        <div className="mb-1 ml-8 flex items-center gap-2 text-[13px] font-bold text-x-dim">
+          <i className="ri-pushpin-fill" />
+          {t('post.pinned')}
+        </div>
+      )}
       {repostedBy && (
         <div className="mb-1 ml-8 flex items-center gap-2 text-[13px] font-bold text-x-dim">
           <i className="ri-repeat-2-line" />
@@ -209,30 +286,86 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
           <Avatar handle={post.author.handle} />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-1 text-[15px]">
-            <Link
-              to={`/u/${post.author.handle}`}
-              onClick={stop}
-              className="font-bold hover:underline"
-            >
-              {post.author.displayName}
-            </Link>
-            {post.author.isBot && (
-              <span className="ml-0.5 rounded bg-x-input px-1 text-xs text-x-dim">
-                {t('profile.bot')}
+          <div className="flex items-start gap-x-1 text-[15px]">
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1">
+              <Link
+                to={`/u/${post.author.handle}`}
+                onClick={stop}
+                className="font-bold hover:underline"
+              >
+                {post.author.displayName}
+              </Link>
+              {post.author.isBot && (
+                <span className="ml-0.5 rounded bg-x-input px-1 text-xs text-x-dim">
+                  {t('profile.bot')}
+                </span>
+              )}
+              <span className="ml-0.5 text-x-dim">@{post.author.handle}</span>
+              <span className="text-x-dim">·</span>
+              <TimeAgo at={post.createdAt} />
+            </div>
+            {/* 右上角"…"菜单：本人帖=删除/置顶；他人帖=关注/屏蔽/隐藏 */}
+            {user && (
+              <span className="relative" onClick={stop}>
+                <ActionButton
+                  icon="ri-more-fill"
+                  color="blue"
+                  onClick={() => setMoreMenuOpen((v) => !v)}
+                />
+                {moreMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-20"
+                      onClick={(e) => {
+                        stop(e);
+                        setMoreMenuOpen(false);
+                      }}
+                    />
+                    <div className="absolute top-6 right-0 z-30 w-fit min-w-44 overflow-hidden rounded-xl border border-x-border bg-x-card whitespace-nowrap shadow-lg">
+                      {user.id === post.authorId ? (
+                        <>
+                          {menuItem('ri-delete-bin-line', t('post.delete'), () => void remove(), true)}
+                          {menuItem(
+                            isPinned ? 'ri-unpin-line' : 'ri-pushpin-line',
+                            isPinned ? t('post.unpin') : t('post.pin'),
+                            () => void togglePin(),
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {menuItem(
+                            authorFollowed ? 'ri-user-unfollow-line' : 'ri-user-follow-line',
+                            authorFollowed
+                              ? t('post.unfollowAuthor', { handle: post.author.handle })
+                              : t('post.followAuthor', { handle: post.author.handle }),
+                            () => void toggleAuthorFollow(),
+                          )}
+                          {menuItem(
+                            'ri-forbid-line',
+                            t('post.blockAuthor', { handle: post.author.handle }),
+                            () => void blockAuthor(),
+                            true,
+                          )}
+                          {menuItem('ri-eye-off-line', t('post.hide'), () => void hidePost())}
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
               </span>
             )}
-            <span className="ml-0.5 text-x-dim">@{post.author.handle}</span>
-            <span className="text-x-dim">·</span>
-            <TimeAgo at={post.createdAt} />
           </div>
           <div className={large ? 'mt-2 text-xl' : 'mt-0.5'}>
             <PostContent content={post.content} />
           </div>
           {post.quoted && <QuotedCard quoted={post.quoted} />}
-          <div className="mt-3 flex items-center justify-between">
-            <ActionButton icon="ri-chat-3-line" count={post.replyCount} color="blue" />
+          {/* 各按钮包 flex-1 左对齐单元格：图标位置不随数字宽度移动（与 X 一致） */}
+          <div className="mt-3 flex items-center">
+            <div className="flex-1">
+              <ActionButton icon="ri-chat-3-line" count={post.replyCount} color="blue" />
+            </div>
             {/* 转发/引用合并：点击弹原地下拉菜单（与 X 一致） */}
+            <div className="flex-1">
             <span className="relative">
               <ActionButton
                 icon="ri-repeat-2-line"
@@ -281,26 +414,26 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
                 </>
               )}
             </span>
-            <ActionButton
-              icon={liked ? 'ri-heart-3-fill' : 'ri-heart-3-line'}
-              count={likeCount}
-              color="pink"
-              active={liked}
-              onClick={(e) => void toggleLike(e)}
-            />
-            {/* 浏览量：仅展示，无动作（stopPropagation 防整卡跳详情） */}
-            <ActionButton icon="ri-bar-chart-2-line" count={post.viewCount} color="blue" onClick={stop} />
-            <span className="flex items-center gap-1">
-              {user?.id === post.authorId && (
-                <ActionButton icon="ri-delete-bin-line" color="red" onClick={(e) => void remove(e)} />
-              )}
+            </div>
+            <div className="flex-1">
               <ActionButton
-                icon={bookmarked ? 'ri-bookmark-fill' : 'ri-bookmark-line'}
-                color="blue"
-                active={bookmarked}
-                onClick={(e) => void toggleBookmark(e)}
+                icon={liked ? 'ri-heart-3-fill' : 'ri-heart-3-line'}
+                count={likeCount}
+                color="pink"
+                active={liked}
+                onClick={(e) => void toggleLike(e)}
               />
-            </span>
+            </div>
+            {/* 浏览量：仅展示，无动作（stopPropagation 防整卡跳详情） */}
+            <div className="flex-1">
+              <ActionButton icon="ri-bar-chart-2-line" count={post.viewCount} color="blue" onClick={stop} />
+            </div>
+            <ActionButton
+              icon={bookmarked ? 'ri-bookmark-fill' : 'ri-bookmark-line'}
+              color="blue"
+              active={bookmarked}
+              onClick={(e) => void toggleBookmark(e)}
+            />
           </div>
         </div>
       </div>

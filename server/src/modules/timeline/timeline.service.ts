@@ -42,14 +42,14 @@ export class TimelineService {
   forYou(viewerId: number | null, cursor?: string, limit?: number): Page<TimelineItem> {
     const { db, clock } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = timelineRepo.forYouEntries(db, clock.now(), decodeScoreIdCursor(cursor), pageSize + 1);
+    const rows = timelineRepo.forYouEntries(db, viewerId, clock.now(), decodeScoreIdCursor(cursor), pageSize + 1);
     return this.toHotPage(rows, pageSize, viewerId);
   }
 
   global(viewerId: number | null, cursor?: string, limit?: number): Page<TimelineItem> {
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = timelineRepo.globalEntries(db, decodeTsIdCursor(cursor), pageSize + 1);
+    const rows = timelineRepo.globalEntries(db, viewerId, decodeTsIdCursor(cursor), pageSize + 1);
     return this.toPage(rows, pageSize, viewerId);
   }
 
@@ -58,7 +58,7 @@ export class TimelineService {
     const profile = this.usersService.getProfileByHandle(handle);
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = timelineRepo.userEntries(db, profile.id, decodeTsIdCursor(cursor), pageSize + 1);
+    const rows = timelineRepo.userEntries(db, profile.id, profile.pinnedPostId, decodeTsIdCursor(cursor), pageSize + 1);
     return this.toPage(rows, pageSize, viewerId);
   }
 

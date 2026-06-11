@@ -28,6 +28,12 @@ const SELECT_POST = `
   JOIN users u ON u.id = p.author_id
 `;
 
+/** 观察者过滤：排除被屏蔽作者与被隐藏帖（@viewerId；匿名时不拼接） */
+export const NOT_BLOCKED_AUTHOR =
+  'AND p.author_id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = @viewerId)';
+export const NOT_HIDDEN =
+  'AND p.id NOT IN (SELECT post_id FROM hidden_posts WHERE user_id = @viewerId)';
+
 export interface CountDeltas {
   like?: number;
   repost?: number;
@@ -69,20 +75,27 @@ export const postsRepo = {
   listReplies(
     db: WorldDb,
     postId: number,
+    viewerId: number | null,
     before: { ts: number; id: number } | null,
     limit: number,
   ): PostRow[] {
     const cursorClause = before
       ? 'AND (p.created_at < @ts OR (p.created_at = @ts AND p.id < @cid))'
       : '';
+    const viewerClause = viewerId !== null ? `${NOT_BLOCKED_AUTHOR} ${NOT_HIDDEN}` : '';
     return db
       .prepare(
         `${SELECT_POST}
-         WHERE p.reply_to_id = @postId AND p.deleted = 0 ${cursorClause}
+         WHERE p.reply_to_id = @postId AND p.deleted = 0 ${viewerClause} ${cursorClause}
          ORDER BY p.created_at DESC, p.id DESC
          LIMIT @limit`,
       )
-      .all({ postId, limit, ...(before ? { ts: before.ts, cid: before.id } : {}) }) as PostRow[];
+      .all({
+        postId,
+        limit,
+        ...(viewerId !== null ? { viewerId } : {}),
+        ...(before ? { ts: before.ts, cid: before.id } : {}),
+      }) as PostRow[];
   },
 
   listByAuthor(
@@ -178,6 +191,18 @@ export const postsRepo = {
 
   bookmarkedSet(db: WorldDb, userId: number, postIds: number[]): Set<number> {
     return this.interactionSet(db, 'bookmarks', userId, postIds);
+  },
+
+  /** 观察者已关注的作者 id 集合（批量构建视图时补 authorFollowedByViewer） */
+  followedAuthorSet(db: WorldDb, viewerId: number, authorIds: number[]): Set<number> {
+    if (authorIds.length === 0) return new Set();
+    const placeholders = authorIds.map(() => '?').join(',');
+    const rows = db
+      .prepare(
+        `SELECT followee_id FROM follows WHERE follower_id = ? AND followee_id IN (${placeholders})`,
+      )
+      .all(viewerId, ...authorIds) as { followee_id: number }[];
+    return new Set(rows.map((r) => r.followee_id));
   },
 
   interactionSet(

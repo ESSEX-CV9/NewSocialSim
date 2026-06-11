@@ -10,6 +10,7 @@ export interface UserRow {
   password_hash: string;
   is_bot: number;
   created_at: number;
+  pinned_post_id: number | null;
 }
 
 export interface UserCounts {
@@ -58,7 +59,9 @@ export const usersRepo = {
   ): { id: number; handle: string; display_name: string; is_bot: number; follower_count: number }[] {
     const excludeClause =
       viewerId !== null
-        ? 'WHERE u.id != @viewerId AND u.id NOT IN (SELECT followee_id FROM follows WHERE follower_id = @viewerId)'
+        ? `WHERE u.id != @viewerId
+           AND u.id NOT IN (SELECT followee_id FROM follows WHERE follower_id = @viewerId)
+           AND u.id NOT IN (SELECT blocked_id FROM blocks WHERE blocker_id = @viewerId)`
         : '';
     return db
       .prepare(
@@ -83,6 +86,26 @@ export const usersRepo = {
       db
         .prepare('SELECT 1 FROM follows WHERE follower_id = ? AND followee_id = ?')
         .get(viewerId, targetId) !== undefined
+    );
+  },
+
+  isBlocking(db: WorldDb, viewerId: number, targetId: number): boolean {
+    return (
+      db
+        .prepare('SELECT 1 FROM blocks WHERE blocker_id = ? AND blocked_id = ?')
+        .get(viewerId, targetId) !== undefined
+    );
+  },
+
+  setPinnedPostId(db: WorldDb, userId: number, postId: number | null): void {
+    db.prepare('UPDATE users SET pinned_post_id = ? WHERE id = ?').run(postId, userId);
+  },
+
+  /** 仅当当前置顶正是该帖时清除（删除帖子时回调用，避免误清新置顶） */
+  clearPinnedIfMatches(db: WorldDb, userId: number, postId: number): void {
+    db.prepare('UPDATE users SET pinned_post_id = NULL WHERE id = ? AND pinned_post_id = ?').run(
+      userId,
+      postId,
     );
   },
 

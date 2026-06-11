@@ -18,4 +18,8 @@ export interface UserProfile extends User {
   postCount: number;
   /** 当前观察者是否已关注此人（匿名时为 false） */
   followedByViewer: boolean;
+  /** 当前观察者是否已屏蔽此人（匿名时为 false） */
+  blockedByViewer: boolean;
+  /** 本人的置顶帖 id（每用户最多一条） */
+  pinnedPostId: number | null;
 }

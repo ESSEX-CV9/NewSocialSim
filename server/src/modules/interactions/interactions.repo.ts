@@ -1,9 +1,9 @@
 import type { WorldDb } from '../../core/db/database.js';
 import type { PostRow } from '../posts/posts.repo.js';
 
-type InteractionTable = 'likes' | 'reposts' | 'bookmarks';
+type InteractionTable = 'likes' | 'reposts' | 'bookmarks' | 'hidden_posts';
 
-/** 点赞/转发/书签共用同一套"用户-帖子"二元关系操作 */
+/** 点赞/转发/书签/隐藏帖共用同一套"用户-帖子"二元关系操作 */
 export const interactionsRepo = {
   /** 幂等插入；返回是否真的新增了 */
   insert(

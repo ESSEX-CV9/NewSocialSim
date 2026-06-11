@@ -69,4 +69,12 @@ export class PostsController {
     this.service.recordViews(req.body.ids);
     reply.status(204).send();
   };
+
+  pin = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {
+    reply.send(this.service.pin(req.user.sub, req.params.id));
+  };
+
+  unpin = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {
+    reply.send(this.service.unpin(req.user.sub, req.params.id));
+  };
 }

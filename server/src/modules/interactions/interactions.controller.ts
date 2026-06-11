@@ -30,6 +30,14 @@ export class InteractionsController {
     reply.send(this.service.unbookmark(req.user.sub, req.params.id));
   };
 
+  hide = async (req: Req, reply: FastifyReply) => {
+    reply.send(this.service.hide(req.user.sub, req.params.id));
+  };
+
+  unhide = async (req: Req, reply: FastifyReply) => {
+    reply.send(this.service.unhide(req.user.sub, req.params.id));
+  };
+
   listBookmarks = async (
     req: FastifyRequest<{ Querystring: { cursor?: string; limit?: number } }>,
     reply: FastifyReply,

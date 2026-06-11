@@ -47,6 +47,20 @@ export class InteractionsService {
     return { active: false };
   }
 
+  /** 隐藏帖（"不感兴趣"）：私密、无计数、无通知，被隐藏的帖从本人各内容流消失 */
+  hide(viewerId: number, postId: number): { active: boolean } {
+    this.postsService.getLiveRow(postId);
+    const { db, clock } = this.worldManager.current();
+    interactionsRepo.insert(db, 'hidden_posts', viewerId, postId, clock.now());
+    return { active: true };
+  }
+
+  unhide(viewerId: number, postId: number): { active: boolean } {
+    const { db } = this.worldManager.current();
+    interactionsRepo.remove(db, 'hidden_posts', viewerId, postId);
+    return { active: false };
+  }
+
   listBookmarks(viewerId: number, cursor?: string, limit?: number): Page<PostView> {
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);

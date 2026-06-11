@@ -99,6 +99,14 @@ export function ProfilePage() {
     { enabled: handle.length > 0 && tab === 'likes' },
   );
 
+  // 置顶帖单独请求，渲染在帖子 Tab 顶部（后端时间线已排除该帖避免重复）
+  const pinnedPostId = profile.data?.user.pinnedPostId ?? null;
+  const pinnedQuery = useQuery({
+    queryKey: ['post', pinnedPostId],
+    queryFn: () => api.getPost(pinnedPostId!),
+    enabled: tab === 'posts' && pinnedPostId !== null,
+  });
+
   if (profile.isLoading) return <Spinner />;
   if (profile.isError) return <ErrorBox error={profile.error} />;
   if (!profile.data) return null;
@@ -110,6 +118,20 @@ export function ProfilePage() {
     const res = isFollowing ? await api.unfollow(handle) : await api.follow(handle);
     setFollowing(res.following);
     void queryClient.invalidateQueries({ queryKey: ['user', handle] });
+  };
+
+  const unblock = async () => {
+    await api.unblockUser(handle);
+    for (const key of [
+      ['user', handle],
+      ['timeline'],
+      ['notifications'],
+      ['unread-count'],
+      ['suggested-users'],
+      ['search-posts'],
+    ]) {
+      void queryClient.invalidateQueries({ queryKey: key });
+    }
   };
 
   const joinedDate = new Date(u.createdAt).toLocaleDateString(locale, {
@@ -165,7 +187,15 @@ export function ProfilePage() {
                 {t('profile.editProfile')}
               </button>
             ) : (
-              viewer && (
+              viewer &&
+              (u.blockedByViewer ? (
+                <button
+                  onClick={() => void unblock()}
+                  className="rounded-full border border-x-red px-4 py-1.5 text-[14px] font-bold text-x-red transition-colors duration-200 hover:bg-x-red/10"
+                >
+                  {t('profile.unblock')}
+                </button>
+              ) : (
                 <button
                   onClick={() => void toggleFollow()}
                   className={`rounded-full px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 ${
@@ -176,7 +206,7 @@ export function ProfilePage() {
                 >
                   {isFollowing ? t('profile.unfollow') : t('profile.follow')}
                 </button>
-              )
+              ))
             )}
           </div>
         </div>
@@ -200,6 +230,13 @@ export function ProfilePage() {
           <i className="ri-calendar-line" />
           <span>{t('profile.joined', { date: joinedDate })}</span>
         </div>
+
+        {u.blockedByViewer && (
+          <div className="mt-2 flex items-center gap-1 text-[14px] text-x-dim">
+            <i className="ri-forbid-line" />
+            <span>{t('profile.blockedNotice')}</span>
+          </div>
+        )}
 
         <div className="mt-3 flex gap-5 text-[14px] text-x-dim">
           <Link to={`/u/${handle}/following`} className="hover:underline">
@@ -236,6 +273,9 @@ export function ProfilePage() {
         <>
           {posts.isLoading && <Spinner />}
           {posts.isError && <ErrorBox error={posts.error} />}
+          {pinnedQuery.data && !pinnedQuery.data.post.deleted && (
+            <PostCard post={pinnedQuery.data.post} pinned onDeleted={refreshLists} />
+          )}
           {posts.items.map((item, i) => (
             <PostCard
               key={`${item.type}-${item.post.id}-${i}`}

@@ -1,6 +1,6 @@
 import type { UserSummary } from '@socialsim/shared';
 import type { WorldDb } from '../../core/db/database.js';
-import type { PostRow } from '../posts/posts.repo.js';
+import { NOT_BLOCKED_AUTHOR, NOT_HIDDEN, type PostRow } from '../posts/posts.repo.js';
 
 /** LIKE 通配符转义：让用户输入的 % _ 按字面匹配 */
 function escapeLike(q: string): string {
@@ -9,8 +9,15 @@ function escapeLike(q: string): string {
 
 export const searchRepo = {
   /** 帖子按内容子串匹配，新帖在前；M4 之后可平滑替换为 FTS5 */
-  searchPosts(db: WorldDb, query: string, beforeId: number | null, limit: number): PostRow[] {
+  searchPosts(
+    db: WorldDb,
+    query: string,
+    viewerId: number | null,
+    beforeId: number | null,
+    limit: number,
+  ): PostRow[] {
     const cursorClause = beforeId !== null ? 'AND p.id < @beforeId' : '';
+    const viewerClause = viewerId !== null ? `${NOT_BLOCKED_AUTHOR} ${NOT_HIDDEN}` : '';
     return db
       .prepare(
         `SELECT p.*,
@@ -20,13 +27,14 @@ export const searchRepo = {
          FROM posts p
          JOIN users u ON u.id = p.author_id
          WHERE p.deleted = 0
-           AND p.content LIKE @pattern ESCAPE '\\' ${cursorClause}
+           AND p.content LIKE @pattern ESCAPE '\\' ${viewerClause} ${cursorClause}
          ORDER BY p.id DESC
          LIMIT @limit`,
       )
       .all({
         pattern: `%${escapeLike(query)}%`,
         limit,
+        ...(viewerId !== null ? { viewerId } : {}),
         ...(beforeId !== null ? { beforeId } : {}),
       }) as PostRow[];
   },

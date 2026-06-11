@@ -17,6 +17,8 @@ export interface PostView extends Post {
   bookmarkedByViewer: boolean;
   /** 被引用的帖子（只嵌一层；被删除时为墓碑视图） */
   quoted: PostView | null;
+  /** 观察者是否已关注作者（本人帖与匿名时为 false；供帖子菜单的关注快捷项） */
+  authorFollowedByViewer: boolean;
 }
 
 export interface TimelineItem {

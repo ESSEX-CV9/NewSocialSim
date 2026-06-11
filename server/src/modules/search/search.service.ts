@@ -42,7 +42,7 @@ export class SearchService {
     const q = normalizeQuery(query);
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = searchRepo.searchPosts(db, q, parseIdCursor(cursor), pageSize + 1);
+    const rows = searchRepo.searchPosts(db, q, viewerId, parseIdCursor(cursor), pageSize + 1);
     const hasMore = rows.length > pageSize;
     const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     const last = pageRows[pageRows.length - 1];

@@ -115,6 +115,27 @@ const migrations: Migration[] = [
       ALTER TABLE posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 6,
+    name: 'blocks-hidden-pin',
+    sql: `
+      CREATE TABLE blocks (
+        blocker_id INTEGER NOT NULL REFERENCES users(id),
+        blocked_id INTEGER NOT NULL REFERENCES users(id),
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (blocker_id, blocked_id)
+      );
+
+      CREATE TABLE hidden_posts (
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        post_id    INTEGER NOT NULL REFERENCES posts(id),
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, post_id)
+      );
+
+      ALTER TABLE users ADD COLUMN pinned_post_id INTEGER REFERENCES posts(id);
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {
