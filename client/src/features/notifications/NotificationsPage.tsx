@@ -1,4 +1,4 @@
-import type { NotificationView } from '@socialsim/shared';
+import type { NotificationView, UserSummary } from '@socialsim/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -54,6 +54,57 @@ function groupNotifications(items: NotificationView[]): NotificationGroup[] {
     }
   }
   return groups;
+}
+
+interface RankedActor {
+  user: UserSummary;
+  followerCount: number;
+  followed: boolean;
+  /** 在通知列表中的原始位置（越小越新） */
+  order: number;
+}
+
+/** 组内 actor 去重并按重要度排序：被我关注 > 粉丝多 > 最新 */
+function rankActors(items: NotificationView[]): RankedActor[] {
+  const map = new Map<number, RankedActor>();
+  items.forEach((n, i) => {
+    if (!map.has(n.actor.id)) {
+      map.set(n.actor.id, {
+        user: n.actor,
+        followerCount: n.actorFollowerCount,
+        followed: n.actorFollowedByViewer,
+        order: i,
+      });
+    }
+  });
+  return [...map.values()].sort(
+    (a, b) =>
+      Number(b.followed) - Number(a.followed) ||
+      b.followerCount - a.followerCount ||
+      a.order - b.order,
+  );
+}
+
+/** X 式头像堆叠：领头完整在最上层，后续各遮一半，尾部渐变淡出，最多 4 个 */
+function AvatarStack({ actors }: { actors: RankedActor[] }) {
+  const shown = actors.slice(0, 4);
+  const OPACITY = ['', '', 'opacity-60', 'opacity-30'];
+  if (shown.length === 1) {
+    return <Avatar handle={shown[0]!.user.handle} size={32} />;
+  }
+  return (
+    <div className="flex items-center">
+      {shown.map((a, i) => (
+        <div
+          key={a.user.id}
+          className={`relative rounded-full border-2 border-x-bg ${i > 0 ? '-ml-4' : ''} ${OPACITY[i] ?? ''}`}
+          style={{ zIndex: shown.length - i }}
+        >
+          <Avatar handle={a.user.handle} size={32} />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 function groupText(
@@ -141,8 +192,8 @@ export function NotificationsPage() {
         const first = group.items[0]!;
         const type = TYPE_ICONS[first.type];
         const unread = group.items.some((n) => !n.read);
-        // 头像行：去重 actor，最多 6 个
-        const actors = [...new Map(group.items.map((n) => [n.actor.id, n.actor])).values()].slice(0, 6);
+        const actors = rankActors(group.items);
+        const lead = actors[0]!;
 
         return (
           <Link key={group.key} to={groupTarget(group)}>
@@ -153,14 +204,10 @@ export function NotificationsPage() {
             >
               <i className={`${type.icon} ${type.color} w-8 shrink-0 text-center text-[26px] leading-none`} />
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  {actors.map((actor) => (
-                    <Avatar key={actor.id} handle={actor.handle} size={32} />
-                  ))}
-                </div>
+                <AvatarStack actors={actors} />
                 {/* 三层文字层级：动作文案最实 > 帖子摘要居中且更小 > 时间最浅 */}
                 <div className="mt-2 text-[15px]">
-                  <span className="font-bold">{first.actor.displayName}</span>{' '}
+                  <span className="font-bold">{lead.user.displayName}</span>{' '}
                   <span>{groupText(group, t)}</span>
                   <span className="text-x-dim">
                     {' '}

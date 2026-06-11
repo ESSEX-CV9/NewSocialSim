@@ -34,6 +34,9 @@ export interface NotificationView {
   id: number;
   type: NotificationType;
   actor: UserSummary;
+  /** actor 的粉丝数与"是否被通知所有者关注"——前端聚合时用于挑选最重要的头像 */
+  actorFollowerCount: number;
+  actorFollowedByViewer: boolean;
   postId: number | null;
   /** 相关帖子的内容预览（前 100 字符）；无帖子或帖子已删除时为 null */
   postExcerpt: string | null;

@@ -64,6 +64,8 @@ function toView(row: NotificationRow): NotificationView {
       displayName: row.actor_display_name,
       isBot: row.actor_is_bot === 1,
     },
+    actorFollowerCount: row.actor_follower_count,
+    actorFollowedByViewer: row.actor_followed === 1,
     postId: row.post_id,
     postExcerpt:
       row.post_content !== null && row.post_deleted === 0

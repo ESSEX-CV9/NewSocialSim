@@ -12,6 +12,8 @@ export interface NotificationRow {
   actor_handle: string;
   actor_display_name: string;
   actor_is_bot: number;
+  actor_follower_count: number;
+  actor_followed: number;
   post_content: string | null;
   post_deleted: number | null;
 }
@@ -49,6 +51,10 @@ export const notificationsRepo = {
                 u.handle       AS actor_handle,
                 u.display_name AS actor_display_name,
                 u.is_bot       AS actor_is_bot,
+                (SELECT COUNT(*) FROM follows WHERE followee_id = n.actor_id) AS actor_follower_count,
+                EXISTS(
+                  SELECT 1 FROM follows WHERE follower_id = @userId AND followee_id = n.actor_id
+                ) AS actor_followed,
                 p.content      AS post_content,
                 p.deleted      AS post_deleted
          FROM notifications n
