@@ -18,7 +18,8 @@ export class MediaController {
     reply: FastifyReply,
   ) => {
     const { stream, mime, size } = this.service.getFileStream(req.params.id, req.query.w);
-    reply
+    // 必须 return reply：async handler resolve undefined 会与流管道竞争，导致空 body
+    return reply
       .header('Content-Type', mime)
       .header('Content-Length', size)
       // 同一 URL（含 ?w=）内容永不变化，可永久缓存
