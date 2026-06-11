@@ -115,6 +115,15 @@ export const messages = {
     'search.empty': '没有找到相关结果',
     'search.prompt': '输入关键词开始搜索',
 
+    'trends.title': '有什么新鲜事',
+    'trends.trending': '热门趋势',
+    'trends.postCount': '{n} 帖子',
+    'trends.empty': '暂无趋势',
+
+    'footer.tos': '服务条款',
+    'footer.privacy': '隐私政策',
+    'footer.cookies': 'Cookie 政策',
+
     'worlds.title': '世界管理',
     'worlds.activeWorld': '当前世界',
     'worlds.simTime': '模拟时间',
@@ -257,6 +266,15 @@ export const messages = {
     'search.users': 'Users',
     'search.empty': 'No results found',
     'search.prompt': 'Type a keyword to search',
+
+    'trends.title': "What's happening",
+    'trends.trending': 'Trending',
+    'trends.postCount': '{n} posts',
+    'trends.empty': 'No trends yet',
+
+    'footer.tos': 'Terms of Service',
+    'footer.privacy': 'Privacy Policy',
+    'footer.cookies': 'Cookie Policy',
 
     'worlds.title': 'World management',
     'worlds.activeWorld': 'Active world',

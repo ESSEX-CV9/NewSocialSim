@@ -32,4 +32,18 @@ export function registerSearchRoutes(app: FastifyInstance, deps: SearchRoutesDep
     opts,
     controller.users,
   );
+  // 趋势为公开数据（同全站流），无需鉴权
+  app.get<{ Querystring: { limit?: number } }>(
+    '/api/search/trends',
+    {
+      schema: {
+        querystring: {
+          type: 'object',
+          additionalProperties: false,
+          properties: { limit: { type: 'integer', minimum: 1, maximum: 20 } },
+        } as const,
+      },
+    },
+    controller.trends,
+  );
 }

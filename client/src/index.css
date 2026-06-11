@@ -105,3 +105,11 @@ body {
   background: var(--th-blue);
   border-radius: 2px;
 }
+
+/* 隐藏滚动条但保留滚动（右边栏） */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

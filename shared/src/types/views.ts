@@ -44,6 +44,14 @@ export interface NotificationView {
   createdAt: number;
 }
 
+/** 趋势条目：近期被讨论的 #话题（右边栏"有什么新鲜事"） */
+export interface TrendItem {
+  /** 含 # 前缀，保留首次出现的原始大小写 */
+  tag: string;
+  /** 近期提及该话题的帖子数（同帖同话题只计一次） */
+  postCount: number;
+}
+
 /** 游标分页的统一包装 */
 export interface Page<T> {
   items: T[];

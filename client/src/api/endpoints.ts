@@ -8,6 +8,7 @@ import type {
   PostView,
   RegisterRequest,
   TimelineItem,
+  TrendItem,
   UpdateProfileRequest,
   UserProfile,
   UserSummary,
@@ -94,6 +95,7 @@ export const api = {
     http<Page<PostView>>('GET', withPage('/api/search/posts', cursor, { q })),
   searchUsers: (q: string, cursor?: string) =>
     http<Page<UserSummary>>('GET', withPage('/api/search/users', cursor, { q })),
+  trends: () => http<{ trends: TrendItem[] }>('GET', '/api/search/trends'),
 
   // worlds
   listWorlds: () => http<{ worlds: WorldSummary[] }>('GET', '/api/admin/worlds'),

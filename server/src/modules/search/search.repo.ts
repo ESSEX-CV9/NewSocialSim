@@ -31,6 +31,16 @@ export const searchRepo = {
       }) as PostRow[];
   },
 
+  /** 近期含 # 的帖子正文（LIKE 预筛，话题解析在 service 的 JS 端进行） */
+  recentHashtagContents(db: WorldDb, sinceTs: number): { content: string }[] {
+    return db
+      .prepare(
+        `SELECT content FROM posts
+         WHERE deleted = 0 AND created_at >= ? AND content LIKE '%#%'`,
+      )
+      .all(sinceTs) as { content: string }[];
+  },
+
   searchUsers(db: WorldDb, query: string, beforeId: number | null, limit: number): UserSummary[] {
     const cursorClause = beforeId !== null ? 'AND id < @beforeId' : '';
     const rows = db

@@ -1,13 +1,12 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
-import { useWorld } from '../world/WorldContext';
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
-import { SimClockDisplay } from './SimClockDisplay';
+import { RightSidebar } from './RightSidebar';
 
 function NavItem({
   to,
@@ -47,11 +46,9 @@ function NavItem({
 
 export function Layout({ children }: { children: ReactNode }) {
   const { user, otherAccounts, switchAccount, logout } = useAuth();
-  const { world } = useWorld();
   const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [q, setQ] = useState('');
   const [composeOpen, setComposeOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
@@ -74,11 +71,6 @@ export function Layout({ children }: { children: ReactNode }) {
     logout();
     queryClient.clear();
     navigate('/');
-  };
-
-  const submitSearch = (e: FormEvent) => {
-    e.preventDefault();
-    if (q.trim()) navigate(`/search?q=${encodeURIComponent(q.trim())}`);
   };
 
   return (
@@ -217,43 +209,9 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* 中栏：内容 */}
       <main className="min-h-screen w-full max-w-150 border-x border-x-border">{children}</main>
 
-      {/* 右栏：搜索 + 世界信息 */}
-      <aside className="sticky top-0 hidden h-screen w-87.5 flex-col gap-4 px-6 py-3 min-[1100px]:flex">
-        <form onSubmit={submitSearch} className="relative">
-          <i className="ri-search-line absolute top-1/2 left-4 -translate-y-1/2 text-[14px] text-x-dim" />
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t('search.placeholder')}
-            className="w-full rounded-full border border-transparent bg-x-input py-2.5 pr-4 pl-11 text-[15px] outline-none placeholder:text-x-dim focus:border-x-blue focus:bg-x-bg"
-          />
-        </form>
-        <div className="rounded-2xl bg-x-card p-4">
-          <h2 className="mb-2 flex items-center gap-2 text-xl font-extrabold">
-            <i className="ri-earth-fill text-[16px] text-x-blue" />
-            {t('worlds.activeWorld')}
-          </h2>
-          {world ? (
-            <div className="flex flex-col gap-1.5 text-[14px] text-x-dim">
-              <div className="text-[17px] font-bold text-x-text">{world.meta.name}</div>
-              {world.meta.description && <p>{world.meta.description}</p>}
-              <SimClockDisplay />
-              <div>
-                {t('worlds.speed')}:{' '}
-                {world.meta.clock.paused
-                  ? t('worlds.paused')
-                  : t('worlds.speedValue', { scale: world.meta.clock.scale })}
-              </div>
-            </div>
-          ) : (
-            <div className="text-[14px] text-x-dim">
-              {t('worlds.noActive')} —{' '}
-              <Link to="/worlds" className="text-x-blue hover:underline">
-                {t('auth.goWorlds')}
-              </Link>
-            </div>
-          )}
-        </div>
+      {/* 右栏：搜索 + 趋势 + 推荐关注 + 世界折叠卡 + 页脚 */}
+      <aside className="no-scrollbar sticky top-0 hidden h-screen w-87.5 flex-col gap-4 overflow-y-auto px-6 pb-3 min-[1100px]:flex">
+        <RightSidebar />
       </aside>
 
       {/* 发帖弹窗 */}
