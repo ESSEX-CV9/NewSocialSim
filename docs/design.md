@@ -70,15 +70,18 @@ NewSocialSim/
 └── data/worlds/<id>/       # 运行时数据（不入 git）：world.db + world.json
 ```
 
-### 数据库 schema（当前 version 5）
+### 数据库 schema（当前 version 6）
 
-- `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at)`
+- `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at, pinned_post_id)`
 - `posts(id, author_id, content, reply_to_id, quote_of_id, created_at, like_count, repost_count, quote_count, reply_count, view_count, deleted)`
-- `likes(user_id, post_id, created_at)`、`reposts(...)`、`bookmarks(...)` —— 主键 (user_id, post_id)
+- `likes(user_id, post_id, created_at)`、`reposts(...)`、`bookmarks(...)`、`hidden_posts(...)` —— 主键 (user_id, post_id)
 - `follows(follower_id, followee_id, created_at)`
+- `blocks(blocker_id, blocked_id, created_at)` —— 主键 (blocker_id, blocked_id)
 - `notifications(id, user_id, type, actor_id, post_id, read, created_at)`
 
 所有 `created_at` 存储的是世界模拟时间（unix 毫秒形式）。`users.is_bot` 为第二阶段虚拟用户预留。计数字段（like_count 等）为反规范化，由 service 在事务内随互动维护；`view_count` 为曝光计数，由客户端经 `POST /api/posts/views` 批量上报（会话内去重），service 另留 `addViews(postId, delta)` 任意增量方法供未来管理端注入模拟浏览量。
+
+屏蔽为单向隐藏：被屏蔽者的帖子/转发从屏蔽者的关注流、为你推荐、全站流、搜索、回复区消失，其互动产生的通知（含未读数）被过滤，推荐关注排除；个人主页时间线、书签与喜欢列表、帖子详情主体不过滤（主动访问场景）。`hidden_posts`（隐藏单帖）在相同范围生效。置顶为每用户一条（`users.pinned_post_id`），个人主页时间线排除置顶帖、由前端单独渲染在顶部。
 
 ### 关键机制
 
