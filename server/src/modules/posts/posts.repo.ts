@@ -84,20 +84,51 @@ export const postsRepo = {
   listByAuthor(
     db: WorldDb,
     authorId: number,
+    repliesOnly: boolean,
     before: { ts: number; id: number } | null,
     limit: number,
   ): PostRow[] {
     const cursorClause = before
       ? 'AND (p.created_at < @ts OR (p.created_at = @ts AND p.id < @cid))'
       : '';
+    const replyClause = repliesOnly ? 'AND p.reply_to_id IS NOT NULL' : 'AND p.reply_to_id IS NULL';
     return db
       .prepare(
         `${SELECT_POST}
-         WHERE p.author_id = @authorId AND p.deleted = 0 ${cursorClause}
+         WHERE p.author_id = @authorId AND p.deleted = 0 ${replyClause} ${cursorClause}
          ORDER BY p.created_at DESC, p.id DESC
          LIMIT @limit`,
       )
       .all({ authorId, limit, ...(before ? { ts: before.ts, cid: before.id } : {}) }) as PostRow[];
+  },
+
+  /** 某用户赞过的帖子，按点赞时间倒序；liked_at 供游标使用 */
+  listLikedBy(
+    db: WorldDb,
+    userId: number,
+    before: { ts: number; id: number } | null,
+    limit: number,
+  ): (PostRow & { liked_at: number })[] {
+    const cursorClause = before
+      ? 'AND (l.created_at < @ts OR (l.created_at = @ts AND p.id < @cid))'
+      : '';
+    return db
+      .prepare(
+        `SELECT p.*,
+                u.handle       AS author_handle,
+                u.display_name AS author_display_name,
+                u.is_bot       AS author_is_bot,
+                l.created_at   AS liked_at
+         FROM likes l
+         JOIN posts p ON p.id = l.post_id
+         JOIN users u ON u.id = p.author_id
+         WHERE l.user_id = @userId AND p.deleted = 0 ${cursorClause}
+         ORDER BY l.created_at DESC, p.id DESC
+         LIMIT @limit`,
+      )
+      .all({ userId, limit, ...(before ? { ts: before.ts, cid: before.id } : {}) }) as (PostRow & {
+      liked_at: number;
+    })[];
   },
 
   adjustCounts(db: WorldDb, postId: number, deltas: CountDeltas): void {

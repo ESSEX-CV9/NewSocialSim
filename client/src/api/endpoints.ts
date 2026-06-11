@@ -39,8 +39,10 @@ export const api = {
   getPost: (id: number) => http<{ post: PostView }>('GET', `/api/posts/${id}`),
   getReplies: (id: number, cursor?: string) =>
     http<Page<PostView>>('GET', withPage(`/api/posts/${id}/replies`, cursor)),
-  getUserPosts: (handle: string, cursor?: string) =>
-    http<Page<PostView>>('GET', withPage(`/api/users/${handle}/posts`, cursor)),
+  getUserPosts: (handle: string, cursor?: string, type: 'posts' | 'replies' = 'posts') =>
+    http<Page<PostView>>('GET', withPage(`/api/users/${handle}/posts`, cursor, { type })),
+  getUserLikes: (handle: string, cursor?: string) =>
+    http<Page<PostView>>('GET', withPage(`/api/users/${handle}/likes`, cursor)),
   deletePost: (id: number) => http<void>('DELETE', `/api/posts/${id}`),
 
   // interactions

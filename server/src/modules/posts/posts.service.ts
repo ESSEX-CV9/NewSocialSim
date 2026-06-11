@@ -83,12 +83,44 @@ export class PostsService {
     return this.toPage(rows, pageSize, viewerId);
   }
 
-  listByHandle(handle: string, viewerId: number | null, cursor?: string, limit?: number): Page<PostView> {
+  listByHandle(
+    handle: string,
+    viewerId: number | null,
+    cursor?: string,
+    limit?: number,
+    type: 'posts' | 'replies' = 'posts',
+  ): Page<PostView> {
     const profile = this.usersService.getProfileByHandle(handle);
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = postsRepo.listByAuthor(db, profile.id, decodeTsIdCursor(cursor), pageSize + 1);
+    const rows = postsRepo.listByAuthor(
+      db,
+      profile.id,
+      type === 'replies',
+      decodeTsIdCursor(cursor),
+      pageSize + 1,
+    );
     return this.toPage(rows, pageSize, viewerId);
+  }
+
+  /** 某用户赞过的帖子（游标键为点赞时间，而非帖子发布时间） */
+  listLikedByHandle(
+    handle: string,
+    viewerId: number | null,
+    cursor?: string,
+    limit?: number,
+  ): Page<PostView> {
+    const profile = this.usersService.getProfileByHandle(handle);
+    const { db } = this.worldManager.current();
+    const pageSize = clampLimit(limit);
+    const rows = postsRepo.listLikedBy(db, profile.id, decodeTsIdCursor(cursor), pageSize + 1);
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+    const last = pageRows[pageRows.length - 1];
+    return {
+      items: this.buildViews(pageRows, viewerId),
+      nextCursor: hasMore && last ? encodeCursor([last.liked_at, last.id]) : null,
+    };
   }
 
   delete(postId: number, viewerId: number): void {

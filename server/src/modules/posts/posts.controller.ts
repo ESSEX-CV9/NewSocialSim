@@ -29,11 +29,29 @@ export class PostsController {
   };
 
   listByHandle = async (
-    req: FastifyRequest<{ Params: { handle: string }; Querystring: PageQuery }>,
+    req: FastifyRequest<{
+      Params: { handle: string };
+      Querystring: PageQuery & { type?: 'posts' | 'replies' };
+    }>,
     reply: FastifyReply,
   ) => {
     reply.send(
       this.service.listByHandle(
+        req.params.handle,
+        viewerIdOf(req),
+        req.query.cursor,
+        req.query.limit,
+        req.query.type ?? 'posts',
+      ),
+    );
+  };
+
+  listLikedByHandle = async (
+    req: FastifyRequest<{ Params: { handle: string }; Querystring: PageQuery }>,
+    reply: FastifyReply,
+  ) => {
+    reply.send(
+      this.service.listLikedByHandle(
         req.params.handle,
         viewerIdOf(req),
         req.query.cursor,

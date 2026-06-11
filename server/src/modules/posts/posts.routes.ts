@@ -29,6 +29,16 @@ const pageQuerySchema = {
   },
 } as const;
 
+const userPostsQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    cursor: { type: 'string' },
+    limit: { type: 'integer', minimum: 1, maximum: 50 },
+    type: { type: 'string', enum: ['posts', 'replies'] },
+  },
+} as const;
+
 export interface PostsRoutesDeps {
   postsService: PostsService;
   requireAuth: preHandlerHookHandler;
@@ -53,10 +63,18 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
     { preHandler: deps.optionalAuth, schema: { params: idParamsSchema, querystring: pageQuerySchema } },
     controller.listReplies,
   );
-  app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>(
+  app.get<{
+    Params: { handle: string };
+    Querystring: { cursor?: string; limit?: number; type?: 'posts' | 'replies' };
+  }>(
     '/api/users/:handle/posts',
-    { preHandler: deps.optionalAuth, schema: { querystring: pageQuerySchema } },
+    { preHandler: deps.optionalAuth, schema: { querystring: userPostsQuerySchema } },
     controller.listByHandle,
+  );
+  app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>(
+    '/api/users/:handle/likes',
+    { preHandler: deps.optionalAuth, schema: { querystring: pageQuerySchema } },
+    controller.listLikedByHandle,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/posts/:id',
