@@ -50,6 +50,11 @@ export class NotificationsService {
     const { db } = this.worldManager.current();
     notificationsRepo.markAllRead(db, userId);
   }
+
+  markRead(userId: number, ids: number[]): void {
+    const { db } = this.worldManager.current();
+    notificationsRepo.markRead(db, userId, ids);
+  }
 }
 
 const EXCERPT_LENGTH = 100;

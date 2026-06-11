@@ -30,4 +30,18 @@ export function registerNotificationsRoutes(
   );
   app.get('/api/notifications/unread-count', { preHandler: deps.requireAuth }, controller.unreadCount);
   app.post('/api/notifications/read-all', { preHandler: deps.requireAuth }, controller.markAllRead);
+  app.post<{ Body: { ids: number[] } }>(
+    '/api/notifications/read',
+    { preHandler: deps.requireAuth, schema: { body: markReadBodySchema } },
+    controller.markRead,
+  );
 }
+
+const markReadBodySchema = {
+  type: 'object',
+  required: ['ids'],
+  additionalProperties: false,
+  properties: {
+    ids: { type: 'array', items: { type: 'integer' }, minItems: 1, maxItems: 100 },
+  },
+} as const;

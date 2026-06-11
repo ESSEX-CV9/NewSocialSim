@@ -77,4 +77,13 @@ export const notificationsRepo = {
   markAllRead(db: WorldDb, userId: number): void {
     db.prepare('UPDATE notifications SET read = 1 WHERE user_id = ? AND read = 0').run(userId);
   },
+
+  /** 按 id 批量标记已读（仅限本人的通知） */
+  markRead(db: WorldDb, userId: number, ids: number[]): void {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(
+      `UPDATE notifications SET read = 1 WHERE user_id = ? AND id IN (${placeholders})`,
+    ).run(userId, ...ids);
+  },
 };

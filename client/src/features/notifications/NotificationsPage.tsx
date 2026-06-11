@@ -149,6 +149,16 @@ export function NotificationsPage() {
     void queryClient.invalidateQueries({ queryKey: ['unread-count'] });
   };
 
+  /** 点击通知组时把组内未读标为已读（不阻塞跳转） */
+  const markGroupRead = (group: NotificationGroup) => {
+    const unreadIds = group.items.filter((n) => !n.read).map((n) => n.id);
+    if (unreadIds.length === 0) return;
+    void api.markRead(unreadIds).then(() => {
+      void queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      void queryClient.invalidateQueries({ queryKey: ['unread-count'] });
+    });
+  };
+
   const tabClass = (active: boolean) =>
     `flex h-13.25 flex-1 cursor-pointer items-center justify-center text-[15px] font-medium transition-colors duration-200 hover:bg-x-hover ${
       active ? 'tab-active' : 'text-x-dim'
@@ -198,7 +208,7 @@ export function NotificationsPage() {
         const lead = actors[0]!;
 
         return (
-          <Link key={group.key} to={groupTarget(group)}>
+          <Link key={group.key} to={groupTarget(group)} onClick={() => markGroupRead(group)}>
             <div
               className={`flex gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover ${
                 unread ? 'border-l-2 border-l-x-blue bg-x-blue/5' : ''

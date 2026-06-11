@@ -23,4 +23,9 @@ export class NotificationsController {
     this.service.markAllRead(req.user.sub);
     reply.status(204).send();
   };
+
+  markRead = async (req: FastifyRequest<{ Body: { ids: number[] } }>, reply: FastifyReply) => {
+    this.service.markRead(req.user.sub, req.body.ids);
+    reply.status(204).send();
+  };
 }

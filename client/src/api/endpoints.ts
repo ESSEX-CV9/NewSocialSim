@@ -87,6 +87,7 @@ export const api = {
     http<Page<NotificationView>>('GET', withPage('/api/notifications', cursor, { filter })),
   unreadCount: () => http<{ count: number }>('GET', '/api/notifications/unread-count'),
   markAllRead: () => http<void>('POST', '/api/notifications/read-all'),
+  markRead: (ids: number[]) => http<void>('POST', '/api/notifications/read', { ids }),
 
   // search
   searchPosts: (q: string, cursor?: string) =>
