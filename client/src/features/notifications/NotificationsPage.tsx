@@ -92,12 +92,14 @@ function AvatarStack({ actors }: { actors: RankedActor[] }) {
   if (shown.length === 1) {
     return <Avatar handle={shown[0]!.user.handle} size={32} />;
   }
+  // 人越多叠得越紧：2 人露一半，3 人露 12px，4 人只露 8px
+  const overlap = shown.length >= 4 ? '-ml-6' : shown.length === 3 ? '-ml-5' : '-ml-4';
   return (
     <div className="flex items-center">
       {shown.map((a, i) => (
         <div
           key={a.user.id}
-          className={`relative rounded-full border-2 border-x-bg ${i > 0 ? '-ml-4' : ''} ${OPACITY[i] ?? ''}`}
+          className={`relative rounded-full border-2 border-x-bg ${i > 0 ? overlap : ''} ${OPACITY[i] ?? ''}`}
           style={{ zIndex: shown.length - i }}
         >
           <Avatar handle={a.user.handle} size={32} />
