@@ -6,18 +6,18 @@ import { toUser, usersRepo, type UserRow } from './users.repo.js';
 export class UsersService {
   constructor(private readonly worldManager: WorldManager) {}
 
-  getProfileByHandle(handle: string): UserProfile {
+  getProfileByHandle(handle: string, viewerId: number | null = null): UserProfile {
     const { db } = this.worldManager.current();
     const row = usersRepo.findByHandle(db, handle);
     if (!row) throw new NotFoundError(`用户 @${handle} 不存在`);
-    return this.buildProfile(row);
+    return this.buildProfile(row, viewerId);
   }
 
-  getProfileById(id: number): UserProfile {
+  getProfileById(id: number, viewerId: number | null = null): UserProfile {
     const { db } = this.worldManager.current();
     const row = usersRepo.findById(db, id);
     if (!row) throw new NotFoundError(`用户 #${id} 不存在`);
-    return this.buildProfile(row);
+    return this.buildProfile(row, viewerId);
   }
 
   updateMe(userId: number, patch: UpdateProfileRequest): UserProfile {
@@ -32,8 +32,13 @@ export class UsersService {
     return this.getProfileById(userId);
   }
 
-  private buildProfile(row: UserRow): UserProfile {
+  private buildProfile(row: UserRow, viewerId: number | null = null): UserProfile {
     const { db } = this.worldManager.current();
-    return { ...toUser(row), ...usersRepo.counts(db, row.id) };
+    return {
+      ...toUser(row),
+      ...usersRepo.counts(db, row.id),
+      followedByViewer:
+        viewerId !== null && viewerId !== row.id && usersRepo.isFollowedBy(db, row.id, viewerId),
+    };
   }
 }

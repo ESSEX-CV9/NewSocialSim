@@ -15,12 +15,17 @@ const updateProfileBodySchema = {
 export interface UsersRoutesDeps {
   usersService: UsersService;
   requireAuth: preHandlerHookHandler;
+  optionalAuth: preHandlerHookHandler;
 }
 
 export function registerUsersRoutes(app: FastifyInstance, deps: UsersRoutesDeps): void {
   const controller = new UsersController(deps.usersService);
 
-  app.get('/api/users/:handle', controller.getByHandle);
+  app.get<{ Params: { handle: string } }>(
+    '/api/users/:handle',
+    { preHandler: deps.optionalAuth },
+    controller.getByHandle,
+  );
   app.patch<{ Body: UpdateProfileRequest }>(
     '/api/users/me',
     { preHandler: deps.requireAuth, schema: { body: updateProfileBodySchema } },

@@ -11,9 +11,11 @@ export interface User {
   createdAt: number;
 }
 
-/** 对外公开的用户信息（带统计数字） */
+/** 对外公开的用户信息（带统计数字与观察者状态） */
 export interface UserProfile extends User {
   followerCount: number;
   followingCount: number;
   postCount: number;
+  /** 当前观察者是否已关注此人（匿名时为 false） */
+  followedByViewer: boolean;
 }

@@ -67,7 +67,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   registerWorldsRoutes(app, { worldManager });
   registerAuthRoutes(app, { authService, worldManager, requireAuth });
-  registerUsersRoutes(app, { usersService, requireAuth });
+  registerUsersRoutes(app, { usersService, requireAuth, optionalAuth });
   registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });
   registerInteractionsRoutes(app, { interactionsService, requireAuth });
   registerFollowsRoutes(app, { followsService, requireAuth });

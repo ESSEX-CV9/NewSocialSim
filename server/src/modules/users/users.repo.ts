@@ -50,6 +50,14 @@ export const usersRepo = {
     return row;
   },
 
+  isFollowedBy(db: WorldDb, targetId: number, viewerId: number): boolean {
+    return (
+      db
+        .prepare('SELECT 1 FROM follows WHERE follower_id = ? AND followee_id = ?')
+        .get(viewerId, targetId) !== undefined
+    );
+  },
+
   updateProfile(
     db: WorldDb,
     userId: number,

@@ -28,6 +28,11 @@ interface ServerState {
   activeWorldId: string | null;
 }
 
+/** 容忍 Windows 编辑器写入的 UTF-8 BOM */
+function readJsonFile(file: string): unknown {
+  return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, ''));
+}
+
 const WORLD_ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,49}$/;
 const CLOCK_PERSIST_INTERVAL_MS = 30_000;
 
@@ -179,7 +184,7 @@ export class WorldManager {
 
   private readMeta(worldId: string): WorldMeta {
     const file = path.join(this.worldDir(worldId), 'world.json');
-    return JSON.parse(fs.readFileSync(file, 'utf8')) as WorldMeta;
+    return readJsonFile(file) as WorldMeta;
   }
 
   private writeMeta(meta: WorldMeta): void {
@@ -189,7 +194,7 @@ export class WorldManager {
 
   private readServerState(): ServerState {
     if (!fs.existsSync(this.stateFile)) return { activeWorldId: null };
-    return JSON.parse(fs.readFileSync(this.stateFile, 'utf8')) as ServerState;
+    return readJsonFile(this.stateFile) as ServerState;
   }
 
   private writeServerState(state: ServerState): void {
