@@ -158,14 +158,19 @@ export function NotificationsPage() {
                     <Avatar key={actor.id} handle={actor.handle} size={32} />
                   ))}
                 </div>
+                {/* 三层文字层级：动作文案最实 > 帖子摘要居中且更小 > 时间最浅 */}
                 <div className="mt-2 text-[15px]">
                   <span className="font-bold">{first.actor.displayName}</span>{' '}
+                  <span>{groupText(group, t)}</span>
                   <span className="text-x-dim">
-                    {groupText(group, t)} · <TimeAgo at={first.createdAt} />
+                    {' '}
+                    · <TimeAgo at={first.createdAt} />
                   </span>
                 </div>
                 {first.postExcerpt && (
-                  <p className="mt-1 line-clamp-2 text-[15px] text-x-dim">{first.postExcerpt}</p>
+                  <p className="mt-1 line-clamp-2 text-[13px] text-x-text/60">
+                    {first.postExcerpt}
+                  </p>
                 )}
               </div>
             </div>

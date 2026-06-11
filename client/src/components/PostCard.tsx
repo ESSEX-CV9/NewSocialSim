@@ -47,7 +47,7 @@ function PostContent({ content }: { content: string }) {
 function Tombstone({ children }: { children?: ReactNode }) {
   const { t } = useI18n();
   return (
-    <div className="rounded-xl border border-x-border bg-x-card p-4 text-[15px] text-x-dim">
+    <div className="rounded-xl border-2 border-x-border bg-x-card p-4 text-[15px] text-x-dim">
       {t('post.deleted')}
       {children}
     </div>
@@ -64,7 +64,7 @@ function QuotedCard({ quoted }: { quoted: PostView }) {
         e.stopPropagation();
         navigate(`/post/${quoted.id}`);
       }}
-      className="mt-2 cursor-pointer rounded-xl border border-x-border p-3 transition-colors duration-200 hover:bg-x-hover"
+      className="mt-2 cursor-pointer rounded-xl border-2 border-x-border p-3 transition-colors duration-200 hover:bg-x-hover"
     >
       <div className="mb-1 flex items-center gap-1.5 text-[15px]">
         <Avatar handle={quoted.author.handle} size={20} />
