@@ -1,6 +1,8 @@
+import type { Page, PostView } from '@socialsim/shared';
+import { decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
-import type { PostsService } from '../posts/posts.service.js';
+import { clampLimit, type PostsService } from '../posts/posts.service.js';
 import { interactionsRepo } from './interactions.repo.js';
 
 export interface InteractionResult {
@@ -29,6 +31,33 @@ export class InteractionsService {
 
   unrepost(viewerId: number, postId: number): InteractionResult {
     return this.set('reposts', viewerId, postId, false);
+  }
+
+  /** 书签：私密（无计数、无通知），幂等开关 */
+  bookmark(viewerId: number, postId: number): { active: boolean } {
+    this.postsService.getLiveRow(postId);
+    const { db, clock } = this.worldManager.current();
+    interactionsRepo.insert(db, 'bookmarks', viewerId, postId, clock.now());
+    return { active: true };
+  }
+
+  unbookmark(viewerId: number, postId: number): { active: boolean } {
+    const { db } = this.worldManager.current();
+    interactionsRepo.remove(db, 'bookmarks', viewerId, postId);
+    return { active: false };
+  }
+
+  listBookmarks(viewerId: number, cursor?: string, limit?: number): Page<PostView> {
+    const { db } = this.worldManager.current();
+    const pageSize = clampLimit(limit);
+    const rows = interactionsRepo.listBookmarkedBy(db, viewerId, decodeTsIdCursor(cursor), pageSize + 1);
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+    const last = pageRows[pageRows.length - 1];
+    return {
+      items: this.postsService.buildViews(pageRows, viewerId),
+      nextCursor: hasMore && last ? encodeCursor([last.marked_at, last.id]) : null,
+    };
   }
 
   /** 幂等开关：重复点赞/重复取消不报错也不重复计数 */

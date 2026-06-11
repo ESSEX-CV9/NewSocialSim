@@ -31,8 +31,16 @@ export const notificationsRepo = {
     ).run(input.userId, input.type, input.actorId, input.postId, input.createdAt);
   },
 
-  list(db: WorldDb, userId: number, beforeId: number | null, limit: number): NotificationRow[] {
+  list(
+    db: WorldDb,
+    userId: number,
+    mentionsOnly: boolean,
+    beforeId: number | null,
+    limit: number,
+  ): NotificationRow[] {
     const cursorClause = beforeId !== null ? 'AND n.id < @beforeId' : '';
+    // “提及”= 指向你的帖子：@mention 与回复
+    const filterClause = mentionsOnly ? "AND n.type IN ('mention', 'reply')" : '';
     return db
       .prepare(
         `SELECT n.*,
@@ -41,7 +49,7 @@ export const notificationsRepo = {
                 u.is_bot       AS actor_is_bot
          FROM notifications n
          JOIN users u ON u.id = n.actor_id
-         WHERE n.user_id = @userId ${cursorClause}
+         WHERE n.user_id = @userId ${filterClause} ${cursorClause}
          ORDER BY n.id DESC
          LIMIT @limit`,
       )

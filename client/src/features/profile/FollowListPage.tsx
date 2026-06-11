@@ -25,7 +25,7 @@ export function FollowListPage({ direction }: { direction: 'followers' | 'follow
           onClick={() => navigate(-1)}
           className="flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
         >
-          <i className="fas fa-arrow-left text-[16px]" />
+          <i className="ri-arrow-left-line text-[16px]" />
         </button>
         <div>
           <div className="text-[17px] font-bold">
@@ -49,14 +49,14 @@ export function FollowListPage({ direction }: { direction: 'followers' | 'follow
           </div>
           {u.isBot && (
             <span className="rounded bg-x-input px-1.5 py-0.5 text-xs text-x-dim">
-              <i className="fas fa-robot mr-1" />
+              <i className="ri-robot-2-line mr-1" />
               {t('profile.bot')}
             </span>
           )}
         </Link>
       ))}
       {query.isSuccess && query.items.length === 0 && (
-        <EmptyBox icon="far fa-user" text={t('search.empty')} />
+        <EmptyBox icon="ri-user-line" text={t('search.empty')} />
       )}
       <LoadMore
         hasNextPage={!!query.hasNextPage}

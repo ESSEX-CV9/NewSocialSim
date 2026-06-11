@@ -64,14 +64,27 @@ export const api = {
     http<Page<UserSummary>>('GET', withPage(`/api/users/${handle}/following`, cursor)),
 
   // timeline
-  homeTimeline: (cursor?: string) =>
-    http<Page<TimelineItem>>('GET', withPage('/api/timeline/home', cursor)),
+  homeTimeline: (cursor?: string, sort: 'latest' | 'hot' = 'latest') =>
+    http<Page<TimelineItem>>('GET', withPage('/api/timeline/home', cursor, { sort })),
+  foryouTimeline: (cursor?: string) =>
+    http<Page<TimelineItem>>('GET', withPage('/api/timeline/foryou', cursor)),
   globalTimeline: (cursor?: string) =>
     http<Page<TimelineItem>>('GET', withPage('/api/timeline/global', cursor)),
+  getUserTimeline: (handle: string, cursor?: string) =>
+    http<Page<TimelineItem>>('GET', withPage(`/api/users/${handle}/timeline`, cursor)),
+
+  // bookmarks
+  bookmark: (id: number) => http<{ active: boolean }>('POST', `/api/posts/${id}/bookmark`),
+  unbookmark: (id: number) => http<{ active: boolean }>('DELETE', `/api/posts/${id}/bookmark`),
+  bookmarks: (cursor?: string) => http<Page<PostView>>('GET', withPage('/api/bookmarks', cursor)),
+
+  // suggestions
+  suggestedUsers: () =>
+    http<{ users: (UserSummary & { followerCount: number })[] }>('GET', '/api/users/suggested'),
 
   // notifications
-  notifications: (cursor?: string) =>
-    http<Page<NotificationView>>('GET', withPage('/api/notifications', cursor)),
+  notifications: (cursor?: string, filter: 'all' | 'mentions' = 'all') =>
+    http<Page<NotificationView>>('GET', withPage('/api/notifications', cursor, { filter })),
   unreadCount: () => http<{ count: number }>('GET', '/api/notifications/unread-count'),
   markAllRead: () => http<void>('POST', '/api/notifications/read-all'),
 

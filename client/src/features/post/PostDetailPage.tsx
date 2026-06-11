@@ -38,7 +38,7 @@ export function PostDetailPage() {
           onClick={() => navigate(-1)}
           className="flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
         >
-          <i className="fas fa-arrow-left text-[16px]" />
+          <i className="ri-arrow-left-line text-[16px]" />
         </button>
         <span className="text-[17px] font-bold">{t('nav.home')}</span>
       </div>
@@ -48,7 +48,7 @@ export function PostDetailPage() {
           to={`/post/${view.replyToId}`}
           className="flex items-center gap-2 border-b border-x-border p-3 text-sm text-x-blue transition-colors duration-200 hover:bg-x-hover"
         >
-          <i className="fas fa-arrow-up text-[12px]" /> {t('post.viewParent')}
+          <i className="ri-arrow-up-line text-[12px]" /> {t('post.viewParent')}
         </Link>
       )}
 

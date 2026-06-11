@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
+import { BookmarksPage } from './features/bookmarks/BookmarksPage';
 import { NotificationsPage } from './features/notifications/NotificationsPage';
 import { PostDetailPage } from './features/post/PostDetailPage';
 import { FollowListPage } from './features/profile/FollowListPage';
@@ -50,6 +51,14 @@ function Shell() {
                 element={
                   <RequireAuth>
                     <NotificationsPage />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/bookmarks"
+                element={
+                  <RequireAuth>
+                    <BookmarksPage />
                   </RequireAuth>
                 }
               />

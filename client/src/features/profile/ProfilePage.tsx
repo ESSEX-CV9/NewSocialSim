@@ -57,10 +57,10 @@ function EditProfileForm({ onDone }: { onDone: () => void }) {
 }
 
 const TAB_EMPTY: Record<ProfileTab, { icon: string; key: 'profile.emptyPosts' | 'profile.emptyReplies' | 'profile.emptyMedia' | 'profile.emptyLikes' }> = {
-  posts: { icon: 'far fa-comment', key: 'profile.emptyPosts' },
-  replies: { icon: 'fas fa-reply', key: 'profile.emptyReplies' },
-  media: { icon: 'far fa-image', key: 'profile.emptyMedia' },
-  likes: { icon: 'far fa-heart', key: 'profile.emptyLikes' },
+  posts: { icon: 'ri-chat-3-line', key: 'profile.emptyPosts' },
+  replies: { icon: 'ri-reply-line', key: 'profile.emptyReplies' },
+  media: { icon: 'ri-image-line', key: 'profile.emptyMedia' },
+  likes: { icon: 'ri-heart-3-line', key: 'profile.emptyLikes' },
 };
 
 export function ProfilePage() {
@@ -80,9 +80,10 @@ export function ProfilePage() {
   });
 
   // 帖子/回复/喜欢三个列表懒加载：切到对应 Tab 才发请求
+  // 帖子 Tab 是"原创 + 本人转发"的时间线（与 X 一致）
   const posts = usePagedQuery(
-    ['user-posts', handle, 'posts'],
-    (cursor) => api.getUserPosts(handle, cursor, 'posts'),
+    ['user-timeline', handle],
+    (cursor) => api.getUserTimeline(handle, cursor),
     { enabled: handle.length > 0 && tab === 'posts' },
   );
   const replies = usePagedQuery(
@@ -114,9 +115,10 @@ export function ProfilePage() {
     month: 'long',
   });
 
-  const activeList = tab === 'posts' ? posts : tab === 'replies' ? replies : tab === 'likes' ? likes : null;
+  const activeList = tab === 'replies' ? replies : tab === 'likes' ? likes : null;
 
   const refreshLists = () => {
+    void queryClient.invalidateQueries({ queryKey: ['user-timeline', handle] });
     void queryClient.invalidateQueries({ queryKey: ['user-posts', handle] });
     void queryClient.invalidateQueries({ queryKey: ['user-likes', handle] });
     void queryClient.invalidateQueries({ queryKey: ['user', handle] });
@@ -135,7 +137,7 @@ export function ProfilePage() {
           onClick={() => navigate(-1)}
           className="mr-6 flex size-8.5 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
         >
-          <i className="fas fa-arrow-left text-[18px]" />
+          <i className="ri-arrow-left-line text-[18px]" />
         </button>
         <div>
           <div className="text-xl leading-tight font-bold">{u.displayName}</div>
@@ -182,7 +184,7 @@ export function ProfilePage() {
             <h1 className="text-xl font-extrabold">{u.displayName}</h1>
             {u.isBot && (
               <span className="rounded bg-x-input px-1.5 py-0.5 text-xs text-x-dim">
-                <i className="fas fa-robot mr-1" />
+                <i className="ri-robot-2-line mr-1" />
                 {t('profile.bot')}
               </span>
             )}
@@ -193,7 +195,7 @@ export function ProfilePage() {
         {u.bio && <p className="mt-3 text-[15px] whitespace-pre-wrap">{u.bio}</p>}
 
         <div className="mt-3 flex items-center gap-1 text-[14px] text-x-dim">
-          <i className="far fa-calendar" />
+          <i className="ri-calendar-line" />
           <span>{t('profile.joined', { date: joinedDate })}</span>
         </div>
 
@@ -227,26 +229,45 @@ export function ProfilePage() {
       </div>
 
       {/* Tab 内容 */}
-      {tab === 'media' ? (
-        <EmptyBox icon={TAB_EMPTY.media.icon} text={t(TAB_EMPTY.media.key)} />
-      ) : (
-        activeList && (
-          <>
-            {activeList.isLoading && <Spinner />}
-            {activeList.isError && <ErrorBox error={activeList.error} />}
-            {activeList.items.map((post) => (
-              <PostCard key={post.id} post={post} onDeleted={refreshLists} />
-            ))}
-            {activeList.isSuccess && activeList.items.length === 0 && (
-              <EmptyBox icon={TAB_EMPTY[tab].icon} text={t(TAB_EMPTY[tab].key)} />
-            )}
-            <LoadMore
-              hasNextPage={!!activeList.hasNextPage}
-              isFetching={activeList.isFetchingNextPage}
-              onClick={() => void activeList.fetchNextPage()}
+      {tab === 'media' && <EmptyBox icon={TAB_EMPTY.media.icon} text={t(TAB_EMPTY.media.key)} />}
+      {tab === 'posts' && (
+        <>
+          {posts.isLoading && <Spinner />}
+          {posts.isError && <ErrorBox error={posts.error} />}
+          {posts.items.map((item, i) => (
+            <PostCard
+              key={`${item.type}-${item.post.id}-${i}`}
+              post={item.post}
+              repostedBy={item.repostedBy}
+              onDeleted={refreshLists}
             />
-          </>
-        )
+          ))}
+          {posts.isSuccess && posts.items.length === 0 && (
+            <EmptyBox icon={TAB_EMPTY.posts.icon} text={t(TAB_EMPTY.posts.key)} />
+          )}
+          <LoadMore
+            hasNextPage={!!posts.hasNextPage}
+            isFetching={posts.isFetchingNextPage}
+            onClick={() => void posts.fetchNextPage()}
+          />
+        </>
+      )}
+      {activeList && (
+        <>
+          {activeList.isLoading && <Spinner />}
+          {activeList.isError && <ErrorBox error={activeList.error} />}
+          {activeList.items.map((post) => (
+            <PostCard key={post.id} post={post} onDeleted={refreshLists} />
+          ))}
+          {activeList.isSuccess && activeList.items.length === 0 && (
+            <EmptyBox icon={TAB_EMPTY[tab].icon} text={t(TAB_EMPTY[tab].key)} />
+          )}
+          <LoadMore
+            hasNextPage={!!activeList.hasNextPage}
+            isFetching={activeList.isFetchingNextPage}
+            onClick={() => void activeList.fetchNextPage()}
+          />
+        </>
       )}
     </div>
   );

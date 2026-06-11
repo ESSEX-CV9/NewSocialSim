@@ -83,6 +83,19 @@ const migrations: Migration[] = [
       ALTER TABLE posts ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
     `,
   },
+  {
+    version: 3,
+    name: 'bookmarks',
+    sql: `
+      CREATE TABLE bookmarks (
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        post_id    INTEGER NOT NULL REFERENCES posts(id),
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (user_id, post_id)
+      );
+      CREATE INDEX idx_bookmarks_user_time ON bookmarks(user_id, created_at DESC);
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

@@ -2,7 +2,9 @@ export const messages = {
   'zh-CN': {
     'app.name': 'SocialSim',
     'nav.home': '首页',
+    'nav.explore': '探索',
     'nav.notifications': '通知',
+    'nav.bookmarks': '书签',
     'nav.search': '搜索',
     'nav.profile': '个人主页',
     'nav.worlds': '世界',
@@ -34,8 +36,14 @@ export const messages = {
     'post.viewParent': '查看上文',
 
     'timeline.following': '关注',
+    'timeline.forYou': '为你推荐',
     'timeline.global': '全站',
+    'timeline.latest': '按最新',
+    'timeline.hot': '按热度',
     'timeline.empty': '这里还没有内容。去全站看看，或者关注一些人吧。',
+    'timeline.noFollowing': '你还没有关注任何人',
+    'timeline.suggestions': '推荐关注',
+    'timeline.followerCount': '{n} 位粉丝',
     'timeline.repostedBy': '{name} 转发了',
 
     'common.loadMore': '加载更多',
@@ -68,12 +76,18 @@ export const messages = {
 
     'notif.title': '通知',
     'notif.markAllRead': '全部已读',
+    'notif.tabAll': '全部',
+    'notif.tabMentions': '提及',
     'notif.reply': '回复了你的帖子',
     'notif.quote': '引用了你的帖子',
     'notif.like': '赞了你的帖子',
     'notif.repost': '转发了你的帖子',
     'notif.follow': '关注了你',
+    'notif.mention': '提到了你',
     'notif.empty': '暂时没有通知',
+
+    'bookmarks.title': '书签',
+    'bookmarks.empty': '还没有收藏任何帖子。点击帖子右下角的书签图标即可收藏。',
 
     'search.placeholder': '搜索 SocialSim',
     'search.posts': '帖子',
@@ -111,7 +125,9 @@ export const messages = {
   en: {
     'app.name': 'SocialSim',
     'nav.home': 'Home',
+    'nav.explore': 'Explore',
     'nav.notifications': 'Notifications',
+    'nav.bookmarks': 'Bookmarks',
     'nav.search': 'Search',
     'nav.profile': 'Profile',
     'nav.worlds': 'Worlds',
@@ -143,8 +159,14 @@ export const messages = {
     'post.viewParent': 'View parent',
 
     'timeline.following': 'Following',
+    'timeline.forYou': 'For you',
     'timeline.global': 'Global',
+    'timeline.latest': 'Latest',
+    'timeline.hot': 'Top',
     'timeline.empty': 'Nothing here yet. Check the global feed or follow some people.',
+    'timeline.noFollowing': "You aren't following anyone yet",
+    'timeline.suggestions': 'Who to follow',
+    'timeline.followerCount': '{n} followers',
     'timeline.repostedBy': '{name} reposted',
 
     'common.loadMore': 'Load more',
@@ -177,12 +199,18 @@ export const messages = {
 
     'notif.title': 'Notifications',
     'notif.markAllRead': 'Mark all read',
+    'notif.tabAll': 'All',
+    'notif.tabMentions': 'Mentions',
     'notif.reply': 'replied to your post',
     'notif.quote': 'quoted your post',
     'notif.like': 'liked your post',
     'notif.repost': 'reposted your post',
     'notif.follow': 'followed you',
+    'notif.mention': 'mentioned you',
     'notif.empty': 'No notifications yet',
+
+    'bookmarks.title': 'Bookmarks',
+    'bookmarks.empty': 'No bookmarks yet. Tap the bookmark icon on any post to save it.',
 
     'search.placeholder': 'Search SocialSim',
     'search.posts': 'Posts',

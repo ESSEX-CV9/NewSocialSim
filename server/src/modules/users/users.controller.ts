@@ -10,6 +10,10 @@ export class UsersController {
     reply.send({ user: this.service.getProfileByHandle(req.params.handle, viewerIdOf(req)) });
   };
 
+  suggested = async (req: FastifyRequest, reply: FastifyReply) => {
+    reply.send({ users: this.service.suggested(viewerIdOf(req)) });
+  };
+
   updateMe = async (req: FastifyRequest<{ Body: UpdateProfileRequest }>, reply: FastifyReply) => {
     reply.send({ user: this.service.updateMe(req.user.sub, req.body) });
   };

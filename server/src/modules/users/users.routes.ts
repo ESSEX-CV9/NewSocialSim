@@ -21,6 +21,7 @@ export interface UsersRoutesDeps {
 export function registerUsersRoutes(app: FastifyInstance, deps: UsersRoutesDeps): void {
   const controller = new UsersController(deps.usersService);
 
+  app.get('/api/users/suggested', { preHandler: deps.optionalAuth }, controller.suggested);
   app.get<{ Params: { handle: string } }>(
     '/api/users/:handle',
     { preHandler: deps.optionalAuth },

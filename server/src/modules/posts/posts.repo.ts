@@ -154,9 +154,13 @@ export const postsRepo = {
     return this.interactionSet(db, 'reposts', userId, postIds);
   },
 
+  bookmarkedSet(db: WorldDb, userId: number, postIds: number[]): Set<number> {
+    return this.interactionSet(db, 'bookmarks', userId, postIds);
+  },
+
   interactionSet(
     db: WorldDb,
-    table: 'likes' | 'reposts',
+    table: 'likes' | 'reposts' | 'bookmarks',
     userId: number,
     postIds: number[],
   ): Set<number> {

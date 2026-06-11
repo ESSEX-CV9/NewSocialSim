@@ -21,4 +21,19 @@ export class InteractionsController {
   unrepost = async (req: Req, reply: FastifyReply) => {
     reply.send(this.service.unrepost(req.user.sub, req.params.id));
   };
+
+  bookmark = async (req: Req, reply: FastifyReply) => {
+    reply.send(this.service.bookmark(req.user.sub, req.params.id));
+  };
+
+  unbookmark = async (req: Req, reply: FastifyReply) => {
+    reply.send(this.service.unbookmark(req.user.sub, req.params.id));
+  };
+
+  listBookmarks = async (
+    req: FastifyRequest<{ Querystring: { cursor?: string; limit?: number } }>,
+    reply: FastifyReply,
+  ) => {
+    reply.send(this.service.listBookmarks(req.user.sub, req.query.cursor, req.query.limit));
+  };
 }

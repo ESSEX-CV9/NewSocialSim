@@ -8,25 +8,38 @@ import { Avatar } from './Avatar';
 import { Composer } from './Composer';
 import { TimeAgo } from './TimeAgo';
 
-/** 帖子正文：#话题 转为搜索链接 */
+/** 帖子正文：#话题 转搜索链接，@用户名 转主页链接 */
 function PostContent({ content }: { content: string }) {
-  const parts = content.split(/(#[^\s#]+)/g);
+  const parts = content.split(/(#[^\s#@]+|@[a-zA-Z0-9_]{2,20})/g);
   return (
     <p className="text-[15px] leading-normal wrap-break-word whitespace-pre-wrap">
-      {parts.map((part, i) =>
-        part.startsWith('#') ? (
-          <Link
-            key={i}
-            to={`/search?q=${encodeURIComponent(part)}&type=posts`}
-            onClick={(e) => e.stopPropagation()}
-            className="text-x-blue hover:underline"
-          >
-            {part}
-          </Link>
-        ) : (
-          part
-        ),
-      )}
+      {parts.map((part, i) => {
+        if (part.startsWith('#')) {
+          return (
+            <Link
+              key={i}
+              to={`/search?q=${encodeURIComponent(part)}&type=posts`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-x-blue hover:underline"
+            >
+              {part}
+            </Link>
+          );
+        }
+        if (part.startsWith('@')) {
+          return (
+            <Link
+              key={i}
+              to={`/u/${part.slice(1)}`}
+              onClick={(e) => e.stopPropagation()}
+              className="text-x-blue hover:underline"
+            >
+              {part}
+            </Link>
+          );
+        }
+        return part;
+      })}
     </p>
   );
 }
@@ -127,6 +140,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [reposted, setReposted] = useState(post.repostedByViewer);
   const [repostCount, setRepostCount] = useState(post.repostCount);
+  const [bookmarked, setBookmarked] = useState(post.bookmarkedByViewer);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [gone, setGone] = useState(false);
 
@@ -157,6 +171,13 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
     setRepostCount(res.count);
   };
 
+  const toggleBookmark = async (e: MouseEvent) => {
+    stop(e);
+    if (!user) return navigate('/login');
+    const res = bookmarked ? await api.unbookmark(post.id) : await api.bookmark(post.id);
+    setBookmarked(res.active);
+  };
+
   const remove = async (e: MouseEvent) => {
     stop(e);
     if (!window.confirm(t('post.deleteConfirm'))) return;
@@ -174,7 +195,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
     >
       {repostedBy && (
         <div className="mb-1 ml-8 flex items-center gap-2 text-[13px] font-bold text-x-dim">
-          <i className="fas fa-retweet" />
+          <i className="ri-repeat-2-line" />
           {t('timeline.repostedBy', { name: repostedBy.displayName })}
         </div>
       )}
@@ -204,17 +225,17 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
             <PostContent content={post.content} />
           </div>
           {post.quoted && <QuotedCard quoted={post.quoted} />}
-          <div className="mt-3 flex max-w-106 items-center justify-between">
-            <ActionButton icon="far fa-comment" count={post.replyCount} color="blue" />
+          <div className="mt-3 flex items-center justify-between">
+            <ActionButton icon="ri-chat-3-line" count={post.replyCount} color="blue" />
             <ActionButton
-              icon="fas fa-retweet"
+              icon="ri-repeat-2-line"
               count={repostCount}
               color="green"
               active={reposted}
               onClick={(e) => void toggleRepost(e)}
             />
             <ActionButton
-              icon="fas fa-quote-left"
+              icon="ri-double-quotes-l"
               color="blue"
               onClick={(e) => {
                 stop(e);
@@ -223,17 +244,23 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
               }}
             />
             <ActionButton
-              icon={liked ? 'fas fa-heart' : 'far fa-heart'}
+              icon={liked ? 'ri-heart-3-fill' : 'ri-heart-3-line'}
               count={likeCount}
               color="pink"
               active={liked}
               onClick={(e) => void toggleLike(e)}
             />
-            {user?.id === post.authorId ? (
-              <ActionButton icon="fas fa-trash-can" color="red" onClick={(e) => void remove(e)} />
-            ) : (
-              <span className="size-8.5" />
-            )}
+            <span className="flex items-center gap-1">
+              {user?.id === post.authorId && (
+                <ActionButton icon="ri-delete-bin-line" color="red" onClick={(e) => void remove(e)} />
+              )}
+              <ActionButton
+                icon={bookmarked ? 'ri-bookmark-fill' : 'ri-bookmark-line'}
+                color="blue"
+                active={bookmarked}
+                onClick={(e) => void toggleBookmark(e)}
+              />
+            </span>
           </div>
         </div>
       </div>
@@ -258,7 +285,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
                 }}
                 className="flex size-9 items-center justify-center rounded-full text-x-text transition-colors duration-200 hover:bg-x-input"
               >
-                <i className="fas fa-xmark text-[18px]" />
+                <i className="ri-close-line text-[18px]" />
               </button>
             </div>
             <Composer

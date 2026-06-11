@@ -1,5 +1,6 @@
 import type { NotificationView } from '@socialsim/shared';
 import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { Avatar } from '../../components/Avatar';
@@ -10,17 +11,23 @@ import { usePagedQuery } from '../../components/usePagedQuery';
 import { useI18n } from '../../i18n/I18nContext';
 
 const TYPE_ICONS: Record<NotificationView['type'], { icon: string; color: string }> = {
-  reply: { icon: 'far fa-comment', color: 'text-x-blue' },
-  quote: { icon: 'fas fa-quote-left', color: 'text-x-blue' },
-  like: { icon: 'fas fa-heart', color: 'text-x-pink' },
-  repost: { icon: 'fas fa-retweet', color: 'text-x-green' },
-  follow: { icon: 'fas fa-user-plus', color: 'text-x-blue' },
+  reply: { icon: 'ri-chat-3-line', color: 'text-x-blue' },
+  quote: { icon: 'ri-double-quotes-l', color: 'text-x-blue' },
+  like: { icon: 'ri-heart-3-fill', color: 'text-x-pink' },
+  repost: { icon: 'ri-repeat-2-line', color: 'text-x-green' },
+  follow: { icon: 'ri-user-add-line', color: 'text-x-blue' },
+  mention: { icon: 'ri-at-line', color: 'text-x-blue' },
 };
+
+type Filter = 'all' | 'mentions';
 
 export function NotificationsPage() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
-  const query = usePagedQuery(['notifications'], (cursor) => api.notifications(cursor));
+  const [filter, setFilter] = useState<Filter>('all');
+  const query = usePagedQuery(['notifications', filter], (cursor) =>
+    api.notifications(cursor, filter),
+  );
 
   const markAll = async () => {
     await api.markAllRead();
@@ -28,17 +35,32 @@ export function NotificationsPage() {
     void queryClient.invalidateQueries({ queryKey: ['unread-count'] });
   };
 
+  const tabClass = (active: boolean) =>
+    `flex h-13.25 flex-1 cursor-pointer items-center justify-center text-[15px] font-medium transition-colors duration-200 hover:bg-x-hover ${
+      active ? 'tab-active' : 'text-x-dim'
+    }`;
+
   return (
     <div>
-      <div className="glass-header flex items-center justify-between px-4 py-2.5">
-        <span className="text-[17px] font-bold">{t('notif.title')}</span>
-        <button
-          onClick={() => void markAll()}
-          className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-x-blue transition-colors duration-200 hover:bg-x-input"
-        >
-          <i className="fas fa-check-double" />
-          {t('notif.markAllRead')}
-        </button>
+      <div className="glass-header">
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <span className="text-[17px] font-bold">{t('notif.title')}</span>
+          <button
+            onClick={() => void markAll()}
+            className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm text-x-blue transition-colors duration-200 hover:bg-x-input"
+          >
+            <i className="ri-check-double-line" />
+            {t('notif.markAllRead')}
+          </button>
+        </div>
+        <div className="flex">
+          <button className={tabClass(filter === 'all')} onClick={() => setFilter('all')}>
+            {t('notif.tabAll')}
+          </button>
+          <button className={tabClass(filter === 'mentions')} onClick={() => setFilter('mentions')}>
+            {t('notif.tabMentions')}
+          </button>
+        </div>
       </div>
       {query.isLoading && <Spinner />}
       {query.isError && <ErrorBox error={query.error} />}
@@ -70,7 +92,7 @@ export function NotificationsPage() {
         );
       })}
       {query.isSuccess && query.items.length === 0 && (
-        <EmptyBox icon="far fa-bell" text={t('notif.empty')} />
+        <EmptyBox icon="ri-notification-2-line" text={t('notif.empty')} />
       )}
       <LoadMore
         hasNextPage={!!query.hasNextPage}

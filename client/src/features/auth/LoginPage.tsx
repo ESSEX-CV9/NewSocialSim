@@ -9,7 +9,7 @@ export function AuthFormShell({ title, children }: { title: string; children: Re
     <div className="flex min-h-screen items-center justify-center">
       <div className="w-full max-w-sm rounded-2xl border border-x-border bg-x-card p-8">
         <div className="mb-4 text-3xl text-x-blue">
-          <i className="fas fa-tower-broadcast" />
+          <i className="ri-base-station-fill" />
         </div>
         <h1 className="mb-6 text-2xl font-extrabold">{title}</h1>
         {children}

@@ -49,7 +49,7 @@ function CreateWorldForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3 border-b border-x-border p-4">
       <h2 className="flex items-center gap-2 text-[17px] font-bold">
-        <i className="fas fa-circle-plus text-x-blue" />
+        <i className="ri-add-circle-line text-x-blue" />
         {t('worlds.create')}
       </h2>
       <input value={form.id} onChange={set('id')} placeholder={t('worlds.id')} className={inputClass} />
@@ -118,7 +118,7 @@ export function WorldsPage() {
 
       <div className="border-b border-x-border p-4">
         <h2 className="mb-2 flex items-center gap-2 text-[17px] font-bold">
-          <i className="fas fa-earth-asia text-x-blue" />
+          <i className="ri-earth-fill text-x-blue" />
           {t('worlds.activeWorld')}
         </h2>
         {world ? (
@@ -160,7 +160,7 @@ export function WorldsPage() {
               </div>
               {w.active ? (
                 <span className="flex items-center gap-1.5 rounded-full bg-x-green/15 px-3 py-1 text-sm font-bold text-x-green">
-                  <i className="fas fa-circle text-[6px]" />
+                  <i className="ri-circle-fill text-[6px]" />
                   {t('worlds.activeBadge')}
                 </span>
               ) : (

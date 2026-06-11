@@ -61,9 +61,28 @@ export class PostsService {
           postId,
         });
       }
+      // @mention：被回复/被引用作者已各有通知，不再重复
+      const alreadyNotified = new Set([authorId, parent?.author_id, quoted?.author_id]);
+      for (const userId of this.resolveMentions(content)) {
+        if (alreadyNotified.has(userId)) continue;
+        this.notificationsService.add({ userId, type: 'mention', actorId: authorId, postId });
+      }
       return postId;
     })();
     return this.getView(id, authorId);
+  }
+
+  /** 解析正文中的 @handle，返回真实存在的用户 id（去重） */
+  private resolveMentions(content: string): number[] {
+    const handles = new Set(
+      [...content.matchAll(/@([a-zA-Z0-9_]{2,20})/g)].map((m) => m[1]!),
+    );
+    const ids: number[] = [];
+    for (const handle of handles) {
+      const id = this.usersService.findIdByHandle(handle);
+      if (id !== null) ids.push(id);
+    }
+    return ids;
   }
 
   /** 帖子详情；已删除的帖子返回墓碑（保持对话串可导航） */
@@ -173,6 +192,8 @@ export class PostsService {
     const liked = viewerId !== null ? postsRepo.likedSet(db, viewerId, allIds) : new Set<number>();
     const reposted =
       viewerId !== null ? postsRepo.repostedSet(db, viewerId, allIds) : new Set<number>();
+    const bookmarked =
+      viewerId !== null ? postsRepo.bookmarkedSet(db, viewerId, allIds) : new Set<number>();
     const byId = new Map(allRows.map((r) => [r.id, r]));
 
     const toView = (row: PostRow, embedQuote: boolean): PostView => ({
@@ -189,6 +210,7 @@ export class PostsService {
       author: toUserSummary(row),
       likedByViewer: liked.has(row.id),
       repostedByViewer: reposted.has(row.id),
+      bookmarkedByViewer: bookmarked.has(row.id),
       quoted:
         embedQuote && row.quote_of_id !== null
           ? (() => {

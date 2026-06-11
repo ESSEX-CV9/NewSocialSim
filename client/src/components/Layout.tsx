@@ -73,30 +73,43 @@ export function Layout({ children }: { children: ReactNode }) {
           to="/"
           className="flex w-fit items-center gap-3 rounded-full p-3 text-2xl font-extrabold text-x-text transition-colors duration-200 hover:bg-x-input"
         >
-          <i className="fas fa-tower-broadcast text-x-blue" />
+          <i className="ri-base-station-fill text-x-blue" />
           <span className="hidden min-[800px]:inline">{t('app.name')}</span>
         </Link>
         <nav className="mt-1 flex flex-col items-center gap-5 min-[800px]:items-stretch">
-          <NavItem to="/" icon="fas fa-house" label={t('nav.home')} />
+          <NavItem to="/" icon="ri-home-5-line" activeIcon="ri-home-5-fill" label={t('nav.home')} />
+          <NavItem
+            to="/search"
+            icon="ri-search-line"
+            activeIcon="ri-search-fill"
+            label={t('nav.explore')}
+          />
           {user && (
             <NavItem
               to="/notifications"
-              icon="far fa-bell"
-              activeIcon="fas fa-bell"
+              icon="ri-notification-2-line"
+              activeIcon="ri-notification-2-fill"
               label={t('nav.notifications')}
               badge={unread.data?.count}
             />
           )}
-          <NavItem to="/search" icon="fas fa-magnifying-glass" label={t('nav.search')} />
+          {user && (
+            <NavItem
+              to="/bookmarks"
+              icon="ri-bookmark-line"
+              activeIcon="ri-bookmark-fill"
+              label={t('nav.bookmarks')}
+            />
+          )}
           {user && (
             <NavItem
               to={`/u/${user.handle}`}
-              icon="far fa-user"
-              activeIcon="fas fa-user"
+              icon="ri-user-line"
+              activeIcon="ri-user-fill"
               label={t('nav.profile')}
             />
           )}
-          <NavItem to="/worlds" icon="fas fa-earth-asia" label={t('nav.worlds')} />
+          <NavItem to="/worlds" icon="ri-earth-line" activeIcon="ri-earth-fill" label={t('nav.worlds')} />
         </nav>
         {user && (
           <button
@@ -112,7 +125,7 @@ export function Layout({ children }: { children: ReactNode }) {
             title={locale === 'zh-CN' ? 'Switch to English' : '切换为中文'}
             className="flex w-fit items-center gap-2 self-start rounded-full px-3 py-1.5 text-sm text-x-dim transition-colors duration-200 hover:bg-x-input"
           >
-            <i className="fas fa-language text-[16px]" />
+            <i className="ri-translate-2 text-[16px]" />
             <span className="hidden min-[800px]:inline">{locale === 'zh-CN' ? 'EN' : '中文'}</span>
           </button>
           {user ? (
@@ -130,7 +143,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 title={t('nav.logout')}
                 className="hidden size-8 items-center justify-center rounded-full text-x-dim transition-colors duration-200 hover:bg-x-border hover:text-x-text min-[800px]:flex"
               >
-                <i className="fas fa-right-from-bracket" />
+                <i className="ri-logout-box-r-line" />
               </button>
             </div>
           ) : (
@@ -139,7 +152,7 @@ export function Layout({ children }: { children: ReactNode }) {
               className="rounded-full bg-x-blue px-4 py-2.5 text-center font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark"
             >
               <span className="hidden min-[800px]:inline">{t('nav.login')}</span>
-              <i className="fas fa-right-to-bracket min-[800px]:hidden" />
+              <i className="ri-login-box-line min-[800px]:hidden" />
             </Link>
           )}
         </div>
@@ -151,7 +164,7 @@ export function Layout({ children }: { children: ReactNode }) {
       {/* 右栏：搜索 + 世界信息 */}
       <aside className="sticky top-0 hidden h-screen w-87.5 flex-col gap-4 px-6 py-3 min-[1100px]:flex">
         <form onSubmit={submitSearch} className="relative">
-          <i className="fas fa-magnifying-glass absolute top-1/2 left-4 -translate-y-1/2 text-[14px] text-x-dim" />
+          <i className="ri-search-line absolute top-1/2 left-4 -translate-y-1/2 text-[14px] text-x-dim" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -161,7 +174,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </form>
         <div className="rounded-2xl bg-x-card p-4">
           <h2 className="mb-2 flex items-center gap-2 text-xl font-extrabold">
-            <i className="fas fa-earth-asia text-[16px] text-x-blue" />
+            <i className="ri-earth-fill text-[16px] text-x-blue" />
             {t('worlds.activeWorld')}
           </h2>
           {world ? (
@@ -202,7 +215,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 onClick={() => setComposeOpen(false)}
                 className="flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
               >
-                <i className="fas fa-xmark text-[18px]" />
+                <i className="ri-close-line text-[18px]" />
               </button>
             </div>
             <Composer

@@ -40,7 +40,7 @@ export function SearchPage() {
     <div>
       <div className="glass-header">
         <form onSubmit={submit} className="relative p-3">
-          <i className="fas fa-magnifying-glass absolute top-1/2 left-7 -translate-y-1/2 text-[14px] text-x-dim" />
+          <i className="ri-search-line absolute top-1/2 left-7 -translate-y-1/2 text-[14px] text-x-dim" />
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
@@ -59,7 +59,7 @@ export function SearchPage() {
         </div>
       </div>
 
-      {q.length === 0 && <EmptyBox icon="fas fa-magnifying-glass" text={t('search.prompt')} />}
+      {q.length === 0 && <EmptyBox icon="ri-search-line" text={t('search.prompt')} />}
       {active.isLoading && q.length > 0 && <Spinner />}
       {active.isError && <ErrorBox error={active.error} />}
 
@@ -81,7 +81,7 @@ export function SearchPage() {
         ))}
 
       {q.length > 0 && active.isSuccess && active.items.length === 0 && (
-        <EmptyBox icon="fas fa-magnifying-glass" text={t('search.empty')} />
+        <EmptyBox icon="ri-search-line" text={t('search.empty')} />
       )}
       <LoadMore
         hasNextPage={!!active.hasNextPage}

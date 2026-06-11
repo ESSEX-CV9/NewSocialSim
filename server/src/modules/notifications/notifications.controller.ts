@@ -5,10 +5,14 @@ export class NotificationsController {
   constructor(private readonly service: NotificationsService) {}
 
   list = async (
-    req: FastifyRequest<{ Querystring: { cursor?: string; limit?: number } }>,
+    req: FastifyRequest<{
+      Querystring: { cursor?: string; limit?: number; filter?: 'all' | 'mentions' };
+    }>,
     reply: FastifyReply,
   ) => {
-    reply.send(this.service.list(req.user.sub, req.query.cursor, req.query.limit));
+    reply.send(
+      this.service.list(req.user.sub, req.query.filter ?? 'all', req.query.cursor, req.query.limit),
+    );
   };
 
   unreadCount = async (req: FastifyRequest, reply: FastifyReply) => {

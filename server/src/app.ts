@@ -60,7 +60,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const postsService = new PostsService(worldManager, usersService, notificationsService);
   const interactionsService = new InteractionsService(worldManager, postsService, notificationsService);
   const followsService = new FollowsService(worldManager, usersService, notificationsService);
-  const timelineService = new TimelineService(worldManager, postsService);
+  const timelineService = new TimelineService(worldManager, postsService, usersService);
   const searchService = new SearchService(worldManager, postsService);
 
   app.get('/api/health', async () => ({ ok: true }));

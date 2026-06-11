@@ -8,6 +8,7 @@ const pageQuerySchema = {
   properties: {
     cursor: { type: 'string' },
     limit: { type: 'integer', minimum: 1, maximum: 50 },
+    filter: { type: 'string', enum: ['all', 'mentions'] },
   },
 } as const;
 
@@ -22,7 +23,7 @@ export function registerNotificationsRoutes(
 ): void {
   const controller = new NotificationsController(deps.notificationsService);
 
-  app.get<{ Querystring: { cursor?: string; limit?: number } }>(
+  app.get<{ Querystring: { cursor?: string; limit?: number; filter?: 'all' | 'mentions' } }>(
     '/api/notifications',
     { preHandler: deps.requireAuth, schema: { querystring: pageQuerySchema } },
     controller.list,

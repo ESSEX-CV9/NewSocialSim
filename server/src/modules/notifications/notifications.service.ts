@@ -22,11 +22,16 @@ export class NotificationsService {
     });
   }
 
-  list(userId: number, cursor?: string, limit?: number): Page<NotificationView> {
+  list(
+    userId: number,
+    filter: 'all' | 'mentions' = 'all',
+    cursor?: string,
+    limit?: number,
+  ): Page<NotificationView> {
     const { db } = this.worldManager.current();
     const pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, limit ?? DEFAULT_PAGE_SIZE));
     const beforeId = parseIdCursor(cursor);
-    const rows = notificationsRepo.list(db, userId, beforeId, pageSize + 1);
+    const rows = notificationsRepo.list(db, userId, filter === 'mentions', beforeId, pageSize + 1);
     const hasMore = rows.length > pageSize;
     const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     const last = pageRows[pageRows.length - 1];

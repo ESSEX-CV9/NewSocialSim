@@ -50,6 +50,34 @@ export const usersRepo = {
     return row;
   },
 
+  /** 推荐关注：按粉丝数倒序，排除自己与已关注（viewerId 为 null 时不排除） */
+  suggested(
+    db: WorldDb,
+    viewerId: number | null,
+    limit: number,
+  ): { id: number; handle: string; display_name: string; is_bot: number; follower_count: number }[] {
+    const excludeClause =
+      viewerId !== null
+        ? 'WHERE u.id != @viewerId AND u.id NOT IN (SELECT followee_id FROM follows WHERE follower_id = @viewerId)'
+        : '';
+    return db
+      .prepare(
+        `SELECT u.id, u.handle, u.display_name, u.is_bot,
+                (SELECT COUNT(*) FROM follows WHERE followee_id = u.id) AS follower_count
+         FROM users u
+         ${excludeClause}
+         ORDER BY follower_count DESC, u.id ASC
+         LIMIT @limit`,
+      )
+      .all({ limit, ...(viewerId !== null ? { viewerId } : {}) }) as {
+      id: number;
+      handle: string;
+      display_name: string;
+      is_bot: number;
+      follower_count: number;
+    }[];
+  },
+
   isFollowedBy(db: WorldDb, targetId: number, viewerId: number): boolean {
     return (
       db

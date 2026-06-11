@@ -24,4 +24,20 @@ export function registerInteractionsRoutes(
   app.delete<{ Params: { id: number } }>('/api/posts/:id/like', opts, controller.unlike);
   app.post<{ Params: { id: number } }>('/api/posts/:id/repost', opts, controller.repost);
   app.delete<{ Params: { id: number } }>('/api/posts/:id/repost', opts, controller.unrepost);
+  app.post<{ Params: { id: number } }>('/api/posts/:id/bookmark', opts, controller.bookmark);
+  app.delete<{ Params: { id: number } }>('/api/posts/:id/bookmark', opts, controller.unbookmark);
+  app.get<{ Querystring: { cursor?: string; limit?: number } }>(
+    '/api/bookmarks',
+    { preHandler: deps.requireAuth, schema: { querystring: bookmarksQuerySchema } },
+    controller.listBookmarks,
+  );
 }
+
+const bookmarksQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    cursor: { type: 'string' },
+    limit: { type: 'integer', minimum: 1, maximum: 50 },
+  },
+} as const;

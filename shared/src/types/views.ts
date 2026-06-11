@@ -13,6 +13,8 @@ export interface PostView extends Post {
   author: UserSummary;
   likedByViewer: boolean;
   repostedByViewer: boolean;
+  /** 观察者是否已收藏（书签私密，不提供计数） */
+  bookmarkedByViewer: boolean;
   /** 被引用的帖子（只嵌一层；被删除时为墓碑视图） */
   quoted: PostView | null;
 }
@@ -26,7 +28,7 @@ export interface TimelineItem {
   activityAt: number;
 }
 
-export type NotificationType = 'reply' | 'quote' | 'like' | 'repost' | 'follow';
+export type NotificationType = 'reply' | 'quote' | 'like' | 'repost' | 'follow' | 'mention';
 
 export interface NotificationView {
   id: number;
