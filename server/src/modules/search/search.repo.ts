@@ -1,0 +1,57 @@
+import type { UserSummary } from '@socialsim/shared';
+import type { WorldDb } from '../../core/db/database.js';
+import type { PostRow } from '../posts/posts.repo.js';
+
+/** LIKE 通配符转义：让用户输入的 % _ 按字面匹配 */
+function escapeLike(q: string): string {
+  return q.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
+
+export const searchRepo = {
+  /** 帖子按内容子串匹配，新帖在前；M4 之后可平滑替换为 FTS5 */
+  searchPosts(db: WorldDb, query: string, beforeId: number | null, limit: number): PostRow[] {
+    const cursorClause = beforeId !== null ? 'AND p.id < @beforeId' : '';
+    return db
+      .prepare(
+        `SELECT p.*,
+                u.handle       AS author_handle,
+                u.display_name AS author_display_name,
+                u.is_bot       AS author_is_bot
+         FROM posts p
+         JOIN users u ON u.id = p.author_id
+         WHERE p.deleted = 0
+           AND p.content LIKE @pattern ESCAPE '\\' ${cursorClause}
+         ORDER BY p.id DESC
+         LIMIT @limit`,
+      )
+      .all({
+        pattern: `%${escapeLike(query)}%`,
+        limit,
+        ...(beforeId !== null ? { beforeId } : {}),
+      }) as PostRow[];
+  },
+
+  searchUsers(db: WorldDb, query: string, beforeId: number | null, limit: number): UserSummary[] {
+    const cursorClause = beforeId !== null ? 'AND id < @beforeId' : '';
+    const rows = db
+      .prepare(
+        `SELECT id, handle, display_name, is_bot
+         FROM users
+         WHERE (handle LIKE @pattern ESCAPE '\\' OR display_name LIKE @pattern ESCAPE '\\')
+           ${cursorClause}
+         ORDER BY id DESC
+         LIMIT @limit`,
+      )
+      .all({
+        pattern: `%${escapeLike(query)}%`,
+        limit,
+        ...(beforeId !== null ? { beforeId } : {}),
+      }) as { id: number; handle: string; display_name: string; is_bot: number }[];
+    return rows.map((r) => ({
+      id: r.id,
+      handle: r.handle,
+      displayName: r.display_name,
+      isBot: r.is_bot === 1,
+    }));
+  },
+};

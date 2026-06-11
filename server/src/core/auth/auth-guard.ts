@@ -21,6 +21,28 @@ declare module '@fastify/jwt' {
  * 需要登录的路由共用的 preHandler：
  * 校验 JWT 本身，并确认其 worldId 与当前活动世界一致。
  */
+/**
+ * 可选登录：带有效 token 时填充 req.user（用于"我是否赞过"等观察者状态），
+ * 匿名或 token 属于其他世界时按未登录处理，不报错。
+ */
+export function makeOptionalAuth(worldManager: WorldManager): preHandlerHookHandler {
+  return async function optionalAuth(req) {
+    try {
+      await req.jwtVerify();
+      if (req.user.worldId !== worldManager.current().worldId) {
+        (req as { user: AuthTokenPayload | undefined }).user = undefined;
+      }
+    } catch {
+      // 匿名访问
+    }
+  };
+}
+
+/** 读取观察者 id；未登录（或 optionalAuth 判为匿名）时为 null */
+export function viewerIdOf(req: { user?: AuthTokenPayload }): number | null {
+  return req.user?.sub ?? null;
+}
+
 export function makeRequireAuth(worldManager: WorldManager): preHandlerHookHandler {
   return async function requireAuth(req) {
     try {

@@ -76,6 +76,13 @@ const migrations: Migration[] = [
       CREATE INDEX idx_notifications_user ON notifications(user_id, created_at DESC);
     `,
   },
+  {
+    version: 2,
+    name: 'posts-soft-delete',
+    sql: `
+      ALTER TABLE posts ADD COLUMN deleted INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

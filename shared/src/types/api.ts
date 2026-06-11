@@ -20,3 +20,9 @@ export interface UpdateProfileRequest {
   displayName?: string;
   bio?: string;
 }
+
+export interface CreatePostRequest {
+  content: string;
+  replyToId?: number;
+  quoteOfId?: number;
+}

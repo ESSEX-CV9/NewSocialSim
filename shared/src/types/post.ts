@@ -12,4 +12,6 @@ export interface Post {
   likeCount: number;
   repostCount: number;
   replyCount: number;
+  /** 软删除：保留占位以维持对话串完整（"此帖已删除"） */
+  deleted: boolean;
 }

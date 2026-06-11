@@ -1,10 +1,22 @@
 import fastifyJwt from '@fastify/jwt';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
-import { makeRequireAuth } from './core/auth/auth-guard.js';
+import { makeOptionalAuth, makeRequireAuth } from './core/auth/auth-guard.js';
 import { AppError } from './core/errors/app-error.js';
 import type { WorldManager } from './core/world/world-manager.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { AuthService } from './modules/auth/auth.service.js';
+import { registerFollowsRoutes } from './modules/follows/follows.routes.js';
+import { FollowsService } from './modules/follows/follows.service.js';
+import { registerInteractionsRoutes } from './modules/interactions/interactions.routes.js';
+import { InteractionsService } from './modules/interactions/interactions.service.js';
+import { registerNotificationsRoutes } from './modules/notifications/notifications.routes.js';
+import { NotificationsService } from './modules/notifications/notifications.service.js';
+import { registerPostsRoutes } from './modules/posts/posts.routes.js';
+import { PostsService } from './modules/posts/posts.service.js';
+import { registerSearchRoutes } from './modules/search/search.routes.js';
+import { SearchService } from './modules/search/search.service.js';
+import { registerTimelineRoutes } from './modules/timeline/timeline.routes.js';
+import { TimelineService } from './modules/timeline/timeline.service.js';
 import { registerUsersRoutes } from './modules/users/users.routes.js';
 import { UsersService } from './modules/users/users.service.js';
 import { registerWorldsRoutes } from './modules/worlds/worlds.routes.js';
@@ -40,14 +52,28 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   const { worldManager } = deps;
   const requireAuth = makeRequireAuth(worldManager);
+  const optionalAuth = makeOptionalAuth(worldManager);
+
   const usersService = new UsersService(worldManager);
   const authService = new AuthService(worldManager, usersService);
+  const notificationsService = new NotificationsService(worldManager);
+  const postsService = new PostsService(worldManager, usersService, notificationsService);
+  const interactionsService = new InteractionsService(worldManager, postsService, notificationsService);
+  const followsService = new FollowsService(worldManager, usersService, notificationsService);
+  const timelineService = new TimelineService(worldManager, postsService);
+  const searchService = new SearchService(worldManager, postsService);
 
   app.get('/api/health', async () => ({ ok: true }));
 
   registerWorldsRoutes(app, { worldManager });
   registerAuthRoutes(app, { authService, worldManager, requireAuth });
   registerUsersRoutes(app, { usersService, requireAuth });
+  registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });
+  registerInteractionsRoutes(app, { interactionsService, requireAuth });
+  registerFollowsRoutes(app, { followsService, requireAuth });
+  registerNotificationsRoutes(app, { notificationsService, requireAuth });
+  registerTimelineRoutes(app, { timelineService, requireAuth, optionalAuth });
+  registerSearchRoutes(app, { searchService, optionalAuth });
 
   return app;
 }
