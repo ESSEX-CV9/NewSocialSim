@@ -96,6 +96,18 @@ const migrations: Migration[] = [
       CREATE INDEX idx_bookmarks_user_time ON bookmarks(user_id, created_at DESC);
     `,
   },
+  {
+    version: 4,
+    name: 'posts-quote-count',
+    sql: `
+      ALTER TABLE posts ADD COLUMN quote_count INTEGER NOT NULL DEFAULT 0;
+      CREATE INDEX idx_posts_quote_of ON posts(quote_of_id);
+      UPDATE posts SET quote_count = (
+        SELECT COUNT(*) FROM posts p2
+        WHERE p2.quote_of_id = posts.id AND p2.deleted = 0
+      );
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

@@ -11,6 +11,8 @@ export interface Post {
   createdAt: number;
   likeCount: number;
   repostCount: number;
+  /** 被引用次数（前端与转发数合并显示） */
+  quoteCount: number;
   replyCount: number;
   /** 软删除：保留占位以维持对话串完整（"此帖已删除"） */
   deleted: boolean;

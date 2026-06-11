@@ -140,6 +140,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [reposted, setReposted] = useState(post.repostedByViewer);
   const [repostCount, setRepostCount] = useState(post.repostCount);
+  const [quoteCount, setQuoteCount] = useState(post.quoteCount);
   const [bookmarked, setBookmarked] = useState(post.bookmarkedByViewer);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [repostMenuOpen, setRepostMenuOpen] = useState(false);
@@ -230,7 +231,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
             <span className="relative">
               <ActionButton
                 icon="ri-repeat-2-line"
-                count={repostCount}
+                count={repostCount + quoteCount}
                 color="green"
                 active={reposted}
                 onClick={(e) => {
@@ -328,6 +329,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
               bordered={false}
               onPosted={(p) => {
                 setQuoteOpen(false);
+                setQuoteCount((c) => c + 1);
                 navigate(`/post/${p.id}`);
               }}
             />

@@ -10,6 +10,7 @@ export interface PostRow {
   created_at: number;
   like_count: number;
   repost_count: number;
+  quote_count: number;
   reply_count: number;
   deleted: number;
   author_handle: string;
@@ -29,6 +30,7 @@ const SELECT_POST = `
 export interface CountDeltas {
   like?: number;
   repost?: number;
+  quote?: number;
   reply?: number;
 }
 
@@ -136,9 +138,16 @@ export const postsRepo = {
       `UPDATE posts SET
          like_count   = like_count   + @like,
          repost_count = repost_count + @repost,
+         quote_count  = quote_count  + @quote,
          reply_count  = reply_count  + @reply
        WHERE id = @postId`,
-    ).run({ postId, like: deltas.like ?? 0, repost: deltas.repost ?? 0, reply: deltas.reply ?? 0 });
+    ).run({
+      postId,
+      like: deltas.like ?? 0,
+      repost: deltas.repost ?? 0,
+      quote: deltas.quote ?? 0,
+      reply: deltas.reply ?? 0,
+    });
   },
 
   markDeleted(db: WorldDb, postId: number): void {

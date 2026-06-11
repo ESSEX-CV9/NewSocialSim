@@ -54,6 +54,7 @@ export class PostsService {
         });
       }
       if (quoted) {
+        postsRepo.adjustCounts(db, quoted.id, { quote: 1 });
         this.notificationsService.add({
           userId: quoted.author_id,
           type: 'quote',
@@ -152,6 +153,9 @@ export class PostsService {
       if (row.reply_to_id !== null) {
         postsRepo.adjustCounts(db, row.reply_to_id, { reply: -1 });
       }
+      if (row.quote_of_id !== null) {
+        postsRepo.adjustCounts(db, row.quote_of_id, { quote: -1 });
+      }
     })();
   }
 
@@ -205,6 +209,7 @@ export class PostsService {
       createdAt: row.created_at,
       likeCount: row.like_count,
       repostCount: row.repost_count,
+      quoteCount: row.quote_count,
       replyCount: row.reply_count,
       deleted: row.deleted === 1,
       author: toUserSummary(row),
