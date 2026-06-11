@@ -41,7 +41,9 @@ export const messages = {
     'composer.send': '发帖',
     'composer.reply': '回复',
     'composer.addImage': '添加图片',
+    'composer.addMedia': '添加图片或视频',
     'composer.imageLimit': '最多 4 张图片',
+    'composer.videoLimit': '视频只能单独发布',
     'composer.removeImage': '移除',
 
     'media.viewerClose': '关闭',
@@ -214,7 +216,9 @@ export const messages = {
     'composer.send': 'Post',
     'composer.reply': 'Reply',
     'composer.addImage': 'Add image',
+    'composer.addMedia': 'Add image or video',
     'composer.imageLimit': 'Up to 4 images',
+    'composer.videoLimit': 'A video must be posted on its own',
     'composer.removeImage': 'Remove',
 
     'media.viewerClose': 'Close',

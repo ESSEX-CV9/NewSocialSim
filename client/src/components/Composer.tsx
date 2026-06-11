@@ -7,7 +7,7 @@ import { Avatar } from './Avatar';
 
 const MAX_LENGTH = 280;
 const MAX_MEDIA = 4;
-const IMAGE_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif';
+const MEDIA_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm';
 
 interface ComposerProps {
   replyToId?: number;
@@ -44,8 +44,14 @@ export function Composer({
 
   const pickFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const room = MAX_MEDIA - media.length;
-    if (files.length > room) {
+    const picked = Array.from(files);
+    const hasVideo = picked.some((f) => f.type.startsWith('video/'));
+    // 视频只能单独发布：不与图片混选，也不追加到已有媒体
+    if ((hasVideo && (picked.length > 1 || media.length > 0)) || media.some((m) => m.type === 'video')) {
+      setError(t('composer.videoLimit'));
+      return;
+    }
+    if (picked.length > MAX_MEDIA - media.length) {
       setError(t('composer.imageLimit'));
       return;
     }
@@ -53,7 +59,7 @@ export function Composer({
     setError(null);
     try {
       const uploaded: MediaView[] = [];
-      for (const file of Array.from(files)) {
+      for (const file of picked) {
         const res = await api.uploadMedia(file);
         uploaded.push(res.media);
       }
@@ -106,7 +112,11 @@ export function Composer({
           <div className={`mb-2 grid gap-2 ${media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
             {media.map((m) => (
               <div key={m.id} className="relative overflow-hidden rounded-2xl border border-x-border">
-                <img src={m.url} alt="" className="max-h-72 w-full object-cover" draggable={false} />
+                {m.type === 'video' ? (
+                  <video src={m.url} controls preload="metadata" className="max-h-72 w-full" />
+                ) : (
+                  <img src={m.url} alt="" className="max-h-72 w-full object-cover" draggable={false} />
+                )}
                 <button
                   aria-label={t('composer.removeImage')}
                   onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
@@ -125,15 +135,15 @@ export function Composer({
           <input
             ref={fileInputRef}
             type="file"
-            accept={IMAGE_ACCEPT}
+            accept={MEDIA_ACCEPT}
             multiple
             className="hidden"
             onChange={(e) => void pickFiles(e.target.files)}
           />
           <button
-            aria-label={t('composer.addImage')}
-            title={t('composer.addImage')}
-            disabled={uploading || media.length >= MAX_MEDIA}
+            aria-label={t('composer.addMedia')}
+            title={t('composer.addMedia')}
+            disabled={uploading || media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
             onClick={() => fileInputRef.current?.click()}
             className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
           >

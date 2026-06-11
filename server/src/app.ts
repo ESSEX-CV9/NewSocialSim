@@ -54,7 +54,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   app.register(fastifyJwt, { secret: deps.jwtSecret });
-  app.register(fastifyMultipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
+  // 上限按视频放到 100MB；图片的 10MB 限制在 media.service 内单独校验
+  app.register(fastifyMultipart, { limits: { fileSize: 100 * 1024 * 1024, files: 1 } });
 
   const { worldManager } = deps;
   const requireAuth = makeRequireAuth(worldManager);

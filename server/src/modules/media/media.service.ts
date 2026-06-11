@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import type { Readable } from 'node:stream';
 import type { MediaView } from '@socialsim/shared';
 import { imageSize } from 'image-size';
 import { config } from '../../config.js';
@@ -14,9 +16,26 @@ const IMAGE_MIMES: Record<string, string> = {
   'image/webp': 'webp',
   'image/gif': 'gif',
 };
+/** 视频 mime 白名单 → 存盘扩展名 */
+const VIDEO_MIMES: Record<string, string> = {
+  'video/mp4': 'mp4',
+  'video/webm': 'webm',
+};
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 /** 一条帖子最多挂的媒体数（X 规则） */
 const MAX_PER_POST = 4;
+
+export function isImageMime(mime: string): boolean {
+  return mime in IMAGE_MIMES;
+}
+
+export function isVideoMime(mime: string): boolean {
+  return mime in VIDEO_MIMES;
+}
+
+/** 视频临时落盘文件名计数器（进程内自增，避免并发上传互踩） */
+let pendingCounter = 0;
 
 /** 媒体文件公开 URL 的纯函数版（供各模块组装 UserSummary 等使用） */
 export function mediaFileUrl(mediaId: number | null, worldId: string): string | null {
@@ -95,19 +114,68 @@ export class MediaService {
     return this.toView(row);
   }
 
-  /** 文件流（公开端点用）；w 与活动世界不一致按不存在处理 */
-  getFileStream(id: number, w: string): { stream: fs.ReadStream; mime: string; size: number } {
+  /** 视频从流式上传创建：先落临时文件（不进内存），入库后改名为 <id>.<ext> */
+  async createVideoFromStream(
+    ownerId: number,
+    source: Readable & { truncated?: boolean },
+    mime: string,
+  ): Promise<MediaView> {
+    const ext = VIDEO_MIMES[mime];
+    if (!ext) throw new ValidationError(`不支持的视频类型：${mime}`);
+
+    const dir = this.mediaDir();
+    const tmpPath = path.join(dir, `pending-${process.pid}-${++pendingCounter}.${ext}`);
+    let size = 0;
+    try {
+      source.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+      });
+      await pipeline(source, fs.createWriteStream(tmpPath));
+      // multipart 的 fileSize 上限触发时流被截断而不报错，必须显式检查
+      if (source.truncated || size > MAX_VIDEO_BYTES) {
+        throw new ValidationError(`视频最大 ${MAX_VIDEO_BYTES / 1024 / 1024}MB`);
+      }
+      if (size === 0) throw new ValidationError('文件为空');
+
+      const { db, clock } = this.worldManager.current();
+      const id = db.transaction(() => {
+        const mediaId = mediaRepo.insert(db, {
+          ownerId,
+          type: 'video',
+          mime,
+          width: null,
+          height: null,
+          sizeBytes: size,
+          source: 'upload',
+          originUrl: null,
+          createdAt: clock.now(),
+        });
+        mediaRepo.updateFileName(db, mediaId, `${mediaId}.${ext}`);
+        return mediaId;
+      })();
+      try {
+        fs.renameSync(tmpPath, path.join(dir, `${id}.${ext}`));
+      } catch (err) {
+        mediaRepo.delete(db, id);
+        throw err;
+      }
+      const row = mediaRepo.findById(db, id)!;
+      return this.toView(row);
+    } catch (err) {
+      fs.rmSync(tmpPath, { force: true });
+      throw err;
+    }
+  }
+
+  /** 文件元信息（公开端点用，Range 由 controller 处理）；w 与活动世界不一致按不存在处理 */
+  getFileInfo(id: number, w: string): { filePath: string; mime: string; size: number } {
     const { worldId, db } = this.worldManager.current();
     if (w !== worldId) throw new NotFoundError(`媒体 #${id} 不存在`);
     const row = mediaRepo.findById(db, id);
     if (!row || !row.file_name) throw new NotFoundError(`媒体 #${id} 不存在`);
     const filePath = path.join(this.mediaDir(), row.file_name);
     if (!fs.existsSync(filePath)) throw new NotFoundError(`媒体 #${id} 文件缺失`);
-    return {
-      stream: fs.createReadStream(filePath),
-      mime: row.mime,
-      size: row.size_bytes,
-    };
+    return { filePath, mime: row.mime, size: row.size_bytes };
   }
 
   /** 批量取多个帖子的媒体视图（posts.service.buildViews 用） */
@@ -124,8 +192,8 @@ export class MediaService {
   }
 
   /**
-   * 校验一组媒体可挂到新帖：≤4、全部存在且本人所有、未被其他帖占用。
-   * A 期仅图片。规则：一条媒体只能挂一个帖子；头像/Banner 不占用名额。
+   * 校验一组媒体可挂到新帖：≤4 张图或恰 1 个视频（不混排）、全部存在且本人所有、
+   * 未被其他帖占用。规则：一条媒体只能挂一个帖子；头像/Banner 不占用名额。
    */
   validateAttachable(ownerId: number, mediaIds: number[]): void {
     if (mediaIds.length === 0) return;
@@ -137,7 +205,9 @@ export class MediaService {
     if (rows.length !== mediaIds.length) throw new ValidationError('包含不存在的媒体');
     for (const row of rows) {
       if (row.owner_id !== ownerId) throw new ValidationError('只能使用自己上传的媒体');
-      if (row.type !== 'image') throw new ValidationError('暂只支持图片媒体');
+    }
+    if (rows.some((r) => r.type === 'video') && rows.length > 1) {
+      throw new ValidationError('视频只能单独发布，不能与其他媒体混排');
     }
     const attached = mediaRepo.attachedSet(db, mediaIds);
     if (attached.size > 0) throw new ValidationError('媒体已被其他帖子使用');

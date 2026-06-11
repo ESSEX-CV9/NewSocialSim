@@ -383,9 +383,16 @@ export function ProfilePage() {
                 <button
                   key={`${post.id}-${m.id}`}
                   onClick={() => navigate(`/post/${post.id}`)}
-                  className="aspect-square overflow-hidden bg-x-input"
+                  className="relative aspect-square overflow-hidden bg-x-input"
                 >
-                  <img src={m.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  {m.type === 'video' ? (
+                    <>
+                      <video src={m.url} preload="metadata" muted className="h-full w-full object-cover" />
+                      <i className="ri-play-circle-fill absolute right-1.5 bottom-1.5 text-[22px] text-white drop-shadow" />
+                    </>
+                  ) : (
+                    <img src={m.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                  )}
                 </button>
               )),
             )}
