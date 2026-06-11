@@ -3,10 +3,12 @@ import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
+import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
 import { TimeAgo } from './TimeAgo';
+import { useViewTracking } from './useViewTracking';
 
 /** 帖子正文：#话题 转搜索链接，@用户名 转主页链接 */
 function PostContent({ content }: { content: string }) {
@@ -94,6 +96,7 @@ function ActionButton({
   active?: boolean | undefined;
   onClick?: ((e: MouseEvent) => void) | undefined;
 }) {
+  const fmt = useFormatCount();
   const colorClass = {
     blue: { text: 'hover:text-x-blue', bubble: 'group-hover/act:bg-x-blue/10', on: 'text-x-blue' },
     green: {
@@ -117,7 +120,7 @@ function ActionButton({
       >
         <i className={`${icon} text-[16px]`} />
       </span>
-      {count !== undefined && count > 0 && <span className="ml-2.5">{count}</span>}
+      {count !== undefined && count > 0 && <span className="ml-2.5">{fmt(count)}</span>}
       {label && <span className="ml-2.5">{label}</span>}
     </button>
   );
@@ -145,6 +148,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [repostMenuOpen, setRepostMenuOpen] = useState(false);
   const [gone, setGone] = useState(false);
+  const viewRef = useViewTracking(post.id, !post.deleted && !gone);
 
   if (gone) return null;
   if (post.deleted) {
@@ -188,6 +192,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
 
   return (
     <article
+      ref={viewRef}
       onClick={() => !large && navigate(`/post/${post.id}`)}
       className={`border-b border-x-border px-4 py-3 ${
         large ? '' : 'cursor-pointer transition-colors duration-200 hover:bg-x-hover'
@@ -283,6 +288,8 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
               active={liked}
               onClick={(e) => void toggleLike(e)}
             />
+            {/* 浏览量：仅展示，无动作（stopPropagation 防整卡跳详情） */}
+            <ActionButton icon="ri-bar-chart-2-line" count={post.viewCount} color="blue" onClick={stop} />
             <span className="flex items-center gap-1">
               {user?.id === post.authorId && (
                 <ActionButton icon="ri-delete-bin-line" color="red" onClick={(e) => void remove(e)} />

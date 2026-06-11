@@ -9,6 +9,7 @@ import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { TimeAgo } from '../../components/TimeAgo';
 import { usePagedQuery } from '../../components/usePagedQuery';
+import { useFormatCount } from '../../i18n/formatCount';
 import { useI18n } from '../../i18n/I18nContext';
 import type { MessageKey } from '../../i18n/messages';
 
@@ -112,6 +113,7 @@ function AvatarStack({ actors }: { actors: RankedActor[] }) {
 function groupText(
   group: NotificationGroup,
   t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+  fmt: (n: number) => string,
 ): string {
   const first = group.items[0]!;
   if (group.items.length === 1) return t(`notif.${first.type}`);
@@ -119,23 +121,24 @@ function groupText(
   const distinctActors = new Set(group.items.map((n) => n.actor.id)).size;
   if (first.type === 'follow') {
     return distinctActors > 1
-      ? t('notif.followMany', { n: distinctActors - 1 })
+      ? t('notif.followMany', { n: fmt(distinctActors - 1) })
       : t('notif.follow');
   }
   // like / repost
   if (distinctActors > 1) {
     return t(first.type === 'like' ? 'notif.likeManyActors' : 'notif.repostManyActors', {
-      n: distinctActors - 1,
+      n: fmt(distinctActors - 1),
     });
   }
   const distinctPosts = new Set(group.items.map((n) => n.postId)).size;
   return t(first.type === 'like' ? 'notif.likeManyPosts' : 'notif.repostManyPosts', {
-    n: distinctPosts,
+    n: fmt(distinctPosts),
   });
 }
 
 export function NotificationsPage() {
   const { t } = useI18n();
+  const fmt = useFormatCount();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
@@ -220,7 +223,7 @@ export function NotificationsPage() {
                 {/* 三层文字层级：动作文案最实 > 帖子摘要居中且更小 > 时间最浅 */}
                 <div className="mt-2 text-[15px]">
                   <span className="font-bold">{lead.user.displayName}</span>{' '}
-                  <span>{groupText(group, t)}</span>
+                  <span>{groupText(group, t, fmt)}</span>
                   <span className="text-x-dim">
                     {' '}
                     · <TimeAgo at={first.createdAt} />

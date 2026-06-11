@@ -108,6 +108,13 @@ const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 5,
+    name: 'posts-view-count',
+    sql: `
+      ALTER TABLE posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0;
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

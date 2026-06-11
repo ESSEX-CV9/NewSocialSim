@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { UserSummary } from '@socialsim/shared';
 import { api } from '../api/endpoints';
+import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
 import { useWorld } from '../world/WorldContext';
 import { Avatar } from './Avatar';
@@ -11,6 +12,7 @@ import { SimClockDisplay } from './SimClockDisplay';
 /** 右边栏"有什么新鲜事"：近期 #话题 排行 */
 function TrendsCard() {
   const { t } = useI18n();
+  const fmt = useFormatCount();
   const navigate = useNavigate();
   const trends = useQuery({
     queryKey: ['trends'],
@@ -33,7 +35,7 @@ function TrendsCard() {
           >
             <div className="text-[13px] text-x-dim">{t('trends.trending')}</div>
             <div className="text-[15px] font-bold text-x-text">{item.tag}</div>
-            <div className="text-[13px] text-x-dim">{t('trends.postCount', { n: item.postCount })}</div>
+            <div className="text-[13px] text-x-dim">{t('trends.postCount', { n: fmt(item.postCount) })}</div>
           </button>
         ))
       )}

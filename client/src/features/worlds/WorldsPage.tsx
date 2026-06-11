@@ -4,6 +4,7 @@ import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
 import { ErrorBox, Spinner } from '../../components/Feedback';
 import { SimClockDisplay } from '../../components/SimClockDisplay';
+import { resetViewTracking } from '../../components/useViewTracking';
 import { useI18n } from '../../i18n/I18nContext';
 import { useWorld } from '../../world/WorldContext';
 import { inputClass } from '../auth/LoginPage';
@@ -109,6 +110,7 @@ export function WorldsPage() {
     // 切换世界后旧 token 必然失效：主动登出并刷新全部数据
     logout();
     queryClient.clear();
+    resetViewTracking(); // 不刷新页面，新世界帖子 id 会与旧世界重叠
     reload();
   };
 

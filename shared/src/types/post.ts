@@ -14,6 +14,8 @@ export interface Post {
   /** 被引用次数（前端与转发数合并显示） */
   quoteCount: number;
   replyCount: number;
+  /** 浏览量：曝光计数（卡片进入视口由客户端批量上报；模拟器层可经同一 API 或管理端注入） */
+  viewCount: number;
   /** 软删除：保留占位以维持对话串完整（"此帖已删除"） */
   deleted: boolean;
 }

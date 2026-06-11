@@ -12,6 +12,7 @@ export interface PostRow {
   repost_count: number;
   quote_count: number;
   reply_count: number;
+  view_count: number;
   deleted: number;
   author_handle: string;
   author_display_name: string;
@@ -32,6 +33,7 @@ export interface CountDeltas {
   repost?: number;
   quote?: number;
   reply?: number;
+  view?: number;
 }
 
 export const postsRepo = {
@@ -139,7 +141,8 @@ export const postsRepo = {
          like_count   = like_count   + @like,
          repost_count = repost_count + @repost,
          quote_count  = quote_count  + @quote,
-         reply_count  = reply_count  + @reply
+         reply_count  = reply_count  + @reply,
+         view_count   = view_count   + @view
        WHERE id = @postId`,
     ).run({
       postId,
@@ -147,7 +150,17 @@ export const postsRepo = {
       repost: deltas.repost ?? 0,
       quote: deltas.quote ?? 0,
       reply: deltas.reply ?? 0,
+      view: deltas.view ?? 0,
     });
+  },
+
+  /** 批量曝光 +1：不存在/已删除的 id 自动忽略 */
+  incrementViewCounts(db: WorldDb, ids: number[]): void {
+    if (ids.length === 0) return;
+    const placeholders = ids.map(() => '?').join(',');
+    db.prepare(
+      `UPDATE posts SET view_count = view_count + 1 WHERE id IN (${placeholders}) AND deleted = 0`,
+    ).run(...ids);
   },
 
   markDeleted(db: WorldDb, postId: number): void {

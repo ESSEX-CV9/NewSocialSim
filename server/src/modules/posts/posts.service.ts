@@ -174,6 +174,17 @@ export class PostsService {
     postsRepo.adjustCounts(db, postId, deltas);
   }
 
+  /** 批量曝光上报：每帖 +1（前端与未来的模拟器虚拟用户走同一 HTTP API） */
+  recordViews(ids: number[]): void {
+    const { db } = this.worldManager.current();
+    postsRepo.incrementViewCounts(db, [...new Set(ids)]);
+  }
+
+  /** 按任意增量调整浏览量（预留：上帝控制台/管理端批量注入模拟浏览量） */
+  addViews(postId: number, delta: number): void {
+    this.adjustCounts(postId, { view: delta });
+  }
+
   /** 按给定顺序批量构建视图（timeline 用） */
   getViewsByIds(ids: number[], viewerId: number | null): Map<number, PostView> {
     const { db } = this.worldManager.current();
@@ -211,6 +222,7 @@ export class PostsService {
       repostCount: row.repost_count,
       quoteCount: row.quote_count,
       replyCount: row.reply_count,
+      viewCount: row.view_count,
       deleted: row.deleted === 1,
       author: toUserSummary(row),
       likedByViewer: liked.has(row.id),

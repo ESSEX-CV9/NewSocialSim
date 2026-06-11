@@ -45,6 +45,7 @@ export const api = {
   getUserLikes: (handle: string, cursor?: string) =>
     http<Page<PostView>>('GET', withPage(`/api/users/${handle}/likes`, cursor)),
   deletePost: (id: number) => http<void>('DELETE', `/api/posts/${id}`),
+  recordViews: (ids: number[]) => http<void>('POST', '/api/posts/views', { ids }),
 
   // interactions
   like: (id: number) => http<{ active: boolean; count: number }>('POST', `/api/posts/${id}/like`),

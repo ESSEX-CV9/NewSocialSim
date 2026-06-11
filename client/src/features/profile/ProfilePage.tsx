@@ -8,6 +8,7 @@ import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { PostCard } from '../../components/PostCard';
 import { usePagedQuery } from '../../components/usePagedQuery';
+import { useFormatCount } from '../../i18n/formatCount';
 import { useI18n } from '../../i18n/I18nContext';
 import { inputClass } from '../auth/LoginPage';
 
@@ -67,6 +68,7 @@ export function ProfilePage() {
   const { handle = '' } = useParams();
   const { user: viewer } = useAuth();
   const { t, locale } = useI18n();
+  const fmt = useFormatCount();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -141,7 +143,7 @@ export function ProfilePage() {
         </button>
         <div>
           <div className="text-xl leading-tight font-bold">{u.displayName}</div>
-          <div className="text-[13px] text-x-dim">{t('profile.postCount', { n: u.postCount })}</div>
+          <div className="text-[13px] text-x-dim">{t('profile.postCount', { n: fmt(u.postCount) })}</div>
         </div>
       </div>
 
@@ -201,10 +203,10 @@ export function ProfilePage() {
 
         <div className="mt-3 flex gap-5 text-[14px] text-x-dim">
           <Link to={`/u/${handle}/following`} className="hover:underline">
-            <b className="text-x-text">{u.followingCount}</b> {t('profile.following')}
+            <b className="text-x-text">{fmt(u.followingCount)}</b> {t('profile.following')}
           </Link>
           <Link to={`/u/${handle}/followers`} className="hover:underline">
-            <b className="text-x-text">{u.followerCount}</b> {t('profile.followers')}
+            <b className="text-x-text">{fmt(u.followerCount)}</b> {t('profile.followers')}
           </Link>
         </div>
       </div>

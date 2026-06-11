@@ -64,4 +64,9 @@ export class PostsController {
     this.service.delete(req.params.id, req.user.sub);
     reply.status(204).send();
   };
+
+  recordViews = async (req: FastifyRequest<{ Body: { ids: number[] } }>, reply: FastifyReply) => {
+    this.service.recordViews(req.body.ids);
+    reply.status(204).send();
+  };
 }

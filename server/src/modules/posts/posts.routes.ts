@@ -14,6 +14,21 @@ const createPostBodySchema = {
   },
 } as const;
 
+const recordViewsBodySchema = {
+  type: 'object',
+  required: ['ids'],
+  additionalProperties: false,
+  properties: {
+    ids: {
+      type: 'array',
+      items: { type: 'integer', minimum: 1 },
+      minItems: 1,
+      maxItems: 100,
+      uniqueItems: true,
+    },
+  },
+} as const;
+
 const idParamsSchema = {
   type: 'object',
   required: ['id'],
@@ -80,5 +95,11 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
     '/api/posts/:id',
     { preHandler: deps.requireAuth, schema: { params: idParamsSchema } },
     controller.delete,
+  );
+  // 曝光上报：匿名也计数（optionalAuth 同时兼容不带 Authorization 头的 sendBeacon）
+  app.post<{ Body: { ids: number[] } }>(
+    '/api/posts/views',
+    { preHandler: deps.optionalAuth, schema: { body: recordViewsBodySchema } },
+    controller.recordViews,
   );
 }

@@ -10,6 +10,7 @@ import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { PostCard } from '../../components/PostCard';
 import { usePagedQuery } from '../../components/usePagedQuery';
+import { useFormatCount } from '../../i18n/formatCount';
 import { useI18n } from '../../i18n/I18nContext';
 
 type MainTab = 'foryou' | 'following';
@@ -77,6 +78,7 @@ function TabWithMenu<T extends string>({
 /** 没关注任何人时的推荐关注列表 */
 function FollowSuggestions() {
   const { t } = useI18n();
+  const fmt = useFormatCount();
   const queryClient = useQueryClient();
   const suggestions = useQuery({ queryKey: ['suggested-users'], queryFn: api.suggestedUsers });
   const [followed, setFollowed] = useState<Set<number>>(new Set());
@@ -99,7 +101,7 @@ function FollowSuggestions() {
           <Link to={`/u/${u.handle}`} className="min-w-0 flex-1">
             <div className="text-[15px] font-bold hover:underline">{u.displayName}</div>
             <div className="text-[14px] text-x-dim">
-              @{u.handle} · {t('timeline.followerCount', { n: u.followerCount })}
+              @{u.handle} · {t('timeline.followerCount', { n: fmt(u.followerCount) })}
             </div>
           </Link>
           <button
