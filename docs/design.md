@@ -70,18 +70,21 @@ NewSocialSim/
 └── data/worlds/<id>/       # 运行时数据（不入 git）：world.db + world.json
 ```
 
-### 数据库 schema（当前 version 6）
+### 数据库 schema（当前 version 7）
 
-- `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at, pinned_post_id)`
+- `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at, pinned_post_id, avatar_media_id, banner_media_id)`
 - `posts(id, author_id, content, reply_to_id, quote_of_id, created_at, like_count, repost_count, quote_count, reply_count, view_count, deleted)`
 - `likes(user_id, post_id, created_at)`、`reposts(...)`、`bookmarks(...)`、`hidden_posts(...)` —— 主键 (user_id, post_id)
 - `follows(follower_id, followee_id, created_at)`
 - `blocks(blocker_id, blocked_id, created_at)` —— 主键 (blocker_id, blocked_id)
 - `notifications(id, user_id, type, actor_id, post_id, read, created_at)`
+- `media(id, owner_id, type, file_name, mime, width, height, size_bytes, source, origin_url, created_at)`、`post_media(post_id, media_id, position)` —— 主键 (post_id, position)
 
 所有 `created_at` 存储的是世界模拟时间（unix 毫秒形式）。`users.is_bot` 为第二阶段虚拟用户预留。计数字段（like_count 等）为反规范化，由 service 在事务内随互动维护；`view_count` 为曝光计数，由客户端经 `POST /api/posts/views` 批量上报（会话内去重），service 另留 `addViews(postId, delta)` 任意增量方法供未来管理端注入模拟浏览量。
 
 屏蔽为单向隐藏：被屏蔽者的帖子/转发从屏蔽者的关注流、为你推荐、全站流、搜索、回复区消失，其互动产生的通知（含未读数）被过滤，推荐关注排除；个人主页时间线、书签与喜欢列表、帖子详情主体不过滤（主动访问场景）。`hidden_posts`（隐藏单帖）在相同范围生效。置顶为每用户一条（`users.pinned_post_id`），个人主页时间线排除置顶帖、由前端单独渲染在顶部。
+
+媒体系统：文件存 `data/worlds/<id>/media/<mediaId>.<ext>`（世界自包含，复制文件夹即含全部媒体），路径每次经活动世界现算保证热切换安全。文件端点 `GET /api/media/:id/file?w=<worldId>` 公开（img 标签带不了 JWT）并返回 immutable 缓存头，`?w=` 防止切世界后媒体 id 撞号造成浏览器缓存污染。一条媒体只能挂一个帖子（≤4 张图），头像/Banner 不占名额；纯图帖允许空文案；软删帖保留媒体文件与关联。外部图片（URL 引入/搜图，C/D 期）一律下载入库不热链。媒体系统按 A 图片地基 → B 视频 → C URL 引入+OG 链接卡片 → D 关键字搜图（Pinterest/Pixiv 等 7 源 + CDP 引导登录）四期推进，当前完成 A 期。
 
 ### 关键机制
 
