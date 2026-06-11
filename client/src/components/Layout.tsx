@@ -76,7 +76,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <i className="fas fa-tower-broadcast text-x-blue" />
           <span className="hidden min-[800px]:inline">{t('app.name')}</span>
         </Link>
-        <nav className="mt-1 flex flex-col items-center gap-1 min-[800px]:items-stretch">
+        <nav className="mt-1 flex flex-col items-center gap-5 min-[800px]:items-stretch">
           <NavItem to="/" icon="fas fa-house" label={t('nav.home')} />
           {user && (
             <NavItem
