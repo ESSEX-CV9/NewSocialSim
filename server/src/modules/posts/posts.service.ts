@@ -6,6 +6,7 @@ import {
 } from '../../core/errors/app-error.js';
 import { decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { extractFirstUrl, type LinkCardsService } from '../link-cards/link-cards.service.js';
 import type { MediaService } from '../media/media.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { UsersService } from '../users/users.service.js';
@@ -21,9 +22,10 @@ export class PostsService {
     private readonly usersService: UsersService,
     private readonly notificationsService: NotificationsService,
     private readonly mediaService: MediaService,
+    private readonly linkCardsService: LinkCardsService,
   ) {}
 
-  create(authorId: number, input: CreatePostRequest): PostView {
+  async create(authorId: number, input: CreatePostRequest): Promise<PostView> {
     const content = input.content.trim();
     const mediaIds = input.mediaIds ?? [];
     // 有媒体时允许纯图无文字（与 X 一致）
@@ -35,6 +37,12 @@ export class PostsService {
       throw new ValidationError('一条帖子不能同时是回复和引用');
     }
     this.mediaService.validateAttachable(authorId, mediaIds);
+
+    // 正文首个 URL 预抓 OG 卡片（内部吞错，失败不阻断发帖）
+    const firstUrl = extractFirstUrl(content);
+    if (firstUrl !== null && mediaIds.length === 0) {
+      await this.linkCardsService.resolve(firstUrl, authorId);
+    }
 
     const { db, clock } = this.worldManager.current();
     const parent = input.replyToId !== undefined ? this.getLiveRow(input.replyToId) : null;
@@ -257,6 +265,14 @@ export class PostsService {
         ? postsRepo.followedAuthorSet(db, viewerId, [...new Set(allRows.map((r) => r.author_id))])
         : new Set<number>();
     const mediaMap = this.mediaService.viewsForPosts(allIds);
+    // 链接卡片：取各帖正文首 URL 批量查缓存（有媒体的帖不显示卡片，X 行为）
+    const firstUrls = new Map<number, string>();
+    for (const r of allRows) {
+      if (r.deleted === 1) continue;
+      const u = extractFirstUrl(r.content);
+      if (u !== null) firstUrls.set(r.id, u);
+    }
+    const cardMap = this.linkCardsService.viewsForUrls([...firstUrls.values()]);
     const byId = new Map(allRows.map((r) => [r.id, r]));
 
     const toView = (row: PostRow, embedQuote: boolean): PostView => ({
@@ -283,6 +299,10 @@ export class PostsService {
       bookmarkedByViewer: bookmarked.has(row.id),
       authorFollowedByViewer: followedAuthors.has(row.author_id),
       media: row.deleted === 1 ? [] : (mediaMap.get(row.id) ?? []),
+      linkCard:
+        row.deleted === 1 || (mediaMap.get(row.id)?.length ?? 0) > 0
+          ? null
+          : (cardMap.get(firstUrls.get(row.id) ?? '') ?? null),
       quoted:
         embedQuote && row.quote_of_id !== null
           ? (() => {

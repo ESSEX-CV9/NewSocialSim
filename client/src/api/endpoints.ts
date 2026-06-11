@@ -55,6 +55,8 @@ export const api = {
   },
   getUserMedia: (handle: string, cursor?: string) =>
     http<Page<PostView>>('GET', withPage(`/api/users/${handle}/media`, cursor)),
+  mediaFromUrl: (url: string, source?: string) =>
+    http<{ media: MediaView }>('POST', '/api/media/from-url', { url, ...(source ? { source } : {}) }),
 
   pinPost: (id: number) => http<{ pinnedPostId: number | null }>('POST', `/api/posts/${id}/pin`),
   unpinPost: (id: number) =>

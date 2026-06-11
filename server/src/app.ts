@@ -12,6 +12,7 @@ import { registerFollowsRoutes } from './modules/follows/follows.routes.js';
 import { FollowsService } from './modules/follows/follows.service.js';
 import { registerInteractionsRoutes } from './modules/interactions/interactions.routes.js';
 import { InteractionsService } from './modules/interactions/interactions.service.js';
+import { LinkCardsService } from './modules/link-cards/link-cards.service.js';
 import { registerMediaRoutes } from './modules/media/media.routes.js';
 import { MediaService } from './modules/media/media.service.js';
 import { registerNotificationsRoutes } from './modules/notifications/notifications.routes.js';
@@ -62,10 +63,17 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const optionalAuth = makeOptionalAuth(worldManager);
 
   const mediaService = new MediaService(worldManager);
+  const linkCardsService = new LinkCardsService(worldManager, mediaService);
   const usersService = new UsersService(worldManager, mediaService);
   const authService = new AuthService(worldManager, usersService);
   const notificationsService = new NotificationsService(worldManager);
-  const postsService = new PostsService(worldManager, usersService, notificationsService, mediaService);
+  const postsService = new PostsService(
+    worldManager,
+    usersService,
+    notificationsService,
+    mediaService,
+    linkCardsService,
+  );
   const interactionsService = new InteractionsService(worldManager, postsService, notificationsService);
   const followsService = new FollowsService(worldManager, usersService, notificationsService);
   const blocksService = new BlocksService(worldManager, usersService, followsService);

@@ -36,6 +36,8 @@ export function Composer({
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [urlInputOpen, setUrlInputOpen] = useState(false);
+  const [urlValue, setUrlValue] = useState('');
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!user) return null;
@@ -69,6 +71,27 @@ export function Composer({
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const addFromUrl = async () => {
+    const url = urlValue.trim();
+    if (!url || uploading) return;
+    if (media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')) {
+      setError(media.some((m) => m.type === 'video') ? t('composer.videoLimit') : t('composer.imageLimit'));
+      return;
+    }
+    setUploading(true);
+    setError(null);
+    try {
+      const res = await api.mediaFromUrl(url);
+      setMedia((prev) => [...prev, res.media]);
+      setUrlValue('');
+      setUrlInputOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -131,6 +154,28 @@ export function Composer({
         {error && (
           <div className="mb-2 text-sm text-x-red">{t('common.error', { message: error })}</div>
         )}
+        {urlInputOpen && (
+          <div className="mb-2 flex items-center gap-2">
+            <input
+              value={urlValue}
+              onChange={(e) => setUrlValue(e.target.value)}
+              placeholder={t('composer.urlPrompt')}
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') void addFromUrl();
+                if (e.key === 'Escape') setUrlInputOpen(false);
+              }}
+              className="min-w-0 flex-1 rounded-full border border-x-border bg-transparent px-4 py-1.5 text-[14px] outline-none placeholder:text-x-dim focus:border-x-blue"
+            />
+            <button
+              onClick={() => void addFromUrl()}
+              disabled={uploading || urlValue.trim().length === 0}
+              className="rounded-full bg-x-blue px-4 py-1.5 text-[14px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
+            >
+              {t('composer.urlAdd')}
+            </button>
+          </div>
+        )}
         <div className="mt-1 flex items-center border-t border-x-border pt-3">
           <input
             ref={fileInputRef}
@@ -148,6 +193,15 @@ export function Composer({
             className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <i className={`${uploading ? 'ri-loader-4-line animate-spin' : 'ri-image-line'} text-[18px]`} />
+          </button>
+          <button
+            aria-label={t('composer.addFromUrl')}
+            title={t('composer.addFromUrl')}
+            disabled={uploading || media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
+            onClick={() => setUrlInputOpen((v) => !v)}
+            className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <i className="ri-link text-[18px]" />
           </button>
           <div className="ml-auto flex items-center gap-3">
             <span

@@ -33,6 +33,8 @@ export interface PostView extends Post {
   authorFollowedByViewer: boolean;
   /** 附加媒体（最多 4 张图或 1 个视频），按 position 排序；墓碑帖为空数组 */
   media: MediaView[];
+  /** 正文首个 URL 的链接卡片；有媒体时不显示（X 行为），抓取失败为 null */
+  linkCard: LinkCardView | null;
 }
 
 export interface TimelineItem {
@@ -58,6 +60,16 @@ export interface NotificationView {
   postExcerpt: string | null;
   read: boolean;
   createdAt: number;
+}
+
+/** 正文首个 URL 的 OG 链接预览卡片（抓取失败/有媒体时为 null） */
+export interface LinkCardView {
+  url: string;
+  title: string;
+  description: string | null;
+  /** 缩略图已下载入库的本地地址 */
+  imageUrl: string | null;
+  siteName: string | null;
 }
 
 /** 趋势条目：近期被讨论的 #话题（右边栏"有什么新鲜事"） */

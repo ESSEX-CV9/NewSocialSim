@@ -40,6 +40,18 @@ export class MediaController {
     return reply.status(201).send({ media });
   };
 
+  fromUrl = async (
+    req: FastifyRequest<{ Body: { url: string; source?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const media = await this.service.ingestImageFromUrl(
+      req.user.sub,
+      req.body.url,
+      req.body.source ?? 'url',
+    );
+    return reply.status(201).send({ media });
+  };
+
   file = async (
     req: FastifyRequest<{ Params: { id: number }; Querystring: { w: string } }>,
     reply: FastifyReply,

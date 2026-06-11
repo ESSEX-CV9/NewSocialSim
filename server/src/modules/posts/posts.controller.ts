@@ -12,7 +12,7 @@ export class PostsController {
   constructor(private readonly service: PostsService) {}
 
   create = async (req: FastifyRequest<{ Body: CreatePostRequest }>, reply: FastifyReply) => {
-    reply.status(201).send({ post: this.service.create(req.user.sub, req.body) });
+    reply.status(201).send({ post: await this.service.create(req.user.sub, req.body) });
   };
 
   getById = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {

@@ -8,16 +8,32 @@ import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
+import { LinkCard } from './LinkCard';
 import { MediaGrid } from './MediaGrid';
 import { TimeAgo } from './TimeAgo';
 import { useViewTracking } from './useViewTracking';
 
-/** 帖子正文：#话题 转搜索链接，@用户名 转主页链接 */
+/** 帖子正文：URL 转外链，#话题 转搜索链接，@用户名 转主页链接 */
 function PostContent({ content }: { content: string }) {
-  const parts = content.split(/(#[^\s#@]+|@[a-zA-Z0-9_]{2,20})/g);
+  const parts = content.split(/(https?:\/\/[^\s]+|#[^\s#@]+|@[a-zA-Z0-9_]{2,20})/g);
   return (
     <p className="text-[15px] leading-normal wrap-break-word whitespace-pre-wrap">
       {parts.map((part, i) => {
+        if (part.startsWith('http://') || part.startsWith('https://')) {
+          const display = part.replace(/^https?:\/\/(www\.)?/, '');
+          return (
+            <a
+              key={i}
+              href={part}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-x-blue hover:underline"
+            >
+              {display.length > 36 ? `${display.slice(0, 36)}…` : display}
+            </a>
+          );
+        }
         if (part.startsWith('#')) {
           return (
             <Link
@@ -361,6 +377,7 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
             <PostContent content={post.content} />
           </div>
           {post.media.length > 0 && <MediaGrid media={post.media} />}
+          {post.linkCard && <LinkCard card={post.linkCard} />}
           {post.quoted && <QuotedCard quoted={post.quoted} />}
           {/* 各按钮包 flex-1 左对齐单元格：图标位置不随数字宽度移动（与 X 一致） */}
           <div className="mt-3 flex items-center">

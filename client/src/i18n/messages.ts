@@ -45,6 +45,9 @@ export const messages = {
     'composer.imageLimit': '最多 4 张图片',
     'composer.videoLimit': '视频只能单独发布',
     'composer.removeImage': '移除',
+    'composer.addFromUrl': '通过链接添加图片',
+    'composer.urlPrompt': '粘贴图片链接',
+    'composer.urlAdd': '添加',
 
     'media.viewerClose': '关闭',
     'media.prev': '上一张',
@@ -220,6 +223,9 @@ export const messages = {
     'composer.imageLimit': 'Up to 4 images',
     'composer.videoLimit': 'A video must be posted on its own',
     'composer.removeImage': 'Remove',
+    'composer.addFromUrl': 'Add image from URL',
+    'composer.urlPrompt': 'Paste an image URL',
+    'composer.urlAdd': 'Add',
 
     'media.viewerClose': 'Close',
     'media.prev': 'Previous',

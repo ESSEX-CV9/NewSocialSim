@@ -6,6 +6,7 @@ import type { MediaView } from '@socialsim/shared';
 import { imageSize } from 'image-size';
 import { config } from '../../config.js';
 import { NotFoundError, ValidationError } from '../../core/errors/app-error.js';
+import { fetchWithLimit } from '../../core/safe-fetch.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import { mediaRepo, type MediaRow } from './media.repo.js';
 
@@ -36,6 +37,22 @@ export function isVideoMime(mime: string): boolean {
 
 /** 视频临时落盘文件名计数器（进程内自增，避免并发上传互踩） */
 let pendingCounter = 0;
+
+/** image-size 探测出的格式 → mime（content-type 不可信时的嗅探兜底） */
+const SNIFF_TYPE_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+};
+
+/** 需要特定 Referer 才放行图片的站点（防盗链；D 期搜图复用） */
+const REFERER_BY_HOST: Record<string, string> = {
+  'i.pximg.net': 'https://www.pixiv.net/',
+  's.pximg.net': 'https://www.pixiv.net/',
+};
+
+const URL_FETCH_TIMEOUT_MS = 10_000;
 
 /** 媒体文件公开 URL 的纯函数版（供各模块组装 UserSummary 等使用） */
 export function mediaFileUrl(mediaId: number | null, worldId: string): string | null {
@@ -112,6 +129,29 @@ export class MediaService {
 
     const row = mediaRepo.findById(db, id)!;
     return this.toView(row);
+  }
+
+  /** 外链图片下载入库（URL 引入 / 搜图选图 / 链接卡片缩略图共用此入口） */
+  async ingestImageFromUrl(ownerId: number, url: string, source: string): Promise<MediaView> {
+    const host = new URL(url).hostname.toLowerCase();
+    const referer = REFERER_BY_HOST[host];
+    const { buf, contentType } = await fetchWithLimit(url, {
+      timeoutMs: URL_FETCH_TIMEOUT_MS,
+      maxBytes: MAX_IMAGE_BYTES,
+      ...(referer ? { headers: { Referer: referer } } : {}),
+    });
+    // content-type 不可信：白名单外尝试用 image-size 嗅探真实格式
+    let mime = contentType;
+    if (!(mime in IMAGE_MIMES)) {
+      try {
+        const sniffed = imageSize(buf).type;
+        mime = (sniffed && SNIFF_TYPE_TO_MIME[sniffed]) || '';
+      } catch {
+        mime = '';
+      }
+      if (!mime) throw new ValidationError('链接内容不是支持的图片格式');
+    }
+    return this.createFromBuffer(ownerId, buf, mime, source, url);
   }
 
   /** 视频从流式上传创建：先落临时文件（不进内存），入库后改名为 <id>.<ext> */

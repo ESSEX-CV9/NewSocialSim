@@ -168,6 +168,21 @@ const migrations: Migration[] = [
       ALTER TABLE users ADD COLUMN banner_media_id INTEGER REFERENCES media(id);
     `,
   },
+  {
+    version: 8,
+    name: 'link-cards',
+    sql: `
+      CREATE TABLE link_cards (
+        url            TEXT PRIMARY KEY,
+        title          TEXT,
+        description    TEXT,
+        image_media_id INTEGER REFERENCES media(id),
+        site_name      TEXT,
+        status         TEXT NOT NULL DEFAULT 'ok',
+        fetched_at     INTEGER NOT NULL
+      );
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {
