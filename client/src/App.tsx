@@ -11,9 +11,11 @@ import { PostDetailPage } from './features/post/PostDetailPage';
 import { FollowListPage } from './features/profile/FollowListPage';
 import { ProfilePage } from './features/profile/ProfilePage';
 import { SearchPage } from './features/search/SearchPage';
+import { SettingsPage } from './features/settings/SettingsPage';
 import { HomePage } from './features/timeline/HomePage';
 import { WorldsPage } from './features/worlds/WorldsPage';
 import { I18nProvider } from './i18n/I18nContext';
+import { ThemeProvider } from './theme/ThemeContext';
 import { useWorld, WorldProvider } from './world/WorldContext';
 
 const queryClient = new QueryClient({
@@ -63,6 +65,7 @@ function Shell() {
                 }
               />
               <Route path="/search" element={<SearchPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="/worlds" element={<WorldsPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
@@ -88,10 +91,12 @@ function Providers() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <WorldProvider>
-        <Providers />
-      </WorldProvider>
-    </QueryClientProvider>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <WorldProvider>
+          <Providers />
+        </WorldProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }

@@ -1,20 +1,59 @@
 @import 'tailwindcss';
 
-/* 参考项目（X 设计语言）的设计令牌 */
-@theme {
-  --color-x-bg: #000000;
-  --color-x-card: #16181c;
-  --color-x-input: #202327;
-  --color-x-hover: rgba(231, 233, 234, 0.03);
-  --color-x-border: #2f3336;
-  --color-x-text: #e7e9ea;
-  --color-x-dim: #71767b;
-  --color-x-blue: #1d9bf0;
-  --color-x-blue-dark: #1a8cd8;
-  --color-x-green: #00ba7c;
-  --color-x-pink: #f91880;
-  --color-x-red: #f4212e;
+/*
+ * 主题系统：两层结构。
+ * 第一层：按 [data-theme] 定义主题变量（新增主题 = 追加一个块 + themes.ts 注册）。
+ * 第二层：Tailwind @theme inline 将 x-* 令牌映射到变量，所有 bg-x-* 等工具类自动跟随主题。
+ */
+:root,
+[data-theme='dark'] {
+  --th-bg: #000000;
+  --th-card: #16181c;
+  --th-input: #202327;
+  --th-hover: rgba(231, 233, 234, 0.03);
+  --th-border: #2f3336;
+  --th-text: #e7e9ea;
+  --th-dim: #71767b;
+  --th-glass: rgba(0, 0, 0, 0.65);
+  --th-blue: #1d9bf0;
+  --th-blue-dark: #1a8cd8;
+  --th-green: #00ba7c;
+  --th-pink: #f91880;
+  --th-red: #f4212e;
+}
 
+[data-theme='light'] {
+  --th-bg: #ffffff;
+  --th-card: #f7f9f9;
+  --th-input: #eff3f4;
+  --th-hover: rgba(15, 20, 25, 0.03);
+  --th-border: #eff3f4;
+  --th-text: #0f1419;
+  --th-dim: #536471;
+  --th-glass: rgba(255, 255, 255, 0.85);
+  --th-blue: #1d9bf0;
+  --th-blue-dark: #1a8cd8;
+  --th-green: #00ba7c;
+  --th-pink: #f91880;
+  --th-red: #f4212e;
+}
+
+@theme inline {
+  --color-x-bg: var(--th-bg);
+  --color-x-card: var(--th-card);
+  --color-x-input: var(--th-input);
+  --color-x-hover: var(--th-hover);
+  --color-x-border: var(--th-border);
+  --color-x-text: var(--th-text);
+  --color-x-dim: var(--th-dim);
+  --color-x-blue: var(--th-blue);
+  --color-x-blue-dark: var(--th-blue-dark);
+  --color-x-green: var(--th-green);
+  --color-x-pink: var(--th-pink);
+  --color-x-red: var(--th-red);
+}
+
+@theme {
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
 }
 
@@ -29,17 +68,17 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.65);
+  background: var(--th-glass);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--color-x-border);
+  border-bottom: 1px solid var(--th-border);
 }
 
 /* 旋转加载圈 */
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid var(--color-x-input);
-  border-top-color: var(--color-x-blue);
+  border: 3px solid var(--th-input);
+  border-top-color: var(--th-blue);
   border-radius: 9999px;
   animation: spin 0.8s linear infinite;
 }
@@ -52,7 +91,7 @@ body {
 /* Tab 底部蓝色指示条 */
 .tab-active {
   position: relative;
-  color: var(--color-x-text);
+  color: var(--th-text);
   font-weight: 700;
 }
 .tab-active::after {
@@ -63,6 +102,6 @@ body {
   transform: translateX(-50%);
   width: 56px;
   height: 4px;
-  background: var(--color-x-blue);
+  background: var(--th-blue);
   border-radius: 2px;
 }

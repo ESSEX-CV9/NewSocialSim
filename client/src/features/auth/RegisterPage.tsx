@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { AuthFormShell, buttonClass, inputClass } from './LoginPage';
@@ -8,6 +8,8 @@ export function RegisterPage() {
   const { register } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const addMode = params.get('add') === '1';
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
@@ -19,7 +21,7 @@ export function RegisterPage() {
     setBusy(true);
     setError(null);
     try {
-      await register({ handle, displayName, password });
+      await register({ handle, displayName, password }, { append: addMode });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -60,7 +62,10 @@ export function RegisterPage() {
           {t('auth.register')}
         </button>
       </form>
-      <Link to="/login" className="mt-4 block text-sm text-x-blue hover:underline">
+      <Link
+        to={addMode ? '/login?add=1' : '/login'}
+        className="mt-4 block text-sm text-x-blue hover:underline"
+      >
         {t('auth.haveAccount')}
       </Link>
     </AuthFormShell>

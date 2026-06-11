@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
 import { useWorld } from '../../world/WorldContext';
@@ -28,6 +28,8 @@ export function LoginPage() {
   const { world } = useWorld();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const addMode = params.get('add') === '1';
   const [handle, setHandle] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +40,7 @@ export function LoginPage() {
     setBusy(true);
     setError(null);
     try {
-      await login({ handle, password });
+      await login({ handle, password }, { append: addMode });
       navigate('/');
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -59,7 +61,9 @@ export function LoginPage() {
   }
 
   return (
-    <AuthFormShell title={t('auth.loginTitle', { world: world.meta.name })}>
+    <AuthFormShell
+      title={addMode ? t('auth.addAccountTitle') : t('auth.loginTitle', { world: world.meta.name })}
+    >
       <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-4">
         <input
           value={handle}
@@ -80,7 +84,10 @@ export function LoginPage() {
           {t('auth.login')}
         </button>
       </form>
-      <Link to="/register" className="mt-4 block text-sm text-x-blue hover:underline">
+      <Link
+        to={addMode ? '/register?add=1' : '/register'}
+        className="mt-4 block text-sm text-x-blue hover:underline"
+      >
         {t('auth.noAccount')}
       </Link>
     </AuthFormShell>

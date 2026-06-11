@@ -105,7 +105,7 @@ function FollowSuggestions() {
           <button
             onClick={() => void follow(u)}
             disabled={followed.has(u.id)}
-            className="rounded-full bg-x-text px-4 py-1.5 text-[14px] font-bold text-black transition-colors duration-200 hover:bg-white disabled:opacity-50"
+            className="rounded-full bg-x-text px-4 py-1.5 text-[14px] font-bold text-x-bg transition-colors duration-200 hover:opacity-90 disabled:opacity-50"
           >
             {t('profile.follow')}
           </button>

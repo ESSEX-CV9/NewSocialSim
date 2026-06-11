@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { api } from '../api/endpoints';
@@ -46,12 +46,14 @@ function NavItem({
 }
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, otherAccounts, switchAccount, logout } = useAuth();
   const { world } = useWorld();
-  const { t, locale, setLocale } = useI18n();
+  const { t } = useI18n();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [q, setQ] = useState('');
   const [composeOpen, setComposeOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
 
   const unread = useQuery({
     queryKey: ['unread-count'],
@@ -59,6 +61,20 @@ export function Layout({ children }: { children: ReactNode }) {
     enabled: !!user,
     refetchInterval: 30_000,
   });
+
+  const handleSwitchAccount = async (index: number) => {
+    setAccountMenuOpen(false);
+    await switchAccount(index);
+    queryClient.clear();
+    navigate('/');
+  };
+
+  const handleLogout = () => {
+    setAccountMenuOpen(false);
+    logout();
+    queryClient.clear();
+    navigate('/');
+  };
 
   const submitSearch = (e: FormEvent) => {
     e.preventDefault();
@@ -119,33 +135,73 @@ export function Layout({ children }: { children: ReactNode }) {
             {t('composer.send')}
           </button>
         )}
-        <div className="mt-auto mb-2 flex flex-col items-center gap-2 min-[800px]:items-stretch min-[800px]:p-2">
-          <button
-            onClick={() => setLocale(locale === 'zh-CN' ? 'en' : 'zh-CN')}
-            title={locale === 'zh-CN' ? 'Switch to English' : '切换为中文'}
-            className="flex w-fit items-center gap-2 self-start rounded-full px-3 py-1.5 text-sm text-x-dim transition-colors duration-200 hover:bg-x-input"
-          >
-            <i className="ri-translate-2 text-[16px]" />
-            <span className="hidden min-[800px]:inline">{locale === 'zh-CN' ? 'EN' : '中文'}</span>
-          </button>
+        <div className="relative mt-auto mb-2 flex flex-col items-center gap-2 min-[800px]:items-stretch min-[800px]:p-2">
           {user ? (
-            <div className="flex items-center gap-3 rounded-full p-2 transition-colors duration-200 hover:bg-x-input">
-              <Avatar handle={user.handle} size={40} />
-              <div className="hidden min-w-0 flex-1 min-[800px]:block">
-                <div className="truncate text-[15px] font-bold">{user.displayName}</div>
-                <div className="truncate text-[13px] text-x-dim">@{user.handle}</div>
-              </div>
+            <>
               <button
-                onClick={() => {
-                  logout();
-                  navigate('/login');
-                }}
-                title={t('nav.logout')}
-                className="hidden size-8 items-center justify-center rounded-full text-x-dim transition-colors duration-200 hover:bg-x-border hover:text-x-text min-[800px]:flex"
+                onClick={() => setAccountMenuOpen((v) => !v)}
+                className="flex w-full items-center gap-3 rounded-full p-2 text-left transition-colors duration-200 hover:bg-x-input"
               >
-                <i className="ri-logout-box-r-line" />
+                <Avatar handle={user.handle} size={40} />
+                <div className="hidden min-w-0 flex-1 min-[800px]:block">
+                  <div className="truncate text-[15px] font-bold">{user.displayName}</div>
+                  <div className="truncate text-[13px] text-x-dim">@{user.handle}</div>
+                </div>
+                <i className="ri-more-fill hidden px-1 text-[18px] text-x-text min-[800px]:inline" />
               </button>
-            </div>
+              {accountMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={() => setAccountMenuOpen(false)} />
+                  <div className="absolute bottom-full left-0 z-30 mb-2 w-64 overflow-hidden rounded-2xl border border-x-border bg-x-card py-2 shadow-lg">
+                    {otherAccounts.map((account) => (
+                      <button
+                        key={account.user.id}
+                        onClick={() => void handleSwitchAccount(account.index)}
+                        className="flex w-full items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-x-input"
+                      >
+                        <Avatar handle={account.user.handle} size={32} />
+                        <div className="min-w-0 flex-1 text-left">
+                          <div className="truncate text-[15px] font-bold">
+                            {account.user.displayName}
+                          </div>
+                          <div className="truncate text-[13px] text-x-dim">
+                            @{account.user.handle}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                    {otherAccounts.length > 0 && <div className="my-1 border-t border-x-border" />}
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        navigate('/login?add=1');
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold transition-colors duration-200 hover:bg-x-input"
+                    >
+                      <i className="ri-user-add-line text-[18px]" />
+                      {t('account.add')}
+                    </button>
+                    <button
+                      onClick={() => {
+                        setAccountMenuOpen(false);
+                        navigate('/settings');
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold transition-colors duration-200 hover:bg-x-input"
+                    >
+                      <i className="ri-settings-3-line text-[18px]" />
+                      {t('account.settings')}
+                    </button>
+                    <button
+                      onClick={handleLogout}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold text-x-red transition-colors duration-200 hover:bg-x-input"
+                    >
+                      <i className="ri-logout-box-r-line text-[18px]" />
+                      {t('account.logoutOf', { handle: user.handle })}
+                    </button>
+                  </div>
+                </>
+              )}
+            </>
           ) : (
             <Link
               to="/login"

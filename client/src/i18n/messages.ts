@@ -22,6 +22,18 @@ export const messages = {
     'auth.haveAccount': '已有账号？去登录',
     'auth.noWorld': '当前没有已加载的世界，请先到世界管理页创建或激活一个世界。',
     'auth.goWorlds': '前往世界管理',
+    'auth.addAccountTitle': '添加新账号',
+
+    'account.add': '添加新账号',
+    'account.settings': '设置',
+    'account.logoutOf': '登出 @{handle}',
+
+    'settings.title': '设置',
+    'settings.display': '显示',
+    'settings.theme': '主题',
+    'settings.themeDark': '深色',
+    'settings.themeLight': '浅色',
+    'settings.language': '语言',
 
     'composer.placeholder': '有什么新鲜事？',
     'composer.replyPlaceholder': '发布你的回复',
@@ -152,6 +164,18 @@ export const messages = {
     'auth.haveAccount': 'Already have an account? Log in',
     'auth.noWorld': 'No world is loaded. Create or activate one in World management first.',
     'auth.goWorlds': 'Go to Worlds',
+    'auth.addAccountTitle': 'Add an account',
+
+    'account.add': 'Add an account',
+    'account.settings': 'Settings',
+    'account.logoutOf': 'Log out @{handle}',
+
+    'settings.title': 'Settings',
+    'settings.display': 'Display',
+    'settings.theme': 'Theme',
+    'settings.themeDark': 'Dark',
+    'settings.themeLight': 'Light',
+    'settings.language': 'Language',
 
     'composer.placeholder': "What's happening?",
     'composer.replyPlaceholder': 'Post your reply',

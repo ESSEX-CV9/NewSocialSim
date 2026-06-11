@@ -169,7 +169,7 @@ export function ProfilePage() {
                   className={`rounded-full px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 ${
                     isFollowing
                       ? 'border border-x-dim text-x-text hover:border-x-red/60 hover:bg-x-red/10 hover:text-x-red'
-                      : 'bg-x-text text-black hover:bg-white'
+                      : 'bg-x-text text-x-bg hover:opacity-90'
                   }`}
                 >
                   {isFollowing ? t('profile.unfollow') : t('profile.follow')}
