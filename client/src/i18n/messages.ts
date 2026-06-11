@@ -32,6 +32,8 @@ export const messages = {
     'post.deleted': '此帖子已被删除',
     'post.delete': '删除',
     'post.deleteConfirm': '确定删除这条帖子吗？',
+    'post.repost': '转发',
+    'post.unrepost': '取消转发',
     'post.quote': '引用',
     'post.viewParent': '查看上文',
 
@@ -84,6 +86,11 @@ export const messages = {
     'notif.repost': '转发了你的帖子',
     'notif.follow': '关注了你',
     'notif.mention': '提到了你',
+    'notif.likeManyPosts': '点赞了你的 {n} 个帖子',
+    'notif.repostManyPosts': '转发了你的 {n} 个帖子',
+    'notif.likeManyActors': '和另外 {n} 人赞了你的帖子',
+    'notif.repostManyActors': '和另外 {n} 人转发了你的帖子',
+    'notif.followMany': '和另外 {n} 人关注了你',
     'notif.empty': '暂时没有通知',
 
     'bookmarks.title': '书签',
@@ -155,6 +162,8 @@ export const messages = {
     'post.deleted': 'This post has been deleted',
     'post.delete': 'Delete',
     'post.deleteConfirm': 'Delete this post?',
+    'post.repost': 'Repost',
+    'post.unrepost': 'Undo repost',
     'post.quote': 'Quote',
     'post.viewParent': 'View parent',
 
@@ -207,6 +216,11 @@ export const messages = {
     'notif.repost': 'reposted your post',
     'notif.follow': 'followed you',
     'notif.mention': 'mentioned you',
+    'notif.likeManyPosts': 'liked {n} of your posts',
+    'notif.repostManyPosts': 'reposted {n} of your posts',
+    'notif.likeManyActors': 'and {n} others liked your post',
+    'notif.repostManyActors': 'and {n} others reposted your post',
+    'notif.followMany': 'and {n} others followed you',
     'notif.empty': 'No notifications yet',
 
     'bookmarks.title': 'Bookmarks',

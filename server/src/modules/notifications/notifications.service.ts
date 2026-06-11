@@ -52,6 +52,8 @@ export class NotificationsService {
   }
 }
 
+const EXCERPT_LENGTH = 100;
+
 function toView(row: NotificationRow): NotificationView {
   return {
     id: row.id,
@@ -63,6 +65,10 @@ function toView(row: NotificationRow): NotificationView {
       isBot: row.actor_is_bot === 1,
     },
     postId: row.post_id,
+    postExcerpt:
+      row.post_content !== null && row.post_deleted === 0
+        ? row.post_content.slice(0, EXCERPT_LENGTH)
+        : null,
     read: row.read === 1,
     createdAt: row.created_at,
   };

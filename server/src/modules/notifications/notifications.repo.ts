@@ -12,6 +12,8 @@ export interface NotificationRow {
   actor_handle: string;
   actor_display_name: string;
   actor_is_bot: number;
+  post_content: string | null;
+  post_deleted: number | null;
 }
 
 export const notificationsRepo = {
@@ -46,9 +48,12 @@ export const notificationsRepo = {
         `SELECT n.*,
                 u.handle       AS actor_handle,
                 u.display_name AS actor_display_name,
-                u.is_bot       AS actor_is_bot
+                u.is_bot       AS actor_is_bot,
+                p.content      AS post_content,
+                p.deleted      AS post_deleted
          FROM notifications n
          JOIN users u ON u.id = n.actor_id
+         LEFT JOIN posts p ON p.id = n.post_id
          WHERE n.user_id = @userId ${filterClause} ${cursorClause}
          ORDER BY n.id DESC
          LIMIT @limit`,

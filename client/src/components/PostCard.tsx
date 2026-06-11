@@ -142,6 +142,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
   const [repostCount, setRepostCount] = useState(post.repostCount);
   const [bookmarked, setBookmarked] = useState(post.bookmarkedByViewer);
   const [quoteOpen, setQuoteOpen] = useState(false);
+  const [repostMenuOpen, setRepostMenuOpen] = useState(false);
   const [gone, setGone] = useState(false);
 
   if (gone) return null;
@@ -163,9 +164,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
     setLikeCount(res.count);
   };
 
-  const toggleRepost = async (e: MouseEvent) => {
-    stop(e);
-    if (!user) return navigate('/login');
+  const toggleRepost = async () => {
     const res = reposted ? await api.unrepost(post.id) : await api.repost(post.id);
     setReposted(res.active);
     setRepostCount(res.count);
@@ -227,22 +226,55 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
           {post.quoted && <QuotedCard quoted={post.quoted} />}
           <div className="mt-3 flex items-center justify-between">
             <ActionButton icon="ri-chat-3-line" count={post.replyCount} color="blue" />
-            <ActionButton
-              icon="ri-repeat-2-line"
-              count={repostCount}
-              color="green"
-              active={reposted}
-              onClick={(e) => void toggleRepost(e)}
-            />
-            <ActionButton
-              icon="ri-double-quotes-l"
-              color="blue"
-              onClick={(e) => {
-                stop(e);
-                if (!user) return navigate('/login');
-                setQuoteOpen(true);
-              }}
-            />
+            {/* 转发/引用合并：点击弹原地下拉菜单（与 X 一致） */}
+            <span className="relative">
+              <ActionButton
+                icon="ri-repeat-2-line"
+                count={repostCount}
+                color="green"
+                active={reposted}
+                onClick={(e) => {
+                  stop(e);
+                  if (!user) return navigate('/login');
+                  setRepostMenuOpen((v) => !v);
+                }}
+              />
+              {repostMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-20"
+                    onClick={(e) => {
+                      stop(e);
+                      setRepostMenuOpen(false);
+                    }}
+                  />
+                  <div className="absolute top-6 left-0 z-30 w-36 overflow-hidden rounded-xl border border-x-border bg-x-card shadow-lg">
+                    <button
+                      onClick={(e) => {
+                        stop(e);
+                        setRepostMenuOpen(false);
+                        void toggleRepost();
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold text-x-text transition-colors duration-200 hover:bg-x-input"
+                    >
+                      <i className="ri-repeat-2-line" />
+                      {reposted ? t('post.unrepost') : t('post.repost')}
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        stop(e);
+                        setRepostMenuOpen(false);
+                        setQuoteOpen(true);
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold text-x-text transition-colors duration-200 hover:bg-x-input"
+                    >
+                      <i className="ri-edit-line" />
+                      {t('post.quote')}
+                    </button>
+                  </div>
+                </>
+              )}
+            </span>
             <ActionButton
               icon={liked ? 'ri-heart-3-fill' : 'ri-heart-3-line'}
               count={likeCount}

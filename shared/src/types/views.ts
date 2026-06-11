@@ -35,6 +35,8 @@ export interface NotificationView {
   type: NotificationType;
   actor: UserSummary;
   postId: number | null;
+  /** 相关帖子的内容预览（前 100 字符）；无帖子或帖子已删除时为 null */
+  postExcerpt: string | null;
   read: boolean;
   createdAt: number;
 }

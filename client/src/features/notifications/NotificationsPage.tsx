@@ -3,26 +3,87 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/endpoints';
+import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { TimeAgo } from '../../components/TimeAgo';
 import { usePagedQuery } from '../../components/usePagedQuery';
 import { useI18n } from '../../i18n/I18nContext';
+import type { MessageKey } from '../../i18n/messages';
 
 const TYPE_ICONS: Record<NotificationView['type'], { icon: string; color: string }> = {
   reply: { icon: 'ri-chat-3-line', color: 'text-x-blue' },
   quote: { icon: 'ri-double-quotes-l', color: 'text-x-blue' },
   like: { icon: 'ri-heart-3-fill', color: 'text-x-pink' },
-  repost: { icon: 'ri-repeat-2-line', color: 'text-x-green' },
-  follow: { icon: 'ri-user-add-line', color: 'text-x-blue' },
+  repost: { icon: 'ri-repeat-2-fill', color: 'text-x-green' },
+  follow: { icon: 'ri-user-add-fill', color: 'text-x-blue' },
   mention: { icon: 'ri-at-line', color: 'text-x-blue' },
 };
 
 type Filter = 'all' | 'mentions';
 
+/** 聚合后的展示单元 */
+interface NotificationGroup {
+  key: string;
+  items: NotificationView[];
+}
+
+/**
+ * 客户端聚合（纯展示层）：
+ * - like/repost：相邻同类型且（同 actor 或 同帖子）合并
+ * - follow：相邻的全部合并
+ * - reply/quote/mention：不合并
+ */
+function groupNotifications(items: NotificationView[]): NotificationGroup[] {
+  const groups: NotificationGroup[] = [];
+  for (const n of items) {
+    const last = groups[groups.length - 1];
+    const first = last?.items[0];
+    const canMerge =
+      first !== undefined &&
+      first.type === n.type &&
+      ((n.type === 'follow' && true) ||
+        ((n.type === 'like' || n.type === 'repost') &&
+          (first.actor.id === n.actor.id ||
+            (first.postId !== null && first.postId === n.postId))));
+    if (canMerge && last) {
+      last.items.push(n);
+    } else {
+      groups.push({ key: `g-${n.id}`, items: [n] });
+    }
+  }
+  return groups;
+}
+
+function groupText(
+  group: NotificationGroup,
+  t: (key: MessageKey, vars?: Record<string, string | number>) => string,
+): string {
+  const first = group.items[0]!;
+  if (group.items.length === 1) return t(`notif.${first.type}`);
+
+  const distinctActors = new Set(group.items.map((n) => n.actor.id)).size;
+  if (first.type === 'follow') {
+    return distinctActors > 1
+      ? t('notif.followMany', { n: distinctActors - 1 })
+      : t('notif.follow');
+  }
+  // like / repost
+  if (distinctActors > 1) {
+    return t(first.type === 'like' ? 'notif.likeManyActors' : 'notif.repostManyActors', {
+      n: distinctActors - 1,
+    });
+  }
+  const distinctPosts = new Set(group.items.map((n) => n.postId)).size;
+  return t(first.type === 'like' ? 'notif.likeManyPosts' : 'notif.repostManyPosts', {
+    n: distinctPosts,
+  });
+}
+
 export function NotificationsPage() {
   const { t } = useI18n();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
   const query = usePagedQuery(['notifications', filter], (cursor) =>
@@ -39,6 +100,18 @@ export function NotificationsPage() {
     `flex h-13.25 flex-1 cursor-pointer items-center justify-center text-[15px] font-medium transition-colors duration-200 hover:bg-x-hover ${
       active ? 'tab-active' : 'text-x-dim'
     }`;
+
+  const groups = groupNotifications(query.items);
+
+  const groupTarget = (group: NotificationGroup): string => {
+    const first = group.items[0]!;
+    if (first.type === 'follow') {
+      return group.items.length > 1 && user
+        ? `/u/${user.handle}/followers`
+        : `/u/${first.actor.handle}`;
+    }
+    return first.postId !== null ? `/post/${first.postId}` : `/u/${first.actor.handle}`;
+  };
 
   return (
     <div>
@@ -64,30 +137,38 @@ export function NotificationsPage() {
       </div>
       {query.isLoading && <Spinner />}
       {query.isError && <ErrorBox error={query.error} />}
-      {query.items.map((n) => {
-        const type = TYPE_ICONS[n.type];
-        const inner = (
-          <div
-            className={`flex items-center gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover ${
-              n.read ? '' : 'border-l-2 border-l-x-blue bg-x-blue/5'
-            }`}
-          >
-            <i className={`${type.icon} ${type.color} w-6 text-center text-[20px]`} />
-            <Avatar handle={n.actor.handle} size={32} />
-            <div className="min-w-0 flex-1 text-[15px]">
-              <span className="font-bold">{n.actor.displayName}</span>{' '}
-              <span className="text-x-dim">{t(`notif.${n.type}`)}</span>
+      {groups.map((group) => {
+        const first = group.items[0]!;
+        const type = TYPE_ICONS[first.type];
+        const unread = group.items.some((n) => !n.read);
+        // 头像行：去重 actor，最多 6 个
+        const actors = [...new Map(group.items.map((n) => [n.actor.id, n.actor])).values()].slice(0, 6);
+
+        return (
+          <Link key={group.key} to={groupTarget(group)}>
+            <div
+              className={`flex gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover ${
+                unread ? 'border-l-2 border-l-x-blue bg-x-blue/5' : ''
+              }`}
+            >
+              <i className={`${type.icon} ${type.color} w-8 shrink-0 text-center text-[26px] leading-none`} />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  {actors.map((actor) => (
+                    <Avatar key={actor.id} handle={actor.handle} size={32} />
+                  ))}
+                </div>
+                <div className="mt-2 text-[15px]">
+                  <span className="font-bold">{first.actor.displayName}</span>{' '}
+                  <span className="text-x-dim">
+                    {groupText(group, t)} · <TimeAgo at={first.createdAt} />
+                  </span>
+                </div>
+                {first.postExcerpt && (
+                  <p className="mt-1 line-clamp-2 text-[15px] text-x-dim">{first.postExcerpt}</p>
+                )}
+              </div>
             </div>
-            <TimeAgo at={n.createdAt} />
-          </div>
-        );
-        return n.postId !== null ? (
-          <Link key={n.id} to={`/post/${n.postId}`}>
-            {inner}
-          </Link>
-        ) : (
-          <Link key={n.id} to={`/u/${n.actor.handle}`}>
-            {inner}
           </Link>
         );
       })}
