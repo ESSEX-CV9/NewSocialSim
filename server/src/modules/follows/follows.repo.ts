@@ -1,11 +1,11 @@
-import type { UserSummary } from '@socialsim/shared';
 import type { WorldDb } from '../../core/db/database.js';
 
-interface FollowUserRow {
+export interface FollowUserRow {
   id: number;
   handle: string;
   display_name: string;
   is_bot: number;
+  avatar_media_id: number | null;
   follow_created_at: number;
 }
 
@@ -41,15 +41,16 @@ export const followsRepo = {
     direction: 'followers' | 'following',
     before: { ts: number; id: number } | null,
     limit: number,
-  ): { user: UserSummary; followedAt: number }[] {
+  ): FollowUserRow[] {
     const [matchCol, selectCol] =
       direction === 'followers' ? ['followee_id', 'follower_id'] : ['follower_id', 'followee_id'];
     const cursorClause = before
       ? 'AND (f.created_at < @ts OR (f.created_at = @ts AND u.id < @cid))'
       : '';
-    const rows = db
+    return db
       .prepare(
-        `SELECT u.id, u.handle, u.display_name, u.is_bot, f.created_at AS follow_created_at
+        `SELECT u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id,
+                f.created_at AS follow_created_at
          FROM follows f
          JOIN users u ON u.id = f.${selectCol}
          WHERE f.${matchCol} = @userId ${cursorClause}
@@ -57,9 +58,5 @@ export const followsRepo = {
          LIMIT @limit`,
       )
       .all({ userId, limit, ...(before ? { ts: before.ts, cid: before.id } : {}) }) as FollowUserRow[];
-    return rows.map((r) => ({
-      user: { id: r.id, handle: r.handle, displayName: r.display_name, isBot: r.is_bot === 1 },
-      followedAt: r.follow_created_at,
-    }));
   },
 };

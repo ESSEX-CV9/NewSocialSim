@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
@@ -14,17 +14,96 @@ import { inputClass } from '../auth/LoginPage';
 
 type ProfileTab = 'posts' | 'replies' | 'media' | 'likes';
 
+/** 头像/横幅编辑项的取值：undefined=未改动；{id:null}=恢复默认 */
+type MediaPatch = { id: number | null; url: string | null } | undefined;
+
+function MediaPicker({
+  label,
+  resetLabel,
+  current,
+  patch,
+  onChange,
+  round,
+}: {
+  label: string;
+  resetLabel: string;
+  current: string | null;
+  patch: MediaPatch;
+  onChange: (next: MediaPatch) => void;
+  round?: boolean;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const previewUrl = patch !== undefined ? patch.url : current;
+  const pick = async (files: FileList | null) => {
+    const file = files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const res = await api.uploadMedia(file);
+      onChange({ id: res.media.id, url: res.media.url });
+    } finally {
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      {previewUrl ? (
+        <img
+          src={previewUrl}
+          alt=""
+          className={`h-12 w-20 border border-x-border object-cover ${round ? 'w-12 rounded-full' : 'rounded-lg'}`}
+        />
+      ) : (
+        <div className={`h-12 w-20 border border-x-border bg-x-input ${round ? 'w-12 rounded-full' : 'rounded-lg'}`} />
+      )}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={(e) => void pick(e.target.files)}
+      />
+      <button
+        onClick={() => inputRef.current?.click()}
+        disabled={uploading}
+        className="rounded-full border border-x-dim px-3 py-1 text-[13px] font-bold transition-colors duration-200 hover:bg-x-input disabled:opacity-50"
+      >
+        {uploading ? <i className="ri-loader-4-line animate-spin" /> : label}
+      </button>
+      {(previewUrl !== null || patch !== undefined) && (
+        <button
+          onClick={() => onChange({ id: null, url: null })}
+          className="rounded-full px-3 py-1 text-[13px] text-x-dim transition-colors duration-200 hover:bg-x-input"
+        >
+          {resetLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function EditProfileForm({ onDone }: { onDone: () => void }) {
   const { user, setUser } = useAuth();
   const { t } = useI18n();
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
+  const [avatar, setAvatar] = useState<MediaPatch>(undefined);
+  const [banner, setBanner] = useState<MediaPatch>(undefined);
   const [busy, setBusy] = useState(false);
 
   const save = async () => {
     setBusy(true);
     try {
-      const res = await api.updateMe({ displayName, bio });
+      const res = await api.updateMe({
+        displayName,
+        bio,
+        ...(avatar !== undefined ? { avatarMediaId: avatar.id } : {}),
+        ...(banner !== undefined ? { bannerMediaId: banner.id } : {}),
+      });
       setUser(res.user);
       onDone();
     } finally {
@@ -38,6 +117,23 @@ function EditProfileForm({ onDone }: { onDone: () => void }) {
       <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} />
       <label className="text-[13px] text-x-dim">{t('profile.bio')}</label>
       <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className={inputClass} />
+      <label className="text-[13px] text-x-dim">{t('profile.changeAvatar')}</label>
+      <MediaPicker
+        label={t('profile.changeAvatar')}
+        resetLabel={t('profile.resetAvatar')}
+        current={user?.avatarUrl ?? null}
+        patch={avatar}
+        onChange={setAvatar}
+        round
+      />
+      <label className="text-[13px] text-x-dim">{t('profile.changeBanner')}</label>
+      <MediaPicker
+        label={t('profile.changeBanner')}
+        resetLabel={t('profile.resetBanner')}
+        current={user?.bannerUrl ?? null}
+        patch={banner}
+        onChange={setBanner}
+      />
       <div className="flex justify-end gap-2">
         <button
           onClick={onDone}
@@ -97,6 +193,11 @@ export function ProfilePage() {
     ['user-likes', handle],
     (cursor) => api.getUserLikes(handle, cursor),
     { enabled: handle.length > 0 && tab === 'likes' },
+  );
+  const mediaPosts = usePagedQuery(
+    ['user-media', handle],
+    (cursor) => api.getUserMedia(handle, cursor),
+    { enabled: handle.length > 0 && tab === 'media' },
   );
 
   // 置顶帖单独请求，渲染在帖子 Tab 顶部（后端时间线已排除该帖避免重复）
@@ -169,14 +270,18 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* Banner：纯色占位（媒体系统上线后支持自定义图片） */}
-      <div className="h-50 w-full bg-x-input" />
+      {/* Banner：有上传图用图片，否则纯色占位 */}
+      {u.bannerUrl ? (
+        <img src={u.bannerUrl} alt="" className="h-50 w-full object-cover" draggable={false} />
+      ) : (
+        <div className="h-50 w-full bg-x-input" />
+      )}
 
       {/* 资料区 */}
       <div className="border-b border-x-border px-4 py-3">
         <div className="-mt-13 flex items-start justify-between">
           <div className="rounded-full border-4 border-x-bg">
-            <Avatar handle={u.handle} size={80} />
+            <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={80} />
           </div>
           <div className="mt-13 pt-1">
             {isMe ? (
@@ -268,7 +373,33 @@ export function ProfilePage() {
       </div>
 
       {/* Tab 内容 */}
-      {tab === 'media' && <EmptyBox icon={TAB_EMPTY.media.icon} text={t(TAB_EMPTY.media.key)} />}
+      {tab === 'media' && (
+        <>
+          {mediaPosts.isLoading && <Spinner />}
+          {mediaPosts.isError && <ErrorBox error={mediaPosts.error} />}
+          <div className="grid grid-cols-3 gap-0.5 p-0.5">
+            {mediaPosts.items.flatMap((post) =>
+              post.media.map((m) => (
+                <button
+                  key={`${post.id}-${m.id}`}
+                  onClick={() => navigate(`/post/${post.id}`)}
+                  className="aspect-square overflow-hidden bg-x-input"
+                >
+                  <img src={m.url} alt="" className="h-full w-full object-cover" loading="lazy" />
+                </button>
+              )),
+            )}
+          </div>
+          {mediaPosts.isSuccess && mediaPosts.items.length === 0 && (
+            <EmptyBox icon={TAB_EMPTY.media.icon} text={t(TAB_EMPTY.media.key)} />
+          )}
+          <LoadMore
+            hasNextPage={!!mediaPosts.hasNextPage}
+            isFetching={mediaPosts.isFetchingNextPage}
+            onClick={() => void mediaPosts.fetchNextPage()}
+          />
+        </>
+      )}
       {tab === 'posts' && (
         <>
           {posts.isLoading && <Spinner />}

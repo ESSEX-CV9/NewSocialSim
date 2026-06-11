@@ -6,6 +6,18 @@ export interface UserSummary {
   handle: string;
   displayName: string;
   isBot: boolean;
+  /** 头像图片地址；null = 用 handle 哈希色块兜底 */
+  avatarUrl: string | null;
+}
+
+/** 媒体资源视图（文件本体经 url 流式获取） */
+export interface MediaView {
+  id: number;
+  type: 'image' | 'video';
+  /** /api/media/<id>/file?w=<worldId>，公开可访问 */
+  url: string;
+  width: number | null;
+  height: number | null;
 }
 
 /** 面向展示的帖子：实体 + 作者 + 观察者状态 + 一层引用嵌入 */
@@ -19,6 +31,8 @@ export interface PostView extends Post {
   quoted: PostView | null;
   /** 观察者是否已关注作者（本人帖与匿名时为 false；供帖子菜单的关注快捷项） */
   authorFollowedByViewer: boolean;
+  /** 附加媒体（最多 4 张图或 1 个视频），按 position 排序；墓碑帖为空数组 */
+  media: MediaView[];
 }
 
 export interface TimelineItem {

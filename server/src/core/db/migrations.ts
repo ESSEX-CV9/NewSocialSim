@@ -136,6 +136,38 @@ const migrations: Migration[] = [
       ALTER TABLE users ADD COLUMN pinned_post_id INTEGER REFERENCES posts(id);
     `,
   },
+  {
+    version: 7,
+    name: 'media',
+    sql: `
+      CREATE TABLE media (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        owner_id    INTEGER NOT NULL REFERENCES users(id),
+        type        TEXT    NOT NULL,
+        file_name   TEXT    NOT NULL,
+        mime        TEXT    NOT NULL,
+        width       INTEGER,
+        height      INTEGER,
+        size_bytes  INTEGER NOT NULL,
+        source      TEXT    NOT NULL DEFAULT 'upload',
+        origin_url  TEXT,
+        created_at  INTEGER NOT NULL
+      );
+      CREATE INDEX idx_media_owner ON media(owner_id, created_at DESC);
+
+      CREATE TABLE post_media (
+        post_id  INTEGER NOT NULL REFERENCES posts(id),
+        media_id INTEGER NOT NULL REFERENCES media(id),
+        position INTEGER NOT NULL,
+        PRIMARY KEY (post_id, position)
+      );
+      CREATE INDEX idx_post_media_media ON post_media(media_id);
+      CREATE INDEX idx_post_media_post  ON post_media(post_id);
+
+      ALTER TABLE users ADD COLUMN avatar_media_id INTEGER REFERENCES media(id);
+      ALTER TABLE users ADD COLUMN banner_media_id INTEGER REFERENCES media(id);
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

@@ -46,6 +46,20 @@ export class PostsController {
     );
   };
 
+  listMediaByHandle = async (
+    req: FastifyRequest<{ Params: { handle: string }; Querystring: PageQuery }>,
+    reply: FastifyReply,
+  ) => {
+    reply.send(
+      this.service.listMediaByHandle(
+        req.params.handle,
+        viewerIdOf(req),
+        req.query.cursor,
+        req.query.limit,
+      ),
+    );
+  };
+
   listLikedByHandle = async (
     req: FastifyRequest<{ Params: { handle: string }; Querystring: PageQuery }>,
     reply: FastifyReply,

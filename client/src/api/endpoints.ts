@@ -3,6 +3,7 @@ import type {
   AuthResponse,
   CreatePostRequest,
   LoginRequest,
+  MediaView,
   NotificationView,
   Page,
   PostView,
@@ -46,6 +47,15 @@ export const api = {
     http<Page<PostView>>('GET', withPage(`/api/users/${handle}/likes`, cursor)),
   deletePost: (id: number) => http<void>('DELETE', `/api/posts/${id}`),
   recordViews: (ids: number[]) => http<void>('POST', '/api/posts/views', { ids }),
+  // media
+  uploadMedia: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return http<{ media: MediaView }>('POST', '/api/media/upload', form);
+  },
+  getUserMedia: (handle: string, cursor?: string) =>
+    http<Page<PostView>>('GET', withPage(`/api/users/${handle}/media`, cursor)),
+
   pinPost: (id: number) => http<{ pinnedPostId: number | null }>('POST', `/api/posts/${id}/pin`),
   unpinPost: (id: number) =>
     http<{ pinnedPostId: number | null }>('DELETE', `/api/posts/${id}/pin`),

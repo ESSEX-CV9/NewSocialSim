@@ -2,6 +2,7 @@ import type { Page, UserSummary } from '@socialsim/shared';
 import { ValidationError } from '../../core/errors/app-error.js';
 import { decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { mediaFileUrl } from '../media/media.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { UsersService } from '../users/users.service.js';
 import { followsRepo } from './follows.repo.js';
@@ -57,15 +58,22 @@ export class FollowsService {
     limit?: number,
   ): Page<UserSummary> {
     const target = this.usersService.getProfileByHandle(handle);
-    const { db } = this.worldManager.current();
+    const { db, worldId } = this.worldManager.current();
     const pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, limit ?? DEFAULT_PAGE_SIZE));
     const rows = followsRepo.listUsers(db, target.id, direction, decodeTsIdCursor(cursor), pageSize + 1);
     const hasMore = rows.length > pageSize;
     const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     const last = pageRows[pageRows.length - 1];
+    const items: UserSummary[] = pageRows.map((r) => ({
+      id: r.id,
+      handle: r.handle,
+      displayName: r.display_name,
+      isBot: r.is_bot === 1,
+      avatarUrl: mediaFileUrl(r.avatar_media_id, worldId),
+    }));
     return {
-      items: pageRows.map((r) => r.user),
-      nextCursor: hasMore && last ? encodeCursor([last.followedAt, last.user.id]) : null,
+      items,
+      nextCursor: hasMore && last ? encodeCursor([last.follow_created_at, last.id]) : null,
     };
   }
 }

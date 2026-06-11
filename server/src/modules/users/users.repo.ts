@@ -11,6 +11,8 @@ export interface UserRow {
   is_bot: number;
   created_at: number;
   pinned_post_id: number | null;
+  avatar_media_id: number | null;
+  banner_media_id: number | null;
 }
 
 export interface UserCounts {
@@ -56,7 +58,14 @@ export const usersRepo = {
     db: WorldDb,
     viewerId: number | null,
     limit: number,
-  ): { id: number; handle: string; display_name: string; is_bot: number; follower_count: number }[] {
+  ): {
+    id: number;
+    handle: string;
+    display_name: string;
+    is_bot: number;
+    avatar_media_id: number | null;
+    follower_count: number;
+  }[] {
     const excludeClause =
       viewerId !== null
         ? `WHERE u.id != @viewerId
@@ -65,7 +74,7 @@ export const usersRepo = {
         : '';
     return db
       .prepare(
-        `SELECT u.id, u.handle, u.display_name, u.is_bot,
+        `SELECT u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.id) AS follower_count
          FROM users u
          ${excludeClause}
@@ -77,6 +86,7 @@ export const usersRepo = {
       handle: string;
       display_name: string;
       is_bot: number;
+      avatar_media_id: number | null;
       follower_count: number;
     }[];
   },
@@ -112,13 +122,24 @@ export const usersRepo = {
   updateProfile(
     db: WorldDb,
     userId: number,
-    patch: { displayName?: string; bio?: string },
+    patch: {
+      displayName?: string;
+      bio?: string;
+      avatarMediaId?: number | null;
+      bannerMediaId?: number | null;
+    },
   ): void {
     if (patch.displayName !== undefined) {
       db.prepare('UPDATE users SET display_name = ? WHERE id = ?').run(patch.displayName, userId);
     }
     if (patch.bio !== undefined) {
       db.prepare('UPDATE users SET bio = ? WHERE id = ?').run(patch.bio, userId);
+    }
+    if (patch.avatarMediaId !== undefined) {
+      db.prepare('UPDATE users SET avatar_media_id = ? WHERE id = ?').run(patch.avatarMediaId, userId);
+    }
+    if (patch.bannerMediaId !== undefined) {
+      db.prepare('UPDATE users SET banner_media_id = ? WHERE id = ?').run(patch.bannerMediaId, userId);
     }
   },
 };

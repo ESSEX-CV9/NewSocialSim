@@ -66,7 +66,7 @@ function WhoToFollowCard() {
           className="flex items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-x-hover"
         >
           <Link to={`/u/${u.handle}`} className="self-start">
-            <Avatar handle={u.handle} size={40} />
+            <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={40} />
           </Link>
           <Link to={`/u/${u.handle}`} className="min-w-0 flex-1">
             <div className="truncate text-[15px] font-bold hover:underline">{u.displayName}</div>

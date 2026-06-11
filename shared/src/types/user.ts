@@ -22,4 +22,10 @@ export interface UserProfile extends User {
   blockedByViewer: boolean;
   /** 本人的置顶帖 id（每用户最多一条） */
   pinnedPostId: number | null;
+  /** 头像图片地址；null = 用 handle 哈希色块兜底 */
+  avatarUrl: string | null;
+  /** 主页横幅图片地址；null = 纯色占位 */
+  bannerUrl: string | null;
+  avatarMediaId: number | null;
+  bannerMediaId: number | null;
 }

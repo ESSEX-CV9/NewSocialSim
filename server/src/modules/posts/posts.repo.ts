@@ -17,13 +17,15 @@ export interface PostRow {
   author_handle: string;
   author_display_name: string;
   author_is_bot: number;
+  author_avatar_media_id: number | null;
 }
 
 const SELECT_POST = `
   SELECT p.*,
-         u.handle       AS author_handle,
-         u.display_name AS author_display_name,
-         u.is_bot       AS author_is_bot
+         u.handle          AS author_handle,
+         u.display_name    AS author_display_name,
+         u.is_bot          AS author_is_bot,
+         u.avatar_media_id AS author_avatar_media_id
   FROM posts p
   JOIN users u ON u.id = p.author_id
 `;
@@ -119,6 +121,28 @@ export const postsRepo = {
       .all({ authorId, limit, ...(before ? { ts: before.ts, cid: before.id } : {}) }) as PostRow[];
   },
 
+  /** 某用户带媒体的帖子（含回复，与 X 媒体 Tab 一致），按发布时间倒序 */
+  listMediaPostsByAuthor(
+    db: WorldDb,
+    authorId: number,
+    before: { ts: number; id: number } | null,
+    limit: number,
+  ): PostRow[] {
+    const cursorClause = before
+      ? 'AND (p.created_at < @ts OR (p.created_at = @ts AND p.id < @cid))'
+      : '';
+    return db
+      .prepare(
+        `${SELECT_POST}
+         WHERE p.author_id = @authorId AND p.deleted = 0
+           AND EXISTS (SELECT 1 FROM post_media pm WHERE pm.post_id = p.id)
+           ${cursorClause}
+         ORDER BY p.created_at DESC, p.id DESC
+         LIMIT @limit`,
+      )
+      .all({ authorId, limit, ...(before ? { ts: before.ts, cid: before.id } : {}) }) as PostRow[];
+  },
+
   /** 某用户赞过的帖子，按点赞时间倒序；liked_at 供游标使用 */
   listLikedBy(
     db: WorldDb,
@@ -132,10 +156,11 @@ export const postsRepo = {
     return db
       .prepare(
         `SELECT p.*,
-                u.handle       AS author_handle,
-                u.display_name AS author_display_name,
-                u.is_bot       AS author_is_bot,
-                l.created_at   AS liked_at
+                u.handle          AS author_handle,
+                u.display_name    AS author_display_name,
+                u.is_bot          AS author_is_bot,
+                u.avatar_media_id AS author_avatar_media_id,
+                l.created_at      AS liked_at
          FROM likes l
          JOIN posts p ON p.id = l.post_id
          JOIN users u ON u.id = p.author_id

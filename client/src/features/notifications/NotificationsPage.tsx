@@ -91,7 +91,7 @@ function AvatarStack({ actors }: { actors: RankedActor[] }) {
   const shown = actors.slice(0, 4);
   const OPACITY = ['', '', 'opacity-60', 'opacity-30'];
   if (shown.length === 1) {
-    return <Avatar handle={shown[0]!.user.handle} size={32} />;
+    return <Avatar handle={shown[0]!.user.handle} avatarUrl={shown[0]!.user.avatarUrl} size={32} />;
   }
   // 人越多叠得越紧：2 人露一半，3 人露 12px，4 人只露 8px
   const overlap = shown.length >= 4 ? '-ml-6' : shown.length === 3 ? '-ml-5' : '-ml-4';
@@ -103,7 +103,7 @@ function AvatarStack({ actors }: { actors: RankedActor[] }) {
           className={`relative rounded-full border-2 border-x-bg ${i > 0 ? overlap : ''} ${OPACITY[i] ?? ''}`}
           style={{ zIndex: shown.length - i }}
         >
-          <Avatar handle={a.user.handle} size={32} />
+          <Avatar handle={a.user.handle} avatarUrl={a.user.avatarUrl} size={32} />
         </div>
       ))}
     </div>

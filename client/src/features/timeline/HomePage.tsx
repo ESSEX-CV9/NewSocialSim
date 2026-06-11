@@ -96,7 +96,7 @@ function FollowSuggestions() {
       {suggestions.data.users.map((u) => (
         <div key={u.id} className="flex items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-x-hover">
           <Link to={`/u/${u.handle}`}>
-            <Avatar handle={u.handle} />
+            <Avatar handle={u.handle} avatarUrl={u.avatarUrl} />
           </Link>
           <Link to={`/u/${u.handle}`} className="min-w-0 flex-1">
             <div className="text-[15px] font-bold hover:underline">{u.displayName}</div>

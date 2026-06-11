@@ -2,6 +2,7 @@ import type { Page, PostView, TrendItem, UserSummary } from '@socialsim/shared';
 import { ValidationError } from '../../core/errors/app-error.js';
 import { decodeCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { mediaFileUrl } from '../media/media.service.js';
 import { clampLimit, type PostsService } from '../posts/posts.service.js';
 import { searchRepo } from './search.repo.js';
 
@@ -54,12 +55,19 @@ export class SearchService {
 
   users(query: string, cursor?: string, limit?: number): Page<UserSummary> {
     const q = normalizeQuery(query);
-    const { db } = this.worldManager.current();
+    const { db, worldId } = this.worldManager.current();
     const pageSize = clampLimit(limit);
     const rows = searchRepo.searchUsers(db, q, parseIdCursor(cursor), pageSize + 1);
     const hasMore = rows.length > pageSize;
-    const items = hasMore ? rows.slice(0, pageSize) : rows;
-    const last = items[items.length - 1];
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+    const last = pageRows[pageRows.length - 1];
+    const items: UserSummary[] = pageRows.map((r) => ({
+      id: r.id,
+      handle: r.handle,
+      displayName: r.display_name,
+      isBot: r.is_bot === 1,
+      avatarUrl: mediaFileUrl(r.avatar_media_id, worldId),
+    }));
     return {
       items,
       nextCursor: hasMore && last ? encodeCursor([last.id]) : null,

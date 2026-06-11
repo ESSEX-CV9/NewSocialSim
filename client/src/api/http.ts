@@ -63,14 +63,16 @@ interface ErrorBody {
 /** 统一请求入口：带活动账号 token、解析业务错误；401 时广播事件让 AuthContext 处理账号失效 */
 export async function http<T>(method: string, url: string, body?: unknown): Promise<T> {
   const headers: Record<string, string> = {};
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const isForm = body instanceof FormData;
+  // FormData 由浏览器自带 multipart boundary，不能手动设 Content-Type
+  if (body !== undefined && !isForm) headers['Content-Type'] = 'application/json';
   const token = getToken();
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(url, {
     method,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : null,
+    body: isForm ? body : body !== undefined ? JSON.stringify(body) : null,
   });
   if (res.status === 204) return undefined as T;
   const data: unknown = await res.json().catch(() => null);

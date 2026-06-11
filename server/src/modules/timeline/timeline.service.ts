@@ -1,6 +1,7 @@
 import type { Page, TimelineItem } from '@socialsim/shared';
 import { decodeCursor, decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { mediaFileUrl } from '../media/media.service.js';
 import type { UsersService } from '../users/users.service.js';
 import { clampLimit, type PostsService } from '../posts/posts.service.js';
 import { timelineRepo, type TimelineEntryRow } from './timeline.repo.js';
@@ -63,6 +64,7 @@ export class TimelineService {
   }
 
   private buildItems(rows: TimelineEntryRow[], viewerId: number | null): TimelineItem[] {
+    const { worldId } = this.worldManager.current();
     const views = this.postsService.getViewsByIds(
       [...new Set(rows.map((r) => r.post_id))],
       viewerId,
@@ -81,6 +83,7 @@ export class TimelineService {
                 handle: row.actor_handle ?? '',
                 displayName: row.actor_display_name ?? '',
                 isBot: row.actor_is_bot === 1,
+                avatarUrl: mediaFileUrl(row.actor_avatar_media_id, worldId),
               }
             : null,
         activityAt: row.activity_at,

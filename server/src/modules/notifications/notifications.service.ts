@@ -1,6 +1,7 @@
 import type { NotificationType, NotificationView, Page } from '@socialsim/shared';
 import { decodeCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { mediaFileUrl } from '../media/media.service.js';
 import { notificationsRepo, type NotificationRow } from './notifications.repo.js';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -28,7 +29,7 @@ export class NotificationsService {
     cursor?: string,
     limit?: number,
   ): Page<NotificationView> {
-    const { db } = this.worldManager.current();
+    const { db, worldId } = this.worldManager.current();
     const pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, limit ?? DEFAULT_PAGE_SIZE));
     const beforeId = parseIdCursor(cursor);
     const rows = notificationsRepo.list(db, userId, filter === 'mentions', beforeId, pageSize + 1);
@@ -36,7 +37,7 @@ export class NotificationsService {
     const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     const last = pageRows[pageRows.length - 1];
     return {
-      items: pageRows.map(toView),
+      items: pageRows.map((r) => toView(r, worldId)),
       nextCursor: hasMore && last ? encodeCursor([last.id]) : null,
     };
   }
@@ -59,7 +60,7 @@ export class NotificationsService {
 
 const EXCERPT_LENGTH = 100;
 
-function toView(row: NotificationRow): NotificationView {
+function toView(row: NotificationRow, worldId: string): NotificationView {
   return {
     id: row.id,
     type: row.type,
@@ -68,6 +69,7 @@ function toView(row: NotificationRow): NotificationView {
       handle: row.actor_handle,
       displayName: row.actor_display_name,
       isBot: row.actor_is_bot === 1,
+      avatarUrl: mediaFileUrl(row.actor_avatar_media_id, worldId),
     },
     actorFollowerCount: row.actor_follower_count,
     actorFollowedByViewer: row.actor_followed === 1,

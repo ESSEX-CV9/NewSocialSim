@@ -11,6 +11,12 @@ const createPostBodySchema = {
     content: { type: 'string', maxLength: 1000 },
     replyToId: { type: 'integer' },
     quoteOfId: { type: 'integer' },
+    mediaIds: {
+      type: 'array',
+      items: { type: 'integer', minimum: 1 },
+      maxItems: 4,
+      uniqueItems: true,
+    },
   },
 } as const;
 
@@ -90,6 +96,11 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
     '/api/users/:handle/likes',
     { preHandler: deps.optionalAuth, schema: { querystring: pageQuerySchema } },
     controller.listLikedByHandle,
+  );
+  app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>(
+    '/api/users/:handle/media',
+    { preHandler: deps.optionalAuth, schema: { querystring: pageQuerySchema } },
+    controller.listMediaByHandle,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/posts/:id',

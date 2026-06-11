@@ -134,7 +134,7 @@ export function Layout({ children }: { children: ReactNode }) {
                 onClick={() => setAccountMenuOpen((v) => !v)}
                 className="flex w-full items-center gap-3 rounded-full p-2 text-left transition-colors duration-200 hover:bg-x-input"
               >
-                <Avatar handle={user.handle} size={40} />
+                <Avatar handle={user.handle} avatarUrl={user.avatarUrl} size={40} />
                 <div className="hidden min-w-0 flex-1 min-[800px]:block">
                   <div className="truncate text-[15px] font-bold">{user.displayName}</div>
                   <div className="truncate text-[13px] text-x-dim">@{user.handle}</div>
@@ -151,7 +151,7 @@ export function Layout({ children }: { children: ReactNode }) {
                         onClick={() => void handleSwitchAccount(account.index)}
                         className="flex w-full items-center gap-3 px-4 py-3 transition-colors duration-200 hover:bg-x-input"
                       >
-                        <Avatar handle={account.user.handle} size={32} />
+                        <Avatar handle={account.user.handle} avatarUrl={account.user.avatarUrl} size={32} />
                         <div className="min-w-0 flex-1 text-left">
                           <div className="truncate text-[15px] font-bold">
                             {account.user.displayName}

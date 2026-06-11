@@ -8,6 +8,7 @@ import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
+import { MediaGrid } from './MediaGrid';
 import { TimeAgo } from './TimeAgo';
 import { useViewTracking } from './useViewTracking';
 
@@ -70,13 +71,14 @@ function QuotedCard({ quoted }: { quoted: PostView }) {
       className="mt-2 cursor-pointer rounded-xl border-2 border-x-border p-3 transition-colors duration-200 hover:bg-x-hover"
     >
       <div className="mb-1 flex items-center gap-1.5 text-[15px]">
-        <Avatar handle={quoted.author.handle} size={20} />
+        <Avatar handle={quoted.author.handle} avatarUrl={quoted.author.avatarUrl} size={20} />
         <span className="font-bold">{quoted.author.displayName}</span>
         <span className="text-x-dim">@{quoted.author.handle}</span>
         <span className="text-x-dim">·</span>
         <TimeAgo at={quoted.createdAt} />
       </div>
       <PostContent content={quoted.content} />
+      {quoted.media.length > 0 && <MediaGrid media={quoted.media} compact />}
     </div>
   );
 }
@@ -283,7 +285,7 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
       )}
       <div className="flex gap-3">
         <Link to={`/u/${post.author.handle}`} onClick={stop} className="self-start">
-          <Avatar handle={post.author.handle} />
+          <Avatar handle={post.author.handle} avatarUrl={post.author.avatarUrl} />
         </Link>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-x-1 text-[15px]">
@@ -358,6 +360,7 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
           <div className={large ? 'mt-2 text-xl' : 'mt-0.5'}>
             <PostContent content={post.content} />
           </div>
+          {post.media.length > 0 && <MediaGrid media={post.media} />}
           {post.quoted && <QuotedCard quoted={post.quoted} />}
           {/* 各按钮包 flex-1 左对齐单元格：图标位置不随数字宽度移动（与 X 一致） */}
           <div className="mt-3 flex items-center">

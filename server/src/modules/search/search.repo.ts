@@ -1,6 +1,13 @@
-import type { UserSummary } from '@socialsim/shared';
 import type { WorldDb } from '../../core/db/database.js';
 import { NOT_BLOCKED_AUTHOR, NOT_HIDDEN, type PostRow } from '../posts/posts.repo.js';
+
+export interface SearchUserRow {
+  id: number;
+  handle: string;
+  display_name: string;
+  is_bot: number;
+  avatar_media_id: number | null;
+}
 
 /** LIKE 通配符转义：让用户输入的 % _ 按字面匹配 */
 function escapeLike(q: string): string {
@@ -49,11 +56,11 @@ export const searchRepo = {
       .all(sinceTs) as { content: string }[];
   },
 
-  searchUsers(db: WorldDb, query: string, beforeId: number | null, limit: number): UserSummary[] {
+  searchUsers(db: WorldDb, query: string, beforeId: number | null, limit: number): SearchUserRow[] {
     const cursorClause = beforeId !== null ? 'AND id < @beforeId' : '';
-    const rows = db
+    return db
       .prepare(
-        `SELECT id, handle, display_name, is_bot
+        `SELECT id, handle, display_name, is_bot, avatar_media_id
          FROM users
          WHERE (handle LIKE @pattern ESCAPE '\\' OR display_name LIKE @pattern ESCAPE '\\')
            ${cursorClause}
@@ -64,12 +71,6 @@ export const searchRepo = {
         pattern: `%${escapeLike(query)}%`,
         limit,
         ...(beforeId !== null ? { beforeId } : {}),
-      }) as { id: number; handle: string; display_name: string; is_bot: number }[];
-    return rows.map((r) => ({
-      id: r.id,
-      handle: r.handle,
-      displayName: r.display_name,
-      isBot: r.is_bot === 1,
-    }));
+      }) as SearchUserRow[];
   },
 };

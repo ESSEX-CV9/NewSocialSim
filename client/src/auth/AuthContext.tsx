@@ -42,7 +42,13 @@ interface AuthValue {
 const AuthContext = createContext<AuthValue | null>(null);
 
 function toSummary(user: UserProfile): UserSummary {
-  return { id: user.id, handle: user.handle, displayName: user.displayName, isBot: user.isBot };
+  return {
+    id: user.id,
+    handle: user.handle,
+    displayName: user.displayName,
+    isBot: user.isBot,
+    avatarUrl: user.avatarUrl,
+  };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

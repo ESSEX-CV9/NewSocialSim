@@ -1,4 +1,5 @@
 import fastifyJwt from '@fastify/jwt';
+import fastifyMultipart from '@fastify/multipart';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { makeOptionalAuth, makeRequireAuth } from './core/auth/auth-guard.js';
 import { AppError } from './core/errors/app-error.js';
@@ -11,6 +12,8 @@ import { registerFollowsRoutes } from './modules/follows/follows.routes.js';
 import { FollowsService } from './modules/follows/follows.service.js';
 import { registerInteractionsRoutes } from './modules/interactions/interactions.routes.js';
 import { InteractionsService } from './modules/interactions/interactions.service.js';
+import { registerMediaRoutes } from './modules/media/media.routes.js';
+import { MediaService } from './modules/media/media.service.js';
 import { registerNotificationsRoutes } from './modules/notifications/notifications.routes.js';
 import { NotificationsService } from './modules/notifications/notifications.service.js';
 import { registerPostsRoutes } from './modules/posts/posts.routes.js';
@@ -51,15 +54,17 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   app.register(fastifyJwt, { secret: deps.jwtSecret });
+  app.register(fastifyMultipart, { limits: { fileSize: 10 * 1024 * 1024, files: 1 } });
 
   const { worldManager } = deps;
   const requireAuth = makeRequireAuth(worldManager);
   const optionalAuth = makeOptionalAuth(worldManager);
 
-  const usersService = new UsersService(worldManager);
+  const mediaService = new MediaService(worldManager);
+  const usersService = new UsersService(worldManager, mediaService);
   const authService = new AuthService(worldManager, usersService);
   const notificationsService = new NotificationsService(worldManager);
-  const postsService = new PostsService(worldManager, usersService, notificationsService);
+  const postsService = new PostsService(worldManager, usersService, notificationsService, mediaService);
   const interactionsService = new InteractionsService(worldManager, postsService, notificationsService);
   const followsService = new FollowsService(worldManager, usersService, notificationsService);
   const blocksService = new BlocksService(worldManager, usersService, followsService);
@@ -69,6 +74,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   app.get('/api/health', async () => ({ ok: true }));
 
   registerWorldsRoutes(app, { worldManager });
+  registerMediaRoutes(app, { mediaService, requireAuth });
   registerAuthRoutes(app, { authService, worldManager, requireAuth });
   registerUsersRoutes(app, { usersService, requireAuth, optionalAuth });
   registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });

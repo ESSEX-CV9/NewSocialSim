@@ -9,6 +9,8 @@ const updateProfileBodySchema = {
   properties: {
     displayName: { type: 'string', maxLength: 50 },
     bio: { type: 'string', maxLength: 500 },
+    avatarMediaId: { type: ['integer', 'null'] },
+    bannerMediaId: { type: ['integer', 'null'] },
   },
 } as const;
 

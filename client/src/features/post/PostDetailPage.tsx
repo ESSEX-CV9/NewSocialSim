@@ -83,7 +83,7 @@ export function PostDetailPage() {
             onClick={() => setComposerOpen(true)}
             className="flex w-full cursor-text items-center gap-3 border-b border-x-border px-4 py-2.5 transition-colors duration-200 hover:bg-x-hover"
           >
-            <Avatar handle={user.handle} size={40} />
+            <Avatar handle={user.handle} avatarUrl={user.avatarUrl} size={40} />
             <span className="flex-1 text-left text-[17px] text-x-dim">
               {t('composer.replyPlaceholder')}
             </span>

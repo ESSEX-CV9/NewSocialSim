@@ -42,7 +42,7 @@ export function FollowListPage({ direction }: { direction: 'followers' | 'follow
           to={`/u/${u.handle}`}
           className="flex items-center gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover"
         >
-          <Avatar handle={u.handle} />
+          <Avatar handle={u.handle} avatarUrl={u.avatarUrl} />
           <div>
             <div className="text-[15px] font-bold">{u.displayName}</div>
             <div className="text-[14px] text-x-dim">@{u.handle}</div>

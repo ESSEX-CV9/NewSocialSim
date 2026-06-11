@@ -6,6 +6,7 @@ import {
 } from '../../core/errors/app-error.js';
 import { decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import type { MediaService } from '../media/media.service.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import type { UsersService } from '../users/users.service.js';
 import { postsRepo, type CountDeltas, type PostRow } from './posts.repo.js';
@@ -19,17 +20,21 @@ export class PostsService {
     private readonly worldManager: WorldManager,
     private readonly usersService: UsersService,
     private readonly notificationsService: NotificationsService,
+    private readonly mediaService: MediaService,
   ) {}
 
   create(authorId: number, input: CreatePostRequest): PostView {
     const content = input.content.trim();
-    if (content.length === 0) throw new ValidationError('内容不能为空');
+    const mediaIds = input.mediaIds ?? [];
+    // 有媒体时允许纯图无文字（与 X 一致）
+    if (content.length === 0 && mediaIds.length === 0) throw new ValidationError('内容不能为空');
     if (content.length > MAX_CONTENT_LENGTH) {
       throw new ValidationError(`内容最长 ${MAX_CONTENT_LENGTH} 字符`);
     }
     if (input.replyToId !== undefined && input.quoteOfId !== undefined) {
       throw new ValidationError('一条帖子不能同时是回复和引用');
     }
+    this.mediaService.validateAttachable(authorId, mediaIds);
 
     const { db, clock } = this.worldManager.current();
     const parent = input.replyToId !== undefined ? this.getLiveRow(input.replyToId) : null;
@@ -44,6 +49,9 @@ export class PostsService {
         quoteOfId: quoted?.id ?? null,
         createdAt: now,
       });
+      if (mediaIds.length > 0) {
+        this.mediaService.attachToPost(postId, mediaIds);
+      }
       if (parent) {
         postsRepo.adjustCounts(db, parent.id, { reply: 1 });
         this.notificationsService.add({
@@ -117,6 +125,25 @@ export class PostsService {
       db,
       profile.id,
       type === 'replies',
+      decodeTsIdCursor(cursor),
+      pageSize + 1,
+    );
+    return this.toPage(rows, pageSize, viewerId);
+  }
+
+  /** 某用户带媒体的帖子（个人主页媒体 Tab） */
+  listMediaByHandle(
+    handle: string,
+    viewerId: number | null,
+    cursor?: string,
+    limit?: number,
+  ): Page<PostView> {
+    const profile = this.usersService.getProfileByHandle(handle);
+    const { db } = this.worldManager.current();
+    const pageSize = clampLimit(limit);
+    const rows = postsRepo.listMediaPostsByAuthor(
+      db,
+      profile.id,
       decodeTsIdCursor(cursor),
       pageSize + 1,
     );
@@ -229,6 +256,7 @@ export class PostsService {
       viewerId !== null
         ? postsRepo.followedAuthorSet(db, viewerId, [...new Set(allRows.map((r) => r.author_id))])
         : new Set<number>();
+    const mediaMap = this.mediaService.viewsForPosts(allIds);
     const byId = new Map(allRows.map((r) => [r.id, r]));
 
     const toView = (row: PostRow, embedQuote: boolean): PostView => ({
@@ -244,11 +272,17 @@ export class PostsService {
       replyCount: row.reply_count,
       viewCount: row.view_count,
       deleted: row.deleted === 1,
-      author: toUserSummary(row),
+      author: toUserSummary(
+        row,
+        row.author_avatar_media_id !== null
+          ? this.mediaService.fileUrl(row.author_avatar_media_id)
+          : null,
+      ),
       likedByViewer: liked.has(row.id),
       repostedByViewer: reposted.has(row.id),
       bookmarkedByViewer: bookmarked.has(row.id),
       authorFollowedByViewer: followedAuthors.has(row.author_id),
+      media: row.deleted === 1 ? [] : (mediaMap.get(row.id) ?? []),
       quoted:
         embedQuote && row.quote_of_id !== null
           ? (() => {
@@ -272,12 +306,13 @@ export class PostsService {
   }
 }
 
-export function toUserSummary(row: PostRow): UserSummary {
+export function toUserSummary(row: PostRow, avatarUrl: string | null): UserSummary {
   return {
     id: row.author_id,
     handle: row.author_handle,
     displayName: row.author_display_name,
     isBot: row.author_is_bot === 1,
+    avatarUrl,
   };
 }
 
