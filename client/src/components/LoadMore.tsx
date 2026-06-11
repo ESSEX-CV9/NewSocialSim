@@ -15,7 +15,7 @@ export function LoadMore({
     <button
       onClick={onClick}
       disabled={isFetching}
-      className="block w-full p-4 text-center text-sky-500 hover:bg-gray-950 disabled:opacity-50"
+      className="block w-full p-4 text-center text-[15px] text-x-blue transition-colors duration-200 hover:bg-x-hover disabled:opacity-50"
     >
       {isFetching ? t('common.loading') : t('common.loadMore')}
     </button>

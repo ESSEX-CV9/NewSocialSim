@@ -6,35 +6,41 @@ import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { useWorld } from '../world/WorldContext';
 import { Avatar } from './Avatar';
+import { Composer } from './Composer';
 import { SimClockDisplay } from './SimClockDisplay';
 
 function NavItem({
   to,
   icon,
+  activeIcon,
   label,
   badge,
 }: {
   to: string;
   icon: string;
+  activeIcon?: string | undefined;
   label: string;
   badge?: number | undefined;
 }) {
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        `flex items-center gap-3 rounded-full px-4 py-2.5 text-lg hover:bg-gray-900 ${isActive ? 'font-bold' : ''}`
-      }
-    >
-      <span className="relative">
-        {icon}
-        {badge !== undefined && badge > 0 && (
-          <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-bold text-white">
-            {badge > 99 ? '99+' : badge}
+    <NavLink to={to} className="group flex w-fit min-[800px]:w-full">
+      {({ isActive }) => (
+        <span
+          className={`flex items-center gap-5 rounded-full p-3 text-xl transition-colors duration-200 group-hover:bg-x-input min-[800px]:px-4 min-[800px]:py-2.5 ${
+            isActive ? 'font-bold' : ''
+          }`}
+        >
+          <span className="relative flex w-6 justify-center">
+            <i className={`${isActive && activeIcon ? activeIcon : icon} text-[22px]`} />
+            {badge !== undefined && badge > 0 && (
+              <span className="absolute -top-1.5 -right-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-x-blue px-1 text-[10px] font-bold text-white">
+                {badge > 99 ? '99+' : badge}
+              </span>
+            )}
           </span>
-        )}
-      </span>
-      <span className="hidden xl:inline">{label}</span>
+          <span className="hidden text-[17px] min-[800px]:inline">{label}</span>
+        </span>
+      )}
     </NavLink>
   );
 }
@@ -45,6 +51,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { t, locale, setLocale } = useI18n();
   const navigate = useNavigate();
   const [q, setQ] = useState('');
+  const [composeOpen, setComposeOpen] = useState(false);
 
   const unread = useQuery({
     queryKey: ['unread-count'],
@@ -61,33 +68,59 @@ export function Layout({ children }: { children: ReactNode }) {
   return (
     <div className="mx-auto flex min-h-screen max-w-7xl">
       {/* 左栏：导航 */}
-      <header className="sticky top-0 flex h-screen w-16 flex-col border-r border-gray-800 p-2 xl:w-64">
-        <Link to="/" className="mb-4 px-4 py-2 text-xl font-bold text-sky-500">
-          <span className="xl:hidden">S</span>
-          <span className="hidden xl:inline">{t('app.name')}</span>
+      <header className="sticky top-0 flex h-screen w-18 flex-col items-center px-2 py-1 min-[800px]:w-68.75 min-[800px]:items-stretch">
+        <Link
+          to="/"
+          className="flex w-fit items-center gap-3 rounded-full p-3 text-2xl font-extrabold text-x-text transition-colors duration-200 hover:bg-x-input"
+        >
+          <i className="fas fa-tower-broadcast text-x-blue" />
+          <span className="hidden min-[800px]:inline">{t('app.name')}</span>
         </Link>
-        <nav className="flex flex-col gap-1">
-          <NavItem to="/" icon="🏠" label={t('nav.home')} />
+        <nav className="mt-1 flex flex-col items-center gap-1 min-[800px]:items-stretch">
+          <NavItem to="/" icon="fas fa-house" label={t('nav.home')} />
           {user && (
-            <NavItem to="/notifications" icon="🔔" label={t('nav.notifications')} badge={unread.data?.count} />
+            <NavItem
+              to="/notifications"
+              icon="far fa-bell"
+              activeIcon="fas fa-bell"
+              label={t('nav.notifications')}
+              badge={unread.data?.count}
+            />
           )}
-          <NavItem to="/search" icon="🔍" label={t('nav.search')} />
-          {user && <NavItem to={`/u/${user.handle}`} icon="👤" label={t('nav.profile')} />}
-          <NavItem to="/worlds" icon="🌍" label={t('nav.worlds')} />
+          <NavItem to="/search" icon="fas fa-magnifying-glass" label={t('nav.search')} />
+          {user && (
+            <NavItem
+              to={`/u/${user.handle}`}
+              icon="far fa-user"
+              activeIcon="fas fa-user"
+              label={t('nav.profile')}
+            />
+          )}
+          <NavItem to="/worlds" icon="fas fa-earth-asia" label={t('nav.worlds')} />
         </nav>
-        <div className="mt-auto flex flex-col gap-2 p-2">
+        {user && (
+          <button
+            onClick={() => setComposeOpen(true)}
+            className="mt-4 hidden w-[90%] rounded-full bg-x-blue py-3.5 text-[17px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark min-[800px]:block"
+          >
+            {t('composer.send')}
+          </button>
+        )}
+        <div className="mt-auto mb-2 flex flex-col items-center gap-2 min-[800px]:items-stretch min-[800px]:p-2">
           <button
             onClick={() => setLocale(locale === 'zh-CN' ? 'en' : 'zh-CN')}
-            className="self-start rounded-full px-3 py-1 text-sm text-gray-400 hover:bg-gray-900"
+            title={locale === 'zh-CN' ? 'Switch to English' : '切换为中文'}
+            className="flex w-fit items-center gap-2 self-start rounded-full px-3 py-1.5 text-sm text-x-dim transition-colors duration-200 hover:bg-x-input"
           >
-            {locale === 'zh-CN' ? 'EN' : '中文'}
+            <i className="fas fa-language text-[16px]" />
+            <span className="hidden min-[800px]:inline">{locale === 'zh-CN' ? 'EN' : '中文'}</span>
           </button>
           {user ? (
-            <div className="flex items-center gap-2">
-              <Avatar handle={user.handle} size={36} />
-              <div className="hidden min-w-0 flex-1 xl:block">
-                <div className="truncate text-sm font-bold">{user.displayName}</div>
-                <div className="truncate text-xs text-gray-500">@{user.handle}</div>
+            <div className="flex items-center gap-3 rounded-full p-2 transition-colors duration-200 hover:bg-x-input">
+              <Avatar handle={user.handle} size={40} />
+              <div className="hidden min-w-0 flex-1 min-[800px]:block">
+                <div className="truncate text-[15px] font-bold">{user.displayName}</div>
+                <div className="truncate text-[13px] text-x-dim">@{user.handle}</div>
               </div>
               <button
                 onClick={() => {
@@ -95,38 +128,46 @@ export function Layout({ children }: { children: ReactNode }) {
                   navigate('/login');
                 }}
                 title={t('nav.logout')}
-                className="rounded-full px-2 py-1 text-sm text-gray-400 hover:bg-gray-900"
+                className="hidden size-8 items-center justify-center rounded-full text-x-dim transition-colors duration-200 hover:bg-x-border hover:text-x-text min-[800px]:flex"
               >
-                ⏏
+                <i className="fas fa-right-from-bracket" />
               </button>
             </div>
           ) : (
-            <Link to="/login" className="rounded-full bg-sky-500 px-4 py-2 text-center font-bold text-white">
-              {t('nav.login')}
+            <Link
+              to="/login"
+              className="rounded-full bg-x-blue px-4 py-2.5 text-center font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark"
+            >
+              <span className="hidden min-[800px]:inline">{t('nav.login')}</span>
+              <i className="fas fa-right-to-bracket min-[800px]:hidden" />
             </Link>
           )}
         </div>
       </header>
 
       {/* 中栏：内容 */}
-      <main className="min-h-screen w-full max-w-xl border-r border-gray-800">{children}</main>
+      <main className="min-h-screen w-full max-w-150 border-x border-x-border">{children}</main>
 
       {/* 右栏：搜索 + 世界信息 */}
-      <aside className="sticky top-0 hidden h-screen flex-1 flex-col gap-4 p-4 lg:flex">
-        <form onSubmit={submitSearch}>
+      <aside className="sticky top-0 hidden h-screen w-87.5 flex-col gap-4 px-6 py-3 min-[1100px]:flex">
+        <form onSubmit={submitSearch} className="relative">
+          <i className="fas fa-magnifying-glass absolute top-1/2 left-4 -translate-y-1/2 text-[14px] text-x-dim" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t('search.placeholder')}
-            className="w-full rounded-full border border-gray-800 bg-gray-950 px-4 py-2 outline-none focus:border-sky-500"
+            className="w-full rounded-full border border-transparent bg-x-input py-2.5 pr-4 pl-11 text-[15px] outline-none placeholder:text-x-dim focus:border-x-blue focus:bg-x-bg"
           />
         </form>
-        <div className="rounded-2xl border border-gray-800 bg-gray-950 p-4">
-          <h2 className="mb-2 font-bold text-gray-300">{t('worlds.activeWorld')}</h2>
+        <div className="rounded-2xl bg-x-card p-4">
+          <h2 className="mb-2 flex items-center gap-2 text-xl font-extrabold">
+            <i className="fas fa-earth-asia text-[16px] text-x-blue" />
+            {t('worlds.activeWorld')}
+          </h2>
           {world ? (
-            <div className="flex flex-col gap-1 text-sm text-gray-400">
-              <div className="text-lg font-bold text-gray-100">{world.meta.name}</div>
-              {world.meta.description && <p className="text-gray-500">{world.meta.description}</p>}
+            <div className="flex flex-col gap-1.5 text-[14px] text-x-dim">
+              <div className="text-[17px] font-bold text-x-text">{world.meta.name}</div>
+              {world.meta.description && <p>{world.meta.description}</p>}
               <SimClockDisplay />
               <div>
                 {t('worlds.speed')}:{' '}
@@ -136,15 +177,47 @@ export function Layout({ children }: { children: ReactNode }) {
               </div>
             </div>
           ) : (
-            <div className="text-sm text-gray-500">
+            <div className="text-[14px] text-x-dim">
               {t('worlds.noActive')} —{' '}
-              <Link to="/worlds" className="text-sky-500 hover:underline">
+              <Link to="/worlds" className="text-x-blue hover:underline">
                 {t('auth.goWorlds')}
               </Link>
             </div>
           )}
         </div>
       </aside>
+
+      {/* 发帖弹窗 */}
+      {composeOpen && (
+        <div
+          onClick={() => setComposeOpen(false)}
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-xl rounded-2xl border border-x-border bg-x-bg"
+          >
+            <div className="flex items-center p-2">
+              <button
+                onClick={() => setComposeOpen(false)}
+                className="flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
+              >
+                <i className="fas fa-xmark text-[18px]" />
+              </button>
+            </div>
+            <Composer
+              placeholder={t('composer.placeholder')}
+              buttonText={t('composer.send')}
+              autoFocus
+              bordered={false}
+              onPosted={(p) => {
+                setComposeOpen(false);
+                navigate(`/post/${p.id}`);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

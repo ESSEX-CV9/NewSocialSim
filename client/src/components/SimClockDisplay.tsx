@@ -17,7 +17,7 @@ export function SimClockDisplay() {
   return (
     <div>
       {t('worlds.simTime')}（{world.meta.calendar.label}）:{' '}
-      <span className="font-mono text-gray-200">{new Date(now).toLocaleString(locale)}</span>
+      <span className="font-mono text-x-text">{new Date(now).toLocaleString(locale)}</span>
     </div>
   );
 }

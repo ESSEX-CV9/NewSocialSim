@@ -30,22 +30,23 @@ export function SearchPage() {
   };
 
   const tabClass = (active: boolean) =>
-    `flex-1 cursor-pointer p-3 text-center font-bold hover:bg-gray-950 ${
-      active ? 'border-b-2 border-sky-500 text-gray-100' : 'text-gray-500'
+    `flex-1 cursor-pointer p-3 text-center text-[15px] transition-colors duration-200 hover:bg-x-hover ${
+      active ? 'tab-active' : 'text-x-dim'
     }`;
 
   const active = tab === 'posts' ? posts : users;
 
   return (
     <div>
-      <div className="sticky top-0 z-10 border-b border-gray-800 bg-black/80 backdrop-blur">
-        <form onSubmit={submit} className="p-3">
+      <div className="glass-header">
+        <form onSubmit={submit} className="relative p-3">
+          <i className="fas fa-magnifying-glass absolute top-1/2 left-7 -translate-y-1/2 text-[14px] text-x-dim" />
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={t('search.placeholder')}
             autoFocus
-            className="w-full rounded-full border border-gray-800 bg-gray-950 px-4 py-2 outline-none focus:border-sky-500"
+            className="w-full rounded-full border border-transparent bg-x-input py-2.5 pr-4 pl-11 text-[15px] outline-none placeholder:text-x-dim focus:border-x-blue focus:bg-x-bg"
           />
         </form>
         <div className="flex">
@@ -58,7 +59,7 @@ export function SearchPage() {
         </div>
       </div>
 
-      {q.length === 0 && <EmptyBox text={t('search.prompt')} />}
+      {q.length === 0 && <EmptyBox icon="fas fa-magnifying-glass" text={t('search.prompt')} />}
       {active.isLoading && q.length > 0 && <Spinner />}
       {active.isError && <ErrorBox error={active.error} />}
 
@@ -69,18 +70,18 @@ export function SearchPage() {
           <Link
             key={u.id}
             to={`/u/${u.handle}`}
-            className="flex items-center gap-3 border-b border-gray-800 p-4 hover:bg-gray-950"
+            className="flex items-center gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover"
           >
             <Avatar handle={u.handle} />
             <div>
-              <div className="font-bold">{u.displayName}</div>
-              <div className="text-sm text-gray-500">@{u.handle}</div>
+              <div className="text-[15px] font-bold">{u.displayName}</div>
+              <div className="text-[14px] text-x-dim">@{u.handle}</div>
             </div>
           </Link>
         ))}
 
       {q.length > 0 && active.isSuccess && active.items.length === 0 && (
-        <EmptyBox text={t('search.empty')} />
+        <EmptyBox icon="fas fa-magnifying-glass" text={t('search.empty')} />
       )}
       <LoadMore
         hasNextPage={!!active.hasNextPage}

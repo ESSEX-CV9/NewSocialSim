@@ -26,13 +26,13 @@ export function HomePage() {
   const refresh = () => void queryClient.invalidateQueries({ queryKey: ['timeline'] });
 
   const tabClass = (active: boolean) =>
-    `flex-1 cursor-pointer p-4 text-center font-bold hover:bg-gray-950 ${
-      active ? 'border-b-2 border-sky-500 text-gray-100' : 'text-gray-500'
+    `flex-1 cursor-pointer p-4 text-center text-[15px] transition-colors duration-200 hover:bg-x-hover ${
+      active ? 'tab-active' : 'text-x-dim'
     }`;
 
   return (
     <div>
-      <div className="sticky top-0 z-10 flex border-b border-gray-800 bg-black/80 backdrop-blur">
+      <div className="glass-header flex">
         {user && (
           <button className={tabClass(tab === 'following')} onClick={() => setTab('following')}>
             {t('timeline.following')}
@@ -61,7 +61,9 @@ export function HomePage() {
           onDeleted={refresh}
         />
       ))}
-      {query.isSuccess && query.items.length === 0 && <EmptyBox text={t('timeline.empty')} />}
+      {query.isSuccess && query.items.length === 0 && (
+        <EmptyBox icon="far fa-comment" text={t('timeline.empty')} />
+      )}
       <LoadMore
         hasNextPage={!!query.hasNextPage}
         isFetching={query.isFetchingNextPage}

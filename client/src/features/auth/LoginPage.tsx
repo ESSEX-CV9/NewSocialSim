@@ -7,8 +7,11 @@ import { useWorld } from '../../world/WorldContext';
 export function AuthFormShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <div className="w-full max-w-sm rounded-2xl border border-gray-800 bg-gray-950 p-8">
-        <h1 className="mb-6 text-2xl font-bold">{title}</h1>
+      <div className="w-full max-w-sm rounded-2xl border border-x-border bg-x-card p-8">
+        <div className="mb-4 text-3xl text-x-blue">
+          <i className="fas fa-tower-broadcast" />
+        </div>
+        <h1 className="mb-6 text-2xl font-extrabold">{title}</h1>
         {children}
       </div>
     </div>
@@ -16,9 +19,9 @@ export function AuthFormShell({ title, children }: { title: string; children: Re
 }
 
 export const inputClass =
-  'w-full rounded-lg border border-gray-800 bg-black px-3 py-2 outline-none focus:border-sky-500';
+  'w-full rounded-lg border border-transparent bg-x-input px-3 py-2.5 text-[15px] outline-none placeholder:text-x-dim focus:border-x-blue';
 export const buttonClass =
-  'w-full rounded-full bg-sky-500 py-2 font-bold text-white hover:bg-sky-600 disabled:opacity-50';
+  'w-full rounded-full bg-x-blue py-2.5 text-[15px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:cursor-not-allowed disabled:opacity-50';
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -47,8 +50,8 @@ export function LoginPage() {
   if (!world) {
     return (
       <AuthFormShell title={t('app.name')}>
-        <p className="mb-4 text-gray-400">{t('auth.noWorld')}</p>
-        <Link to="/worlds" className="text-sky-500 hover:underline">
+        <p className="mb-4 text-[15px] text-x-dim">{t('auth.noWorld')}</p>
+        <Link to="/worlds" className="text-[15px] text-x-blue hover:underline">
           {t('auth.goWorlds')}
         </Link>
       </AuthFormShell>
@@ -72,12 +75,12 @@ export function LoginPage() {
           placeholder={t('auth.password')}
           className={inputClass}
         />
-        {error && <div className="text-sm text-red-400">{error}</div>}
+        {error && <div className="text-sm text-x-red">{error}</div>}
         <button type="submit" disabled={busy || !handle || !password} className={buttonClass}>
           {t('auth.login')}
         </button>
       </form>
-      <Link to="/register" className="mt-4 block text-sm text-sky-500 hover:underline">
+      <Link to="/register" className="mt-4 block text-sm text-x-blue hover:underline">
         {t('auth.noAccount')}
       </Link>
     </AuthFormShell>

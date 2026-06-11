@@ -47,8 +47,11 @@ function CreateWorldForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3 border-b border-gray-800 p-4">
-      <h2 className="font-bold">{t('worlds.create')}</h2>
+    <form onSubmit={(e) => void submit(e)} className="flex flex-col gap-3 border-b border-x-border p-4">
+      <h2 className="flex items-center gap-2 text-[17px] font-bold">
+        <i className="fas fa-circle-plus text-x-blue" />
+        {t('worlds.create')}
+      </h2>
       <input value={form.id} onChange={set('id')} placeholder={t('worlds.id')} className={inputClass} />
       <input value={form.name} onChange={set('name')} placeholder={t('worlds.name')} className={inputClass} />
       <textarea
@@ -59,27 +62,27 @@ function CreateWorldForm({ onCreated }: { onCreated: () => void }) {
         className={inputClass}
       />
       <div className="flex gap-3">
-        <label className="flex flex-1 flex-col gap-1 text-sm text-gray-400">
+        <label className="flex flex-1 flex-col gap-1 text-[13px] text-x-dim">
           {t('worlds.locale')}
           <select value={form.locale} onChange={set('locale')} className={inputClass}>
             <option value="zh-CN">中文</option>
             <option value="en">English</option>
           </select>
         </label>
-        <label className="flex flex-1 flex-col gap-1 text-sm text-gray-400">
+        <label className="flex flex-1 flex-col gap-1 text-[13px] text-x-dim">
           {t('worlds.scale')}
           <input value={form.scale} onChange={set('scale')} type="number" min="0.1" step="any" className={inputClass} />
         </label>
-        <label className="flex flex-1 flex-col gap-1 text-sm text-gray-400">
+        <label className="flex flex-1 flex-col gap-1 text-[13px] text-x-dim">
           {t('worlds.calendarLabel')}
           <input value={form.calendarLabel} onChange={set('calendarLabel')} className={inputClass} />
         </label>
       </div>
-      {error && <div className="text-sm text-red-400">{error}</div>}
+      {error && <div className="text-sm text-x-red">{error}</div>}
       <button
         type="submit"
         disabled={busy || !form.id || !form.name}
-        className="self-end rounded-full bg-sky-500 px-5 py-1.5 font-bold text-white disabled:opacity-50"
+        className="self-end rounded-full bg-x-blue px-5 py-1.5 text-[15px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
       >
         {t('worlds.submit')}
       </button>
@@ -111,16 +114,17 @@ export function WorldsPage() {
 
   return (
     <div>
-      <div className="sticky top-0 z-10 border-b border-gray-800 bg-black/80 p-3 font-bold backdrop-blur">
-        {t('worlds.title')}
-      </div>
+      <div className="glass-header px-4 py-3 text-[17px] font-bold">{t('worlds.title')}</div>
 
-      <div className="border-b border-gray-800 p-4">
-        <h2 className="mb-2 font-bold text-gray-300">{t('worlds.activeWorld')}</h2>
+      <div className="border-b border-x-border p-4">
+        <h2 className="mb-2 flex items-center gap-2 text-[17px] font-bold">
+          <i className="fas fa-earth-asia text-x-blue" />
+          {t('worlds.activeWorld')}
+        </h2>
         {world ? (
-          <div className="flex flex-col gap-1 text-sm text-gray-400">
-            <div className="text-xl font-bold text-gray-100">
-              {world.meta.name} <span className="text-sm text-gray-500">({world.meta.id})</span>
+          <div className="flex flex-col gap-1.5 rounded-2xl bg-x-card p-4 text-[14px] text-x-dim">
+            <div className="text-xl font-bold text-x-text">
+              {world.meta.name} <span className="text-sm font-normal text-x-dim">({world.meta.id})</span>
             </div>
             {world.meta.description && <p>{world.meta.description}</p>}
             <SimClockDisplay />
@@ -132,33 +136,37 @@ export function WorldsPage() {
             </div>
           </div>
         ) : (
-          <div className="text-gray-500">{t('worlds.noActive')}</div>
+          <div className="text-[15px] text-x-dim">{t('worlds.noActive')}</div>
         )}
       </div>
 
       <CreateWorldForm onCreated={reload} />
 
       <div className="p-4">
-        <h2 className="mb-3 font-bold text-gray-300">{t('worlds.list')}</h2>
+        <h2 className="mb-3 text-[17px] font-bold">{t('worlds.list')}</h2>
         {worlds.isLoading && <Spinner />}
         {worlds.isError && <ErrorBox error={worlds.error} />}
         <div className="flex flex-col gap-3">
           {worlds.data?.worlds.map((w) => (
-            <div key={w.id} className="flex items-center gap-3 rounded-xl border border-gray-800 p-4">
+            <div
+              key={w.id}
+              className="flex items-center gap-3 rounded-2xl border border-x-border p-4 transition-colors duration-200 hover:bg-x-hover"
+            >
               <div className="min-w-0 flex-1">
-                <div className="font-bold">
-                  {w.name} <span className="text-sm font-normal text-gray-500">({w.id})</span>
+                <div className="text-[15px] font-bold">
+                  {w.name} <span className="text-sm font-normal text-x-dim">({w.id})</span>
                 </div>
-                {w.description && <div className="truncate text-sm text-gray-500">{w.description}</div>}
+                {w.description && <div className="truncate text-sm text-x-dim">{w.description}</div>}
               </div>
               {w.active ? (
-                <span className="rounded-full bg-green-900/50 px-3 py-1 text-sm text-green-400">
+                <span className="flex items-center gap-1.5 rounded-full bg-x-green/15 px-3 py-1 text-sm font-bold text-x-green">
+                  <i className="fas fa-circle text-[6px]" />
                   {t('worlds.activeBadge')}
                 </span>
               ) : (
                 <button
                   onClick={() => void activate(w.id)}
-                  className="rounded-full border border-gray-700 px-3 py-1 text-sm hover:bg-gray-900"
+                  className="rounded-full border border-x-dim px-3 py-1 text-sm font-bold transition-colors duration-200 hover:bg-x-input"
                 >
                   {t('worlds.activate')}
                 </button>

@@ -51,7 +51,7 @@ export function RegisterPage() {
           placeholder={t('auth.password')}
           className={inputClass}
         />
-        {error && <div className="text-sm text-red-400">{error}</div>}
+        {error && <div className="text-sm text-x-red">{error}</div>}
         <button
           type="submit"
           disabled={busy || !handle || !displayName || !password}
@@ -60,7 +60,7 @@ export function RegisterPage() {
           {t('auth.register')}
         </button>
       </form>
-      <Link to="/login" className="mt-4 block text-sm text-sky-500 hover:underline">
+      <Link to="/login" className="mt-4 block text-sm text-x-blue hover:underline">
         {t('auth.haveAccount')}
       </Link>
     </AuthFormShell>

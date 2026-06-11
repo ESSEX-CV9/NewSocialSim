@@ -26,7 +26,7 @@ export function TimeAgo({ at }: { at: number }) {
   else text = new Date(at).toLocaleDateString(locale);
 
   return (
-    <time className="text-gray-500" title={new Date(at).toLocaleString(locale)}>
+    <time className="text-x-dim" title={new Date(at).toLocaleString(locale)}>
       {text}
     </time>
   );

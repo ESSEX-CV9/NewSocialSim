@@ -12,14 +12,14 @@ import { TimeAgo } from './TimeAgo';
 function PostContent({ content }: { content: string }) {
   const parts = content.split(/(#[^\s#]+)/g);
   return (
-    <p className="break-words whitespace-pre-wrap">
+    <p className="text-[15px] leading-normal wrap-break-word whitespace-pre-wrap">
       {parts.map((part, i) =>
         part.startsWith('#') ? (
           <Link
             key={i}
             to={`/search?q=${encodeURIComponent(part)}&type=posts`}
             onClick={(e) => e.stopPropagation()}
-            className="text-sky-500 hover:underline"
+            className="text-x-blue hover:underline"
           >
             {part}
           </Link>
@@ -34,7 +34,7 @@ function PostContent({ content }: { content: string }) {
 function Tombstone({ children }: { children?: ReactNode }) {
   const { t } = useI18n();
   return (
-    <div className="rounded-xl border border-gray-800 p-4 text-gray-500">
+    <div className="rounded-xl border border-x-border bg-x-card p-4 text-[15px] text-x-dim">
       {t('post.deleted')}
       {children}
     </div>
@@ -51,16 +51,62 @@ function QuotedCard({ quoted }: { quoted: PostView }) {
         e.stopPropagation();
         navigate(`/post/${quoted.id}`);
       }}
-      className="mt-2 cursor-pointer rounded-xl border border-gray-800 p-3 hover:bg-gray-950"
+      className="mt-2 cursor-pointer rounded-xl border border-x-border p-3 transition-colors duration-200 hover:bg-x-hover"
     >
-      <div className="mb-1 flex items-center gap-2 text-sm">
+      <div className="mb-1 flex items-center gap-1.5 text-[15px]">
         <Avatar handle={quoted.author.handle} size={20} />
         <span className="font-bold">{quoted.author.displayName}</span>
-        <span className="text-gray-500">@{quoted.author.handle}</span>
+        <span className="text-x-dim">@{quoted.author.handle}</span>
+        <span className="text-x-dim">·</span>
         <TimeAgo at={quoted.createdAt} />
       </div>
       <PostContent content={quoted.content} />
     </div>
+  );
+}
+
+/** 互动按钮：FA 图标 + 计数，hover 时图标出现同色 10% 圆形气泡 */
+function ActionButton({
+  icon,
+  count,
+  label,
+  color,
+  active,
+  onClick,
+}: {
+  icon: string;
+  count?: number | undefined;
+  label?: string | undefined;
+  color: 'blue' | 'green' | 'pink' | 'red';
+  active?: boolean | undefined;
+  onClick?: ((e: MouseEvent) => void) | undefined;
+}) {
+  const colorClass = {
+    blue: { text: 'hover:text-x-blue', bubble: 'group-hover/act:bg-x-blue/10', on: 'text-x-blue' },
+    green: {
+      text: 'hover:text-x-green',
+      bubble: 'group-hover/act:bg-x-green/10',
+      on: 'text-x-green',
+    },
+    pink: { text: 'hover:text-x-pink', bubble: 'group-hover/act:bg-x-pink/10', on: 'text-x-pink' },
+    red: { text: 'hover:text-x-red', bubble: 'group-hover/act:bg-x-red/10', on: 'text-x-red' },
+  }[color];
+
+  return (
+    <button
+      onClick={onClick}
+      className={`group/act flex items-center text-[13px] transition-colors duration-200 ${
+        active ? colorClass.on : 'text-x-dim'
+      } ${colorClass.text}`}
+    >
+      <span
+        className={`-m-2 flex size-8.5 items-center justify-center rounded-full transition-colors duration-200 ${colorClass.bubble}`}
+      >
+        <i className={`${icon} text-[16px]`} />
+      </span>
+      {count !== undefined && count > 0 && <span className="ml-2.5">{count}</span>}
+      {label && <span className="ml-2.5">{label}</span>}
+    </button>
   );
 }
 
@@ -87,7 +133,7 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
   if (gone) return null;
   if (post.deleted) {
     return (
-      <div className="border-b border-gray-800 p-4">
+      <div className="border-b border-x-border p-4">
         <Tombstone />
       </div>
     );
@@ -119,25 +165,25 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
     onDeleted?.(post.id);
   };
 
-  const actionClass =
-    'flex items-center gap-1.5 text-sm text-gray-500 transition-colors';
-
   return (
     <article
       onClick={() => !large && navigate(`/post/${post.id}`)}
-      className={`border-b border-gray-800 p-4 ${large ? '' : 'cursor-pointer hover:bg-gray-950/60'}`}
+      className={`border-b border-x-border px-4 py-3 ${
+        large ? '' : 'cursor-pointer transition-colors duration-200 hover:bg-x-hover'
+      }`}
     >
       {repostedBy && (
-        <div className="mb-1 ml-8 text-sm text-gray-500">
+        <div className="mb-1 ml-8 flex items-center gap-2 text-[13px] font-bold text-x-dim">
+          <i className="fas fa-retweet" />
           {t('timeline.repostedBy', { name: repostedBy.displayName })}
         </div>
       )}
       <div className="flex gap-3">
-        <Link to={`/u/${post.author.handle}`} onClick={stop}>
+        <Link to={`/u/${post.author.handle}`} onClick={stop} className="self-start">
           <Avatar handle={post.author.handle} />
         </Link>
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-x-2 text-sm">
+          <div className="flex flex-wrap items-center gap-x-1 text-[15px]">
             <Link
               to={`/u/${post.author.handle}`}
               onClick={stop}
@@ -146,52 +192,47 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
               {post.author.displayName}
             </Link>
             {post.author.isBot && (
-              <span className="rounded bg-gray-800 px-1 text-xs text-gray-400">
+              <span className="ml-0.5 rounded bg-x-input px-1 text-xs text-x-dim">
                 {t('profile.bot')}
               </span>
             )}
-            <span className="text-gray-500">@{post.author.handle}</span>
-            <span className="text-gray-600">·</span>
+            <span className="ml-0.5 text-x-dim">@{post.author.handle}</span>
+            <span className="text-x-dim">·</span>
             <TimeAgo at={post.createdAt} />
           </div>
           <div className={large ? 'mt-2 text-xl' : 'mt-0.5'}>
             <PostContent content={post.content} />
           </div>
           {post.quoted && <QuotedCard quoted={post.quoted} />}
-          <div className="mt-3 flex max-w-md items-center justify-between">
-            <span className={`${actionClass} hover:text-sky-500`}>
-              <span>💬</span>
-              {post.replyCount > 0 && post.replyCount}
-            </span>
-            <button
+          <div className="mt-3 flex max-w-106 items-center justify-between">
+            <ActionButton icon="far fa-comment" count={post.replyCount} color="blue" />
+            <ActionButton
+              icon="fas fa-retweet"
+              count={repostCount}
+              color="green"
+              active={reposted}
               onClick={(e) => void toggleRepost(e)}
-              className={`${actionClass} hover:text-green-500 ${reposted ? 'text-green-500' : ''}`}
-            >
-              <span>🔁</span>
-              {repostCount > 0 && repostCount}
-            </button>
-            <button
+            />
+            <ActionButton
+              icon="fas fa-quote-left"
+              color="blue"
               onClick={(e) => {
                 stop(e);
                 if (!user) return navigate('/login');
                 setQuoteOpen(true);
               }}
-              className={`${actionClass} hover:text-sky-500`}
-            >
-              <span>❝</span>
-              {t('post.quote')}
-            </button>
-            <button
+            />
+            <ActionButton
+              icon={liked ? 'fas fa-heart' : 'far fa-heart'}
+              count={likeCount}
+              color="pink"
+              active={liked}
               onClick={(e) => void toggleLike(e)}
-              className={`${actionClass} hover:text-pink-500 ${liked ? 'text-pink-500' : ''}`}
-            >
-              <span>{liked ? '❤️' : '🤍'}</span>
-              {likeCount > 0 && likeCount}
-            </button>
-            {user?.id === post.authorId && (
-              <button onClick={(e) => void remove(e)} className={`${actionClass} hover:text-red-500`}>
-                🗑
-              </button>
+            />
+            {user?.id === post.authorId ? (
+              <ActionButton icon="fas fa-trash-can" color="red" onClick={(e) => void remove(e)} />
+            ) : (
+              <span className="size-8.5" />
             )}
           </div>
         </div>
@@ -205,12 +246,27 @@ export function PostCard({ post, repostedBy, large, onDeleted }: PostCardProps) 
           }}
           className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20"
         >
-          <div onClick={stop} className="w-full max-w-xl rounded-2xl border border-gray-800 bg-black">
+          <div
+            onClick={stop}
+            className="w-full max-w-xl rounded-2xl border border-x-border bg-x-bg"
+          >
+            <div className="flex items-center p-2">
+              <button
+                onClick={(e) => {
+                  stop(e);
+                  setQuoteOpen(false);
+                }}
+                className="flex size-9 items-center justify-center rounded-full text-x-text transition-colors duration-200 hover:bg-x-input"
+              >
+                <i className="fas fa-xmark text-[18px]" />
+              </button>
+            </div>
             <Composer
               quoteOfId={post.id}
               placeholder={t('composer.quotePlaceholder')}
               buttonText={t('composer.send')}
               autoFocus
+              bordered={false}
               onPosted={(p) => {
                 setQuoteOpen(false);
                 navigate(`/post/${p.id}`);

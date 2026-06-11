@@ -13,6 +13,8 @@ interface ComposerProps {
   placeholder: string;
   buttonText: string;
   autoFocus?: boolean;
+  /** 弹窗等无下边框场景传 false */
+  bordered?: boolean;
   onPosted: (post: PostView) => void;
 }
 
@@ -22,6 +24,7 @@ export function Composer({
   placeholder,
   buttonText,
   autoFocus,
+  bordered = true,
   onPosted,
 }: ComposerProps) {
   const { user } = useAuth();
@@ -53,7 +56,7 @@ export function Composer({
   };
 
   return (
-    <div className="flex gap-3 border-b border-gray-800 p-4">
+    <div className={`flex gap-3 p-4 ${bordered ? 'border-b border-x-border' : ''}`}>
       <Avatar handle={user.handle} />
       <div className="min-w-0 flex-1">
         <textarea
@@ -62,20 +65,26 @@ export function Composer({
           placeholder={placeholder}
           autoFocus={autoFocus}
           rows={Math.min(6, Math.max(2, content.split('\n').length))}
-          className="w-full resize-none bg-transparent text-lg outline-none placeholder:text-gray-600"
+          className="w-full resize-none bg-transparent text-xl outline-none placeholder:text-x-dim"
           onKeyDown={(e) => {
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
           }}
         />
-        {error && <div className="mb-2 text-sm text-red-400">{t('common.error', { message: error })}</div>}
-        <div className="flex items-center justify-end gap-3">
-          <span className={`text-sm ${remaining < 20 ? 'text-amber-500' : 'text-gray-600'} ${remaining < 0 ? 'text-red-500' : ''}`}>
+        {error && (
+          <div className="mb-2 text-sm text-x-red">{t('common.error', { message: error })}</div>
+        )}
+        <div className="mt-1 flex items-center justify-end gap-3 border-t border-x-border pt-3">
+          <span
+            className={`text-[13px] ${
+              remaining < 0 ? 'text-x-red' : remaining < 20 ? 'text-amber-500' : 'text-x-dim'
+            }`}
+          >
             {remaining}
           </span>
           <button
             onClick={() => void submit()}
             disabled={busy || content.trim().length === 0 || remaining < 0}
-            className="rounded-full bg-sky-500 px-5 py-1.5 font-bold text-white hover:bg-sky-600 disabled:opacity-50"
+            className="rounded-full bg-x-blue px-5 py-1.5 text-[15px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
           >
             {buttonText}
           </button>

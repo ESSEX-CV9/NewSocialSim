@@ -20,15 +20,18 @@ export function FollowListPage({ direction }: { direction: 'followers' | 'follow
 
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-gray-800 bg-black/80 p-3 backdrop-blur">
-        <button onClick={() => navigate(-1)} className="rounded-full px-2 hover:bg-gray-900">
-          ←
+      <div className="glass-header flex items-center gap-5 px-3 py-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
+        >
+          <i className="fas fa-arrow-left text-[16px]" />
         </button>
         <div>
-          <div className="font-bold">
+          <div className="text-[17px] font-bold">
             {direction === 'followers' ? t('profile.followers') : t('profile.following')}
           </div>
-          <div className="text-sm text-gray-500">@{handle}</div>
+          <div className="text-[13px] text-x-dim">@{handle}</div>
         </div>
       </div>
       {query.isLoading && <Spinner />}
@@ -37,21 +40,24 @@ export function FollowListPage({ direction }: { direction: 'followers' | 'follow
         <Link
           key={u.id}
           to={`/u/${u.handle}`}
-          className="flex items-center gap-3 border-b border-gray-800 p-4 hover:bg-gray-950"
+          className="flex items-center gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover"
         >
           <Avatar handle={u.handle} />
           <div>
-            <div className="font-bold">{u.displayName}</div>
-            <div className="text-sm text-gray-500">@{u.handle}</div>
+            <div className="text-[15px] font-bold">{u.displayName}</div>
+            <div className="text-[14px] text-x-dim">@{u.handle}</div>
           </div>
           {u.isBot && (
-            <span className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-gray-400">
+            <span className="rounded bg-x-input px-1.5 py-0.5 text-xs text-x-dim">
+              <i className="fas fa-robot mr-1" />
               {t('profile.bot')}
             </span>
           )}
         </Link>
       ))}
-      {query.isSuccess && query.items.length === 0 && <EmptyBox text={t('search.empty')} />}
+      {query.isSuccess && query.items.length === 0 && (
+        <EmptyBox icon="far fa-user" text={t('search.empty')} />
+      )}
       <LoadMore
         hasNextPage={!!query.hasNextPage}
         isFetching={query.isFetchingNextPage}

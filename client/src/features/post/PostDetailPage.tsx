@@ -33,19 +33,22 @@ export function PostDetailPage() {
 
   return (
     <div>
-      <div className="sticky top-0 z-10 flex items-center gap-4 border-b border-gray-800 bg-black/80 p-3 backdrop-blur">
-        <button onClick={() => navigate(-1)} className="rounded-full px-2 hover:bg-gray-900">
-          ←
+      <div className="glass-header flex items-center gap-5 px-3 py-2">
+        <button
+          onClick={() => navigate(-1)}
+          className="flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
+        >
+          <i className="fas fa-arrow-left text-[16px]" />
         </button>
-        <span className="font-bold">{t('nav.home')}</span>
+        <span className="text-[17px] font-bold">{t('nav.home')}</span>
       </div>
 
       {view.replyToId !== null && (
         <Link
           to={`/post/${view.replyToId}`}
-          className="block border-b border-gray-800 p-3 text-sm text-sky-500 hover:bg-gray-950"
+          className="flex items-center gap-2 border-b border-x-border p-3 text-sm text-x-blue transition-colors duration-200 hover:bg-x-hover"
         >
-          ↑ {t('post.viewParent')}
+          <i className="fas fa-arrow-up text-[12px]" /> {t('post.viewParent')}
         </Link>
       )}
 
