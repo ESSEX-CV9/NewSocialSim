@@ -259,6 +259,8 @@ export const messages = {
     'videoTools.mirrorHint': '默认从 GitHub 官方 release 下载，受代理与 GitHub CDN 波动影响可能较慢。可填入镜像加速地址替换（如 gh-proxy 类服务拼接的完整直链），留空恢复官方源。',
     'videoTools.mirrorYtdlp': 'yt-dlp 下载地址',
     'videoTools.mirrorFfmpeg': 'ffmpeg 下载地址',
+    'videoTools.biliTitle': 'B 站 Cookie',
+    'videoTools.biliHint': 'B 站接口对无 Cookie 的请求返回 412 风控，引入 B 站视频需粘贴浏览器 Cookie：登录 bilibili.com 后按 F12 → 网络 → 任意请求的请求头里复制 Cookie 整串。',
 
     'mediaSearch.title': '搜索图片',
     'mediaSearch.queryPrompt': '输入关键字搜图',
@@ -588,6 +590,8 @@ export const messages = {
     'videoTools.mirrorHint': 'Defaults to official GitHub releases, which can be slow depending on proxy and GitHub CDN. Paste a mirror URL to override (e.g. a full link via a gh-proxy style service); leave empty to restore the official source.',
     'videoTools.mirrorYtdlp': 'yt-dlp download URL',
     'videoTools.mirrorFfmpeg': 'ffmpeg download URL',
+    'videoTools.biliTitle': 'Bilibili cookies',
+    'videoTools.biliHint': 'Bilibili API returns 412 (risk control) without cookies. To import Bilibili videos, log in at bilibili.com, press F12 → Network → copy the whole Cookie header from any request.',
 
     'mediaSearch.title': 'Search images',
     'mediaSearch.queryPrompt': 'Search images by keyword',

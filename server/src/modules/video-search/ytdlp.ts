@@ -70,6 +70,22 @@ interface RunOptions {
   onStdoutLine?: ((line: string) => void) | undefined;
 }
 
+/** 各方法的请求选项（cookie 用于 B站 等需要浏览器 Cookie 过风控的站点） */
+export interface YtDlpRequestOpts {
+  proxy?: string | undefined;
+  cookie?: string | undefined;
+}
+
+/** 从 stderr 提取人类可读的错误：优先首个 ERROR: 行，限长 300 */
+function pickErrorLine(stderrTail: string, exitCode: number | null): string {
+  const lines = stderrTail
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const line = lines.find((l) => l.startsWith('ERROR:')) ?? lines.pop();
+  return (line ?? `yt-dlp 退出码 ${exitCode}`).slice(0, 300);
+}
+
 export class YtDlp {
   constructor(private readonly tools: ToolsService) {}
 
@@ -77,9 +93,10 @@ export class YtDlp {
     return this.tools.ytdlpPath() !== null;
   }
 
-  private commonArgs(proxy: string | undefined): string[] {
+  private commonArgs(opts: YtDlpRequestOpts): string[] {
     const args = ['--no-warnings', '--no-playlist'];
-    if (proxy) args.push('--proxy', proxy);
+    if (opts.proxy) args.push('--proxy', opts.proxy);
+    if (opts.cookie) args.push('--add-header', `Cookie: ${opts.cookie}`);
     const ffmpegDir = this.tools.ffmpegDir();
     if (ffmpegDir) args.push('--ffmpeg-location', ffmpegDir);
     return args;
@@ -130,14 +147,19 @@ export class YtDlp {
       });
       proc.on('error', (err) => finish(err));
       proc.on('exit', (code) => {
-        if (code === 0) finish(null);
-        else finish(new Error(stderrTail.trim().split(/\r?\n/).pop() || `yt-dlp 退出码 ${code}`));
+        if (code === 0) {
+          finish(null);
+        } else {
+          // 完整 stderr 进服务端 console——任务卡片只显示摘要，排查靠这里
+          console.error(`[yt-dlp] 失败（退出码 ${code}）：yt-dlp ${args.join(' ')}\n${stderrTail.trim()}`);
+          finish(new Error(pickErrorLine(stderrTail, code)));
+        }
       });
     });
   }
 
-  async probe(url: string, proxy: string | undefined, signal?: AbortSignal): Promise<ProbeResult> {
-    const out = await this.run(['-J', ...this.commonArgs(proxy), url], {
+  async probe(url: string, opts: YtDlpRequestOpts, signal?: AbortSignal): Promise<ProbeResult> {
+    const out = await this.run(['-J', ...this.commonArgs(opts), url], {
       timeoutMs: PROBE_TIMEOUT_MS,
       signal,
     });
@@ -165,12 +187,13 @@ export class YtDlp {
   async searchFlatPlaylist(
     target: string,
     limit: number,
-    proxy: string | undefined,
+    opts: YtDlpRequestOpts,
     signal?: AbortSignal,
   ): Promise<FlatEntry[]> {
     // 搜索目标本身就是 playlist，这里不能带 --no-playlist
     const args = ['-J', '--flat-playlist', '--playlist-items', `1:${limit}`, '--no-warnings'];
-    if (proxy) args.push('--proxy', proxy);
+    if (opts.proxy) args.push('--proxy', opts.proxy);
+    if (opts.cookie) args.push('--add-header', `Cookie: ${opts.cookie}`);
     const out = await this.run([...args, target], { timeoutMs: SEARCH_TIMEOUT_MS, signal });
     let info: { entries?: Record<string, unknown>[] };
     try {
@@ -195,7 +218,7 @@ export class YtDlp {
    */
   async download(
     url: string,
-    opts: { maxHeight: number; maxBytes: number; outDir: string; proxy: string | undefined },
+    opts: { maxHeight: number; maxBytes: number; outDir: string } & YtDlpRequestOpts,
     onProgress: (pct: number, totalBytes: number | null) => void,
     signal?: AbortSignal,
   ): Promise<DownloadResult> {
@@ -211,7 +234,7 @@ export class YtDlp {
       String(opts.maxBytes),
       '--newline',
       '--no-mtime',
-      ...this.commonArgs(opts.proxy),
+      ...this.commonArgs(opts),
       '-o',
       path.join(opts.outDir, 'video.%(ext)s'),
       url,

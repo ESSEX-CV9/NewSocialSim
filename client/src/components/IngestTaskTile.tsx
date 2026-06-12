@@ -24,7 +24,7 @@ export function IngestTaskTile({
 
   return (
     <div
-      className={`relative flex h-24 w-44 shrink-0 flex-col justify-between overflow-hidden rounded-xl border p-2 ${
+      className={`relative flex min-h-24 w-44 shrink-0 flex-col justify-between gap-1 overflow-hidden rounded-xl border p-2 ${
         failed ? 'border-x-red/60' : 'border-x-border'
       } bg-x-input`}
     >
@@ -37,7 +37,8 @@ export function IngestTaskTile({
       </div>
       {failed ? (
         <div className="flex flex-col gap-1">
-          <span className="truncate text-[11px] text-x-red" title={task.errorMessage}>
+          {/* 三行 + title 全文；完整 yt-dlp stderr 在服务端 console */}
+          <span className="line-clamp-3 text-[11px] leading-tight text-x-red" title={task.errorMessage}>
             {task.errorMessage ?? t('composer.videoTaskFailed')}
           </span>
           <div className="flex gap-2">

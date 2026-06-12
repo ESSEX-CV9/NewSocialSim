@@ -39,6 +39,7 @@ export interface MaskedConfig {
   /** 视频工具下载源覆盖（非敏感，原样返回；空串 = 用官方源） */
   toolsYtdlpUrl: string;
   toolsFfmpegUrl: string;
+  bilibiliHasCookies: boolean;
 }
 
 export class MediaSearchService {
@@ -131,6 +132,7 @@ export class MediaSearchService {
       gelbooruHasKey: !!(cfg.gelbooru?.userId && cfg.gelbooru.apiKey),
       toolsYtdlpUrl: cfg.tools?.ytdlpUrl ?? '',
       toolsFfmpegUrl: cfg.tools?.ffmpegUrl ?? '',
+      bilibiliHasCookies: !!cfg.bilibili?.cookies?.trim(),
     };
   }
 

@@ -68,6 +68,11 @@ const configBodySchema = {
         ffmpegUrl: { type: 'string', maxLength: 500 },
       },
     },
+    bilibili: {
+      type: 'object',
+      additionalProperties: false,
+      properties: { cookies: { type: 'string', maxLength: 8192 } },
+    },
     video: {
       type: 'object',
       additionalProperties: false,

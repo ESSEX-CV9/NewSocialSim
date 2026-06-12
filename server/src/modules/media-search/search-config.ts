@@ -21,6 +21,8 @@ export interface MediaSearchConfig {
   gelbooru?: { userId?: string; apiKey?: string };
   /** 视频工具下载源覆盖（镜像加速）；留空用 GitHub 官方 release */
   tools?: { ytdlpUrl?: string; ffmpegUrl?: string };
+  /** B站浏览器 Cookie（api.bilibili.com 对无 Cookie 请求 412 风控；视频引入用） */
+  bilibili?: { cookies?: string };
   /** 视频引入设置（下载限额仅约束下载模式；siteModes 为可嵌入站点的形态路由覆盖） */
   video?: {
     maxHeight?: number;
@@ -98,6 +100,7 @@ export function patchSearchConfig(patch: Partial<MediaSearchConfig>): MediaSearc
     ...(patch.danbooru !== undefined ? { danbooru: { ...current.danbooru, ...patch.danbooru } } : {}),
     ...(patch.gelbooru !== undefined ? { gelbooru: { ...current.gelbooru, ...patch.gelbooru } } : {}),
     ...(patch.tools !== undefined ? { tools: { ...current.tools, ...patch.tools } } : {}),
+    ...(patch.bilibili !== undefined ? { bilibili: { ...current.bilibili, ...patch.bilibili } } : {}),
     ...(patch.video !== undefined
       ? {
           video: {

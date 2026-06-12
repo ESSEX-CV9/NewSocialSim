@@ -284,6 +284,7 @@ export interface MediaSearchMaskedConfig {
   gelbooruHasKey: boolean;
   toolsYtdlpUrl: string;
   toolsFfmpegUrl: string;
+  bilibiliHasCookies: boolean;
 }
 
 export interface PixivLoginStatus {

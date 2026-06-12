@@ -1,4 +1,4 @@
-import type { ProgressiveFormat, YtDlp } from './ytdlp.js';
+import type { ProgressiveFormat, YtDlp, YtDlpRequestOpts } from './ytdlp.js';
 
 /**
  * 流式引用的直链解析缓存：mediaId → 渐进式 mp4 直链 + 防盗链请求头。
@@ -32,7 +32,7 @@ export class StreamResolver {
 
   constructor(
     private readonly ytdlp: YtDlp,
-    private readonly getProxy: () => string | undefined,
+    private readonly optsFor: (url: string) => YtDlpRequestOpts,
   ) {}
 
   /** 引入任务 probe 时顺手预热，首次播放免一次解析 */
@@ -52,7 +52,7 @@ export class StreamResolver {
     if (flying) return flying;
 
     const p = this.ytdlp
-      .probe(originUrl, this.getProxy())
+      .probe(originUrl, this.optsFor(originUrl))
       .then((probe) => {
         if (!probe.progressive) throw new Error('源站已无渐进式格式');
         const resolved: ResolvedStream = {

@@ -114,6 +114,8 @@ export function VideoToolsSettings() {
   const [ytdlpUrl, setYtdlpUrl] = useState<string | null>(null);
   const [ffmpegUrl, setFfmpegUrl] = useState<string | null>(null);
   const [mirrorMsg, setMirrorMsg] = useState<string | null>(null);
+  const [biliCookies, setBiliCookies] = useState('');
+  const [biliMsg, setBiliMsg] = useState<string | null>(null);
 
   const status = useQuery({
     queryKey: ['tools-status'],
@@ -161,6 +163,19 @@ export function VideoToolsSettings() {
     }
   };
 
+  const saveBiliCookies = async () => {
+    if (!biliCookies.trim()) return;
+    setBiliMsg(null);
+    try {
+      await api.patchMediaSearchConfig({ bilibili: { cookies: biliCookies.trim() } });
+      setBiliCookies('');
+      setBiliMsg(t('mediaSearch.saved'));
+      void queryClient.invalidateQueries({ queryKey: ['media-search-config'] });
+    } catch (e) {
+      setBiliMsg(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <section className="border-b border-x-border p-4">
       <h2 className="mb-1 text-xl font-extrabold">{t('videoTools.settingsTitle')}</h2>
@@ -204,6 +219,35 @@ export function VideoToolsSettings() {
           <button
             onClick={() => void saveMirrors()}
             disabled={ytdlpUrl === null && ffmpegUrl === null}
+            className="rounded-full bg-x-blue px-4 py-1.5 text-[14px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
+          >
+            {t('common.save')}
+          </button>
+        </div>
+      </div>
+
+      {/* B站 Cookie：api.bilibili.com 对无 Cookie 请求 412 风控，引入 B站视频必填 */}
+      <h3 className="mt-6 mb-2 text-[15px] font-bold text-x-dim">{t('videoTools.biliTitle')}</h3>
+      <p className="mb-2 text-[13px] text-x-dim">{t('videoTools.biliHint')}</p>
+      <div className="flex flex-col gap-2">
+        {config.data?.config.bilibiliHasCookies && (
+          <span className="text-[13px] text-x-green">
+            <i className="ri-checkbox-circle-fill mr-1" />
+            {t('mediaSearch.configured')}
+          </span>
+        )}
+        <textarea
+          value={biliCookies}
+          onChange={(e) => setBiliCookies(e.target.value)}
+          placeholder="buvid3=...; SESSDATA=...; bili_jct=..."
+          rows={2}
+          className={inputClass}
+        />
+        <div className="flex items-center gap-3 self-end">
+          {biliMsg && <span className="text-[13px] text-x-dim">{biliMsg}</span>}
+          <button
+            onClick={() => void saveBiliCookies()}
+            disabled={!biliCookies.trim()}
             className="rounded-full bg-x-blue px-4 py-1.5 text-[14px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
           >
             {t('common.save')}

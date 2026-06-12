@@ -10,7 +10,22 @@ import { readSearchConfig, videoSettings, type VideoSettings } from '../media-se
 import type { ToolsService } from '../tools/tools.service.js';
 import { StreamResolver, type ResolvedStream } from './stream-resolver.js';
 import { VideoTaskError, VideoTaskManager, type VideoTask, type VideoTaskView } from './video-tasks.js';
-import { YtDlp, type ProbeResult } from './ytdlp.js';
+import { YtDlp, type ProbeResult, type YtDlpRequestOpts } from './ytdlp.js';
+
+/** 按目标站点组装 yt-dlp 请求选项：全局代理 + 站点 Cookie（B站 412 风控需浏览器 Cookie） */
+export function requestOptsFor(url: string): YtDlpRequestOpts {
+  const cfg = readSearchConfig();
+  const opts: YtDlpRequestOpts = { proxy: cfg.proxy?.trim() || undefined };
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    if (host === 'bilibili.com' || host.endsWith('.bilibili.com') || host === 'b23.tv') {
+      opts.cookie = cfg.bilibili?.cookies?.trim() || undefined;
+    }
+  } catch {
+    // URL 异常由后续 probe 报错
+  }
+  return opts;
+}
 
 /** 成人站域名清单：contentRating!=='all' 的世界拒绝引入（D/E 期搜索源沿用同清单） */
 const ADULT_HOSTS = ['pornhub.com', 'rule34video.com'];
@@ -46,7 +61,7 @@ export class VideoSearchService {
     private readonly mediaService: MediaService,
   ) {
     this.ytdlp = new YtDlp(toolsService);
-    this.resolver = new StreamResolver(this.ytdlp, () => readSearchConfig().proxy?.trim() || undefined);
+    this.resolver = new StreamResolver(this.ytdlp, requestOptsFor);
     // 有任务在执行时拒绝覆盖二进制（Windows 文件锁）
     toolsService.setBusyCheck(() => this.tasks.hasRunning());
   }
@@ -106,8 +121,8 @@ export class VideoSearchService {
   }
 
   /** probe（带 URL_UNSUPPORTED 包装）+ 标题落任务 */
-  private async probeFor(task: VideoTask, proxy: string | undefined): Promise<ProbeResult> {
-    const probe = await this.ytdlp.probe(task.url, proxy, task.abort.signal).catch((err: Error) => {
+  private async probeFor(task: VideoTask, opts: YtDlpRequestOpts): Promise<ProbeResult> {
+    const probe = await this.ytdlp.probe(task.url, opts, task.abort.signal).catch((err: Error) => {
       throw new VideoTaskError('URL_UNSUPPORTED', `无法解析该链接：${err.message}`);
     });
     task.title = probe.title;
@@ -116,11 +131,10 @@ export class VideoSearchService {
 
   /** 下载模式执行流：probe → 同源去重 → 下载 → 世界核对 → 入库 → 海报（非致命） */
   private async runDownload(task: VideoTask): Promise<MediaView> {
-    const cfg = readSearchConfig();
-    const settings = videoSettings(cfg);
-    const proxy = cfg.proxy?.trim() || undefined;
+    const settings = videoSettings(readSearchConfig());
+    const opts = requestOptsFor(task.url);
 
-    const probe = await this.probeFor(task, proxy);
+    const probe = await this.probeFor(task, opts);
     const originUrl = probe.webpageUrl || task.url;
 
     // 同源去重：已有同 origin_url 的入库视频则复用，不重复下载字节
@@ -130,16 +144,15 @@ export class VideoSearchService {
       task.progress = 100;
       return reused;
     }
-    return this.downloadAndStore(task, probe, originUrl, settings, proxy);
+    return this.downloadAndStore(task, probe, originUrl, settings, opts);
   }
 
   /** 流式引用执行流：probe → 去重 → 渐进式判定（HLS 按配置回退）→ 海报（刚需）→ 建流式行 */
   private async runStream(task: VideoTask): Promise<MediaView> {
-    const cfg = readSearchConfig();
-    const settings = videoSettings(cfg);
-    const proxy = cfg.proxy?.trim() || undefined;
+    const settings = videoSettings(readSearchConfig());
+    const opts = requestOptsFor(task.url);
 
-    const probe = await this.probeFor(task, proxy);
+    const probe = await this.probeFor(task, opts);
     const originUrl = probe.webpageUrl || task.url;
 
     this.assertWorld(task);
@@ -158,7 +171,7 @@ export class VideoSearchService {
           task.progress = 100;
           return reusedLib;
         }
-        return this.downloadAndStore(task, probe, originUrl, settings, proxy);
+        return this.downloadAndStore(task, probe, originUrl, settings, opts);
       }
       throw new VideoTaskError('HLS_ONLY', '该源没有可直连播放的单文件格式（HLS/DASH-only），可改用下载模式');
     }
@@ -190,7 +203,7 @@ export class VideoSearchService {
     probe: ProbeResult,
     originUrl: string,
     settings: VideoSettings,
-    proxy: string | undefined,
+    opts: YtDlpRequestOpts,
   ): Promise<MediaView> {
     const signal = task.abort.signal;
     if (probe.filesizeApprox !== null && probe.filesizeApprox > settings.maxBytes * 1.2) {
@@ -204,7 +217,7 @@ export class VideoSearchService {
     try {
       const result = await this.ytdlp.download(
         originUrl,
-        { maxHeight: settings.maxHeight, maxBytes: settings.maxBytes, outDir, proxy },
+        { maxHeight: settings.maxHeight, maxBytes: settings.maxBytes, outDir, ...opts },
         (pct, totalBytes) => {
           task.progress = Math.min(99, Math.round(pct));
           task.totalBytes = totalBytes;
