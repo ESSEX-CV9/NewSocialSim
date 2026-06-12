@@ -66,6 +66,6 @@ npm workspaces monorepo：
 ## 下一步
 
 - 短期：第九至十二周期（UX 体验修改 11 项、资料页增强、私信系统 v11/v12、私信打磨与媒体查看器 X 化重构）均已实施并经用户人工验收，私信与查看器经多轮反馈打磨。详见 devlog 2026-06-12。用户可能继续逐批提出 UI/UX 改进；用户偶尔会亲自微调样式并直接提交（如弹窗定位 pt-10），动相关代码前先看 git log 以其提交为准。
-- 中期：M5 模拟器（ECS 架构虚拟用户、ContentGenerator 接口先模板后 LLM、上帝控制台、数据导出）；其前置后端能力（世界时钟控制 API、虚拟用户管理 API）与无排期待办清单见 docs/design.md 的"后续路线"。虚拟用户发图帖的链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
+- 中期：M5 模拟器设计已定稿（docs/design.md "M5 模拟器设计"章节：三层世界数据/三档账号/GM 层、agentic 检索、四驱动源、内容池与成本体系、三厂双档 LLM 与缓存纪律、盲评与生态基调等拟真性防护）。实施顺序为世界工作台先行（元数据编辑/时钟控制/快照/设定文件库/NPC 设计器），再搭 M5 骨架，见 docs/design.md "后续路线"。虚拟用户发图帖的链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 媒体系统四期（A 图片地基 / B 视频 / C URL 引入+OG 链接卡片 / D 关键字搜图）已全部完成，设计细节见 docs/design.md。
 - 未实现的大块：自定义历法换算、生产构建流程。
