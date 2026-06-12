@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { Avatar } from '../../components/Avatar';
+import { useConfirm } from '../../components/ConfirmProvider';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useI18n } from '../../i18n/I18nContext';
 
@@ -17,6 +18,7 @@ export function ConversationInfoModal({
   const { t } = useI18n();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const other = conversation.otherParticipant;
 
   // 复用资料页缓存判断屏蔽方向（blockedEither 不含方向信息）
@@ -27,7 +29,8 @@ export function ConversationInfoModal({
   const blocked = profile.data?.user.blockedByViewer ?? false;
 
   const toggleBlock = async () => {
-    if (!blocked && !window.confirm(t('post.blockConfirm', { handle: other.handle }))) return;
+    if (!blocked && !(await confirm({ title: t('post.blockConfirm', { handle: other.handle }), danger: true })))
+      return;
     if (blocked) await api.unblockUser(other.handle);
     else await api.blockUser(other.handle);
     void queryClient.invalidateQueries({ queryKey: ['user', other.handle] });

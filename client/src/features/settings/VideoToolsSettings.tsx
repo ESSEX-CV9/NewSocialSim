@@ -111,6 +111,7 @@ export function VideoToolsSettings() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [installing, setInstalling] = useState(false);
+  const [installError, setInstallError] = useState<string | null>(null);
   const [ytdlpUrl, setYtdlpUrl] = useState<string | null>(null);
   const [ffmpegUrl, setFfmpegUrl] = useState<string | null>(null);
   const [mirrorMsg, setMirrorMsg] = useState<string | null>(null);
@@ -164,11 +165,12 @@ export function VideoToolsSettings() {
 
   const install = async (id: ToolId) => {
     setInstalling(true);
+    setInstallError(null);
     try {
       await api.toolInstall(id);
       await queryClient.invalidateQueries({ queryKey: ['tools-status'] });
     } catch (e) {
-      alert(e instanceof Error ? e.message : String(e));
+      setInstallError(e instanceof Error ? e.message : String(e));
     } finally {
       setInstalling(false);
     }
@@ -219,6 +221,7 @@ export function VideoToolsSettings() {
           />
         ))}
       </div>
+      {installError && <div className="mt-2 text-[13px] text-x-red">{installError}</div>}
 
       {/* 镜像源：GitHub 直连/代理慢时可替换下载地址 */}
       <h3 className="mt-6 mb-2 text-[15px] font-bold text-x-dim">{t('videoTools.mirrorTitle')}</h3>

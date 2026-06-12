@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
+import { useConfirm } from '../../components/ConfirmProvider';
 import { LinkCard } from '../../components/LinkCard';
 import { MediaGrid } from '../../components/MediaGrid';
 import { PostContent } from '../../components/PostContent';
@@ -22,6 +23,7 @@ export function MessageBubble({
   showSeen: boolean;
 }) {
   const { t, locale } = useI18n();
+  const confirm = useConfirm();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -42,7 +44,7 @@ export function MessageBubble({
   };
 
   const deleteMessage = async () => {
-    if (!window.confirm(t('dm.deleteMessageConfirm'))) return;
+    if (!(await confirm({ title: t('dm.deleteMessageConfirm'), danger: true }))) return;
     try {
       await api.dmDeleteMessage(message.id);
       await invalidate();

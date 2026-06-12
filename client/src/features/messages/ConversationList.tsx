@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
+import { useConfirm } from '../../components/ConfirmProvider';
 import { LoadMore } from '../../components/LoadMore';
 import { TimeAgo } from '../../components/TimeAgo';
 import { usePagedQuery } from '../../components/usePagedQuery';
@@ -24,6 +25,7 @@ function ConversationListItem({
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   // 右键上下文菜单（鼠标坐标定位，向上/向左钳制防溢出视口）
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const other = conversation.otherParticipant;
@@ -49,7 +51,7 @@ function ConversationListItem({
 
   const deleteConversation = async () => {
     setMenu(null);
-    if (!window.confirm(t('dm.deleteConversationConfirm'))) return;
+    if (!(await confirm({ title: t('dm.deleteConversationConfirm'), danger: true }))) return;
     await api.dmHideConversation(conversation.id);
     void queryClient.invalidateQueries({ queryKey: ['dm-conversations'] });
     void queryClient.invalidateQueries({ queryKey: ['dm-unread'] });

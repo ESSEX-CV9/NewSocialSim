@@ -7,7 +7,7 @@ import { patchAuthorFollow, patchPostById } from '../api/postCache';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
-import { ConfirmDialog } from './ConfirmDialog';
+import { useConfirm } from './ConfirmProvider';
 import { LinkCard } from './LinkCard';
 import { PostActions, ActionButton } from './PostActions';
 import { PostContent } from './PostContent';
@@ -46,8 +46,8 @@ export function PostCard({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const confirm = useConfirm();
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [gone, setGone] = useState(false);
   const viewRef = useViewTracking(post.id, !post.deleted && !gone);
 
@@ -63,7 +63,9 @@ export function PostCard({
   const stop = (e: MouseEvent) => e.stopPropagation();
 
   const remove = async () => {
-    setConfirmDelete(false);
+    setMoreMenuOpen(false);
+    if (!(await confirm({ title: t('post.deleteConfirm'), confirmLabel: t('post.delete'), danger: true })))
+      return;
     await api.deletePost(post.id);
     patchPostById(queryClient, post.id, () => ({ deleted: true }));
     setGone(true);
@@ -91,7 +93,9 @@ export function PostCard({
   };
 
   const blockAuthor = async () => {
-    if (!window.confirm(t('post.blockConfirm', { handle: post.author.handle }))) return;
+    setMoreMenuOpen(false);
+    if (!(await confirm({ title: t('post.blockConfirm', { handle: post.author.handle }), danger: true })))
+      return;
     await api.blockUser(post.author.handle);
     setGone(true);
     onDeleted?.(post.id);
@@ -138,16 +142,6 @@ export function PostCard({
   );
 
   return (
-    <>
-      {confirmDelete && (
-        <ConfirmDialog
-          title={t('post.deleteConfirm')}
-          confirmLabel={t('post.delete')}
-          danger
-          onConfirm={() => void remove()}
-          onCancel={() => setConfirmDelete(false)}
-        />
-      )}
     <article
       ref={viewRef}
       onClick={() => !large && navigate(`/post/${post.id}`)}
@@ -225,10 +219,7 @@ export function PostCard({
                     <div className="absolute top-6 right-0 z-30 w-fit min-w-44 overflow-hidden rounded-xl border border-x-border bg-x-card whitespace-nowrap shadow-lg">
                       {user.id === post.authorId ? (
                         <>
-                          {menuItem('ri-delete-bin-line', t('post.delete'), () => {
-                            setMoreMenuOpen(false);
-                            setConfirmDelete(true);
-                          }, true)}
+                          {menuItem('ri-delete-bin-line', t('post.delete'), () => void remove(), true)}
                           {menuItem(
                             isPinned ? 'ri-unpin-line' : 'ri-pushpin-line',
                             isPinned ? t('post.unpin') : t('post.pin'),
@@ -284,6 +275,5 @@ export function PostCard({
         </div>
       </div>
     </article>
-    </>
   );
 }

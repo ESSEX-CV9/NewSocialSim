@@ -10,6 +10,7 @@ export function ConfirmDialog({
   confirmLabel,
   cancelLabel,
   danger,
+  hideCancel,
   onConfirm,
   onCancel,
 }: {
@@ -18,6 +19,8 @@ export function ConfirmDialog({
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  /** 告知弹窗：隐藏取消钮（单按钮，替代 window.alert） */
+  hideCancel?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }) {
@@ -28,7 +31,7 @@ export function ConfirmDialog({
         e.stopPropagation();
         onCancel();
       }}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-60 flex items-center justify-center bg-black/60 px-4"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -45,12 +48,14 @@ export function ConfirmDialog({
           >
             {confirmLabel ?? t('common.confirm')}
           </button>
-          <button
-            onClick={onCancel}
-            className="rounded-full border border-x-border py-2.5 text-[15px] font-bold text-x-text transition-colors duration-200 hover:bg-x-hover"
-          >
-            {cancelLabel ?? t('common.cancel')}
-          </button>
+          {!hideCancel && (
+            <button
+              onClick={onCancel}
+              className="rounded-full border border-x-border py-2.5 text-[15px] font-bold text-x-text transition-colors duration-200 hover:bg-x-hover"
+            >
+              {cancelLabel ?? t('common.cancel')}
+            </button>
+          )}
         </div>
       </div>
     </div>

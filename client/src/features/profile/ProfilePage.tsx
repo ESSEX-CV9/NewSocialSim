@@ -6,6 +6,7 @@ import { api } from '../../api/endpoints';
 import { patchAuthorFollow } from '../../api/postCache';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
+import { useAlert } from '../../components/ConfirmProvider';
 import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { MediaLightbox } from '../../components/MediaLightbox';
@@ -138,6 +139,7 @@ export function ProfilePage() {
   const fmt = useFormatCount();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const alert = useAlert();
   const [editing, setEditing] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyInfoOpen, setVerifyInfoOpen] = useState(false);
@@ -222,7 +224,7 @@ export function ProfilePage() {
       const res = await api.dmFindOrCreate(u.id);
       navigate(`/messages/${res.conversation.id}`);
     } catch (e) {
-      window.alert(e instanceof Error ? e.message : String(e));
+      void alert({ title: e instanceof Error ? e.message : String(e) });
     }
   };
 

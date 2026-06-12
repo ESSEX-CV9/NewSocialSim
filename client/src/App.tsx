@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './auth/AuthContext';
+import { ConfirmProvider } from './components/ConfirmProvider';
 import { Layout } from './components/Layout';
 import { LoginPage } from './features/auth/LoginPage';
 import { RegisterPage } from './features/auth/RegisterPage';
@@ -99,7 +100,9 @@ function Providers() {
     <I18nProvider defaultLocale={world?.meta.locale ?? 'zh-CN'}>
       <AuthProvider>
         <BrowserRouter>
-          <Shell />
+          <ConfirmProvider>
+            <Shell />
+          </ConfirmProvider>
         </BrowserRouter>
       </AuthProvider>
     </I18nProvider>

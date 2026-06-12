@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
+import { useConfirm } from '../../components/ConfirmProvider';
 import { usePagedQuery } from '../../components/usePagedQuery';
 import { UserHoverCard } from '../../components/UserHoverCard';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
@@ -20,6 +21,7 @@ export function ConversationView({ conversationId }: { conversationId: number })
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const { connected } = useDmStream();
   const [infoOpen, setInfoOpen] = useState(false);
 
@@ -113,7 +115,7 @@ export function ConversationView({ conversationId }: { conversationId: number })
   };
 
   const hideConversation = async () => {
-    if (!window.confirm(t('dm.deleteConversationConfirm'))) return;
+    if (!(await confirm({ title: t('dm.deleteConversationConfirm'), danger: true }))) return;
     await api.dmHideConversation(conversationId);
     void queryClient.invalidateQueries({ queryKey: ['dm-conversations'] });
     void queryClient.invalidateQueries({ queryKey: ['dm-unread'] });

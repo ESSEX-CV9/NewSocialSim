@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type FormEvent } from 'react';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
+import { useConfirm } from '../../components/ConfirmProvider';
 import { ErrorBox, Spinner } from '../../components/Feedback';
 import { SimClockDisplay } from '../../components/SimClockDisplay';
 import { resetViewTracking } from '../../components/useViewTracking';
@@ -113,6 +114,7 @@ export function WorldsPage() {
   const { world, refresh } = useWorld();
   const { logout } = useAuth();
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
 
   const worlds = useQuery({ queryKey: ['worlds'], queryFn: api.listWorlds });
 
@@ -122,7 +124,7 @@ export function WorldsPage() {
   };
 
   const activate = async (id: string) => {
-    if (!window.confirm(t('worlds.confirmSwitch'))) return;
+    if (!(await confirm({ title: t('worlds.confirmSwitch') }))) return;
     await api.activateWorld(id);
     // 切换世界后旧 token 必然失效：主动登出并刷新全部数据
     logout();
