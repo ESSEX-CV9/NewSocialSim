@@ -85,6 +85,12 @@ export class MediaService {
     return mediaFileUrl(mediaId, worldId)!;
   }
 
+  /** 流式引用视频的播放 URL（服务端现解直链做 Range 透传代理） */
+  private streamUrl(mediaId: number): string {
+    const { worldId } = this.worldManager.current();
+    return `/api/media/${mediaId}/stream?w=${encodeURIComponent(worldId)}`;
+  }
+
   /** 从内存缓冲创建图片媒体（上传与 C/D 期的外链下载共用此入口） */
   createFromBuffer(
     ownerId: number,
@@ -258,6 +264,76 @@ export class MediaService {
     return this.toView(mediaRepo.findById(db, id)!);
   }
 
+  /**
+   * 创建流式引用视频行：不存文件（file_name 留空占位，/file 端点天然 404），
+   * 只存 origin_url 与元数据；海报为刚需（流式无本地帧，失败应由调用方拦截）。
+   */
+  createStreamVideo(
+    ownerId: number,
+    meta: {
+      width: number | null;
+      height: number | null;
+      durationMs: number | null;
+      originUrl: string;
+      posterMediaId: number;
+    },
+  ): MediaView {
+    const { db, clock } = this.worldManager.current();
+    const id = mediaRepo.insert(db, {
+      ownerId,
+      type: 'video',
+      mime: 'video/mp4',
+      width: meta.width,
+      height: meta.height,
+      sizeBytes: 0,
+      source: 'video-stream',
+      originUrl: meta.originUrl,
+      createdAt: clock.now(),
+      storage: 'stream',
+      durationMs: meta.durationMs,
+      posterMediaId: meta.posterMediaId,
+    });
+    return this.toView(mediaRepo.findById(db, id)!);
+  }
+
+  /** 同源去重（流式行）：同主未挂接直接复用；否则复制元数据与海报引用为新行（无字节成本） */
+  reuseStreamByOrigin(ownerId: number, originUrl: string): MediaView | null {
+    const { db, clock } = this.worldManager.current();
+    const rows = mediaRepo.findVideosByOrigin(db, originUrl, 'stream');
+    if (rows.length === 0) return null;
+    const attached = mediaRepo.attachedSet(db, rows.map((r) => r.id));
+    const own = rows.find((r) => r.owner_id === ownerId && !attached.has(r.id));
+    if (own) return this.toView(own);
+    const src = rows[0]!;
+    if (src.poster_media_id === null) return null;
+    const id = mediaRepo.insert(db, {
+      ownerId,
+      type: 'video',
+      mime: src.mime,
+      width: src.width,
+      height: src.height,
+      sizeBytes: 0,
+      source: src.source,
+      originUrl,
+      createdAt: clock.now(),
+      storage: 'stream',
+      durationMs: src.duration_ms,
+      posterMediaId: src.poster_media_id,
+    });
+    return this.toView(mediaRepo.findById(db, id)!);
+  }
+
+  /** 流式行的源信息（/stream 代理端点用）；非流式行/世界不符一律 404 */
+  getStreamInfo(id: number, w: string): { originUrl: string } {
+    const { worldId, db } = this.worldManager.current();
+    if (w !== worldId) throw new NotFoundError(`媒体 #${id} 不存在`);
+    const row = mediaRepo.findById(db, id);
+    if (!row || row.type !== 'video' || row.storage !== 'stream' || !row.origin_url) {
+      throw new NotFoundError(`媒体 #${id} 不存在`);
+    }
+    return { originUrl: row.origin_url };
+  }
+
   /** 给视频媒体补挂海报图（海报为独立 image media 行，不挂帖不占名额） */
   setPoster(mediaId: number, posterMediaId: number): MediaView {
     const { db } = this.worldManager.current();
@@ -423,6 +499,7 @@ export class MediaService {
       view.durationMs = row.duration_ms;
       view.posterUrl = mediaFileUrl(row.poster_media_id, worldId);
       view.storage = row.storage;
+      if (row.storage === 'stream') view.url = this.streamUrl(row.id);
     }
     return view;
   }

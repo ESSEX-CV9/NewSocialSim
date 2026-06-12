@@ -1,7 +1,26 @@
 import type { MediaView } from '@socialsim/shared';
 import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useI18n } from '../i18n/I18nContext';
 import { MediaLightbox } from './MediaLightbox';
 import { attachVideoPlayback, getVideoProgress } from './videoPlayback';
+
+/** 流式引用视频源失效时的占位：海报 + 蒙层提示 */
+export function StreamUnavailable({ media, className }: { media: MediaView; className?: string }) {
+  const { t } = useI18n();
+  return (
+    <div className={`relative bg-black ${className ?? ''}`}>
+      {media.posterUrl && (
+        <img src={media.posterUrl} alt="" className="h-full w-full object-contain opacity-50" />
+      )}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className="rounded-full bg-black/70 px-4 py-1.5 text-[14px] text-white">
+          <i className="ri-link-unlink-m mr-1.5" />
+          {t('video.sourceUnavailable')}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 /** 内嵌视频：静音自动播放（50% 进视窗播、出视窗停、同屏只播最新），进度跨页记忆 */
 function InlineVideo({
@@ -14,6 +33,7 @@ function InlineVideo({
   postId?: number | undefined;
 }) {
   const [lightbox, setLightbox] = useState(false);
+  const [failed, setFailed] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
@@ -36,6 +56,15 @@ function InlineVideo({
     };
   }, [media.url]);
 
+  // 流式引用源失效：显示海报占位（library 文件不会失效，报错属异常不拦）
+  if (failed && media.storage === 'stream') {
+    return (
+      <div className="mt-2 overflow-hidden rounded-2xl border border-x-border">
+        <StreamUnavailable media={media} className={`aspect-video w-full ${compact ? 'max-h-72' : 'max-h-128'}`} />
+      </div>
+    );
+  }
+
   return (
     <div className="relative mt-2 overflow-hidden rounded-2xl border border-x-border">
       <video
@@ -44,6 +73,8 @@ function InlineVideo({
         controls
         muted
         preload="metadata"
+        poster={media.posterUrl ?? undefined}
+        onError={() => setFailed(true)}
         onClick={(e) => e.stopPropagation()}
         className={`w-full bg-black ${compact ? 'max-h-72' : 'max-h-128'}`}
       />
@@ -111,12 +142,23 @@ export function MediaGrid({
     >
       {item.type === 'video' ? (
         <>
-          <video
-            src={item.url}
-            preload="metadata"
-            muted
-            className="pointer-events-none h-full w-full object-cover"
-          />
+          {/* 有海报用海报当缩略图（流式视频滚动列表时不必触发代理拉流），无海报取首帧 */}
+          {item.posterUrl ? (
+            <img
+              src={item.posterUrl}
+              alt=""
+              className="pointer-events-none h-full w-full object-cover"
+              loading="lazy"
+              draggable={false}
+            />
+          ) : (
+            <video
+              src={item.url}
+              preload="metadata"
+              muted
+              className="pointer-events-none h-full w-full object-cover"
+            />
+          )}
           <i className="ri-play-circle-fill absolute right-1.5 bottom-1.5 text-[22px] text-white drop-shadow" />
         </>
       ) : (

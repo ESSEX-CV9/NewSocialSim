@@ -19,6 +19,20 @@ const taskParamsSchema = {
   properties: { id: { type: 'string', minLength: 1, maxLength: 50 } },
 } as const;
 
+const streamParamsSchema = {
+  type: 'object',
+  required: ['id'],
+  additionalProperties: false,
+  properties: { id: { type: 'integer', minimum: 1 } },
+} as const;
+
+const streamQuerySchema = {
+  type: 'object',
+  required: ['w'],
+  additionalProperties: false,
+  properties: { w: { type: 'string', minLength: 1, maxLength: 100 } },
+} as const;
+
 export interface VideoSearchRoutesDeps {
   videoSearchService: VideoSearchService;
   requireAuth: preHandlerHookHandler;
@@ -43,5 +57,12 @@ export function registerVideoSearchRoutes(app: FastifyInstance, deps: VideoSearc
     '/api/video/tasks/:id',
     { ...auth, schema: { params: taskParamsSchema } },
     controller.cancel,
+  );
+  // 流式播放代理公开：video 标签带不了 Authorization 头（与 /file 端点同口径，?w= 把门）
+  // 路由由本模块注册（依赖 yt-dlp 解析直链），避免 media 模块反向依赖 video-search
+  app.get<{ Params: { id: string }; Querystring: { w: string } }>(
+    '/api/media/:id/stream',
+    { schema: { params: streamParamsSchema, querystring: streamQuerySchema } },
+    controller.stream,
   );
 }

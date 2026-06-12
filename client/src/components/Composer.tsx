@@ -48,6 +48,7 @@ export function Composer({
   const [urlInputOpen, setUrlInputOpen] = useState(false);
   const [urlValue, setUrlValue] = useState('');
   const [urlKind, setUrlKind] = useState<'image' | 'video'>('image');
+  const [urlMode, setUrlMode] = useState<'auto' | 'download' | 'stream'>('auto');
   const [notice, setNotice] = useState<string | null>(null);
   /** 本发帖框创建的视频引入任务 id（任务本体由服务端持有，轮询取回） */
   const [taskIds, setTaskIds] = useState<string[]>([]);
@@ -166,8 +167,9 @@ export function Composer({
     setNotice(null);
     try {
       if (urlKind === 'video') {
-        // 视频走形态路由：可嵌入站点默认返回 embed（URL 留正文走链接卡），否则建异步任务
-        const res = await api.videoIngest(url, 'auto');
+        // 视频默认走形态路由（auto）：可嵌入站点返回 embed（URL 留正文走链接卡），否则建异步任务；
+        // 用户也可显式指定下载/流式
+        const res = await api.videoIngest(url, urlMode);
         if (res.embed) {
           setContent((prev) => (prev.trim().length > 0 ? `${prev.trimEnd()} ${url}` : url));
           setNotice(t('composer.videoEmbedHint'));
@@ -273,7 +275,13 @@ export function Composer({
         {media.length === 1 && (
           <div className="relative mb-2 overflow-hidden rounded-2xl border border-x-border">
             {media[0]!.type === 'video' ? (
-              <video src={media[0]!.url} controls preload="metadata" className="max-h-72 w-full" />
+              <video
+                src={media[0]!.url}
+                controls
+                preload="metadata"
+                poster={media[0]!.posterUrl ?? undefined}
+                className="max-h-72 w-full"
+              />
             ) : (
               <img src={media[0]!.url} alt="" className="max-h-72 w-full object-cover" draggable={false} />
             )}
@@ -295,7 +303,11 @@ export function Composer({
               >
                 {m.type === 'video' ? (
                   <>
-                    <video src={m.url} preload="metadata" muted className="h-full w-full object-cover" />
+                    {m.posterUrl ? (
+                      <img src={m.posterUrl} alt="" className="h-full w-full object-cover" draggable={false} />
+                    ) : (
+                      <video src={m.url} preload="metadata" muted className="h-full w-full object-cover" />
+                    )}
                     <i className="ri-play-circle-fill pointer-events-none absolute right-1 bottom-1 text-[18px] text-white drop-shadow" />
                   </>
                 ) : (
@@ -355,6 +367,17 @@ export function Composer({
                 </button>
               ))}
             </div>
+            {urlKind === 'video' && (
+              <select
+                value={urlMode}
+                onChange={(e) => setUrlMode(e.target.value as typeof urlMode)}
+                className="shrink-0 rounded-full border border-x-border bg-x-bg px-2 py-1 text-[12px] text-x-dim outline-none focus:border-x-blue"
+              >
+                <option value="auto">{t('composer.videoModeAuto')}</option>
+                <option value="download">{t('composer.videoModeDownload')}</option>
+                <option value="stream">{t('composer.videoModeStream')}</option>
+              </select>
+            )}
             <input
               value={urlValue}
               onChange={(e) => setUrlValue(e.target.value)}

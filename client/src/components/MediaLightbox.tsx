@@ -16,11 +16,13 @@ import { TimeAgo } from './TimeAgo';
 import { usePagedQuery } from './usePagedQuery';
 import { UserHoverCard } from './UserHoverCard';
 import { VerifiedBadge } from './VerifiedBadge';
+import { StreamUnavailable } from './MediaGrid';
 import { attachVideoPlayback } from './videoPlayback';
 
 /** 查看器内的视频：有声自动播放，进度跨场景记忆；点击画面为默认播放/暂停行为 */
 function LightboxVideo({ media }: { media: MediaView }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -28,12 +30,23 @@ function LightboxVideo({ media }: { media: MediaView }) {
     return attachVideoPlayback(el, media.url);
   }, [media.url]);
 
+  if (failed && media.storage === 'stream') {
+    return (
+      <StreamUnavailable
+        media={media}
+        className="aspect-video max-h-full w-full max-w-3xl overflow-hidden rounded-xl"
+      />
+    );
+  }
+
   return (
     <video
       ref={videoRef}
       src={media.url}
       controls
       autoPlay
+      poster={media.posterUrl ?? undefined}
+      onError={() => setFailed(true)}
       onClick={(e) => e.stopPropagation()}
       className="max-h-full max-w-full"
     />

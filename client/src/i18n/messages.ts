@@ -237,6 +237,11 @@ export const messages = {
     'composer.videoTaskFailed': '引入失败',
     'composer.videoTaskRetry': '重试',
     'composer.videoTaskDismiss': '移除',
+    'composer.videoModeAuto': '自动',
+    'composer.videoModeDownload': '下载入库',
+    'composer.videoModeStream': '流式引用',
+
+    'video.sourceUnavailable': '源视频已失效',
 
     'videoTools.settingsTitle': '视频工具',
     'videoTools.intro': '搜索与引入外站视频需要 yt-dlp（下载器）与 ffmpeg（格式处理），点击安装即可自动下载到本机，无需手动配置。',
@@ -561,6 +566,11 @@ export const messages = {
     'composer.videoTaskFailed': 'Import failed',
     'composer.videoTaskRetry': 'Retry',
     'composer.videoTaskDismiss': 'Dismiss',
+    'composer.videoModeAuto': 'Auto',
+    'composer.videoModeDownload': 'Download',
+    'composer.videoModeStream': 'Stream',
+
+    'video.sourceUnavailable': 'Source video unavailable',
 
     'videoTools.settingsTitle': 'Video tools',
     'videoTools.intro': 'Searching and importing external videos requires yt-dlp (downloader) and ffmpeg (format processing). Click install to download them automatically — no manual setup needed.',
