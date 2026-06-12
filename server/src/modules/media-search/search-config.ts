@@ -21,6 +21,33 @@ export interface MediaSearchConfig {
   gelbooru?: { userId?: string; apiKey?: string };
   /** 视频工具下载源覆盖（镜像加速）；留空用 GitHub 官方 release */
   tools?: { ytdlpUrl?: string; ffmpegUrl?: string };
+  /** 视频引入设置（下载限额仅约束下载模式；siteModes 为可嵌入站点的形态路由覆盖） */
+  video?: {
+    maxHeight?: number;
+    maxDownloadMb?: number;
+    defaultMode?: 'download' | 'stream';
+    hlsFallback?: 'download' | 'error';
+    siteModes?: { youtube?: 'embed' | 'download' | 'stream'; bilibili?: 'embed' | 'download' | 'stream' };
+  };
+}
+
+/** video 段解析后的有效值（缺省补默认） */
+export interface VideoSettings {
+  maxHeight: number;
+  maxBytes: number;
+  defaultMode: 'download' | 'stream';
+  hlsFallback: 'download' | 'error';
+  siteModes: { youtube?: 'embed' | 'download' | 'stream'; bilibili?: 'embed' | 'download' | 'stream' };
+}
+
+export function videoSettings(cfg: MediaSearchConfig): VideoSettings {
+  return {
+    maxHeight: cfg.video?.maxHeight ?? 720,
+    maxBytes: (cfg.video?.maxDownloadMb ?? 150) * 1024 * 1024,
+    defaultMode: cfg.video?.defaultMode ?? 'download',
+    hlsFallback: cfg.video?.hlsFallback ?? 'error',
+    siteModes: cfg.video?.siteModes ?? {},
+  };
 }
 
 const FILE = path.join(config.dataDir, 'media-search.json');
@@ -71,6 +98,17 @@ export function patchSearchConfig(patch: Partial<MediaSearchConfig>): MediaSearc
     ...(patch.danbooru !== undefined ? { danbooru: { ...current.danbooru, ...patch.danbooru } } : {}),
     ...(patch.gelbooru !== undefined ? { gelbooru: { ...current.gelbooru, ...patch.gelbooru } } : {}),
     ...(patch.tools !== undefined ? { tools: { ...current.tools, ...patch.tools } } : {}),
+    ...(patch.video !== undefined
+      ? {
+          video: {
+            ...current.video,
+            ...patch.video,
+            ...(patch.video.siteModes !== undefined
+              ? { siteModes: { ...current.video?.siteModes, ...patch.video.siteModes } }
+              : {}),
+          },
+        }
+      : {}),
   };
   fs.mkdirSync(path.dirname(FILE), { recursive: true });
   fs.writeFileSync(FILE, JSON.stringify(next, null, 2), 'utf8');

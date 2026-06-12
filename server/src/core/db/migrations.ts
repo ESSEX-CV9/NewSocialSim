@@ -264,6 +264,18 @@ const migrations: Migration[] = [
       ALTER TABLE conversation_participants ADD COLUMN pinned_at INTEGER;
     `,
   },
+  {
+    version: 13,
+    name: 'media-video-import',
+    // storage：'library' 文件在世界 media 目录 / 'stream' 流式引用（只存 origin_url 与元数据，D 期启用）
+    // poster_media_id：视频海报图（独立 image media 行，不挂帖）；origin_url 索引服务同源去重
+    sql: `
+      ALTER TABLE media ADD COLUMN storage TEXT NOT NULL DEFAULT 'library';
+      ALTER TABLE media ADD COLUMN duration_ms INTEGER;
+      ALTER TABLE media ADD COLUMN poster_media_id INTEGER REFERENCES media(id);
+      CREATE INDEX idx_media_origin_url ON media(origin_url) WHERE origin_url IS NOT NULL;
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

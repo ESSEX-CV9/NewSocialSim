@@ -18,7 +18,7 @@ import { registerMediaRoutes } from './modules/media/media.routes.js';
 import { MediaService } from './modules/media/media.service.js';
 import { registerMediaSearchRoutes } from './modules/media-search/media-search.routes.js';
 import { MediaSearchService } from './modules/media-search/media-search.service.js';
-import { readSearchConfig } from './modules/media-search/search-config.js';
+import { readSearchConfig, videoSettings } from './modules/media-search/search-config.js';
 import { registerMessagesRoutes } from './modules/messages/messages.routes.js';
 import { MessagesService } from './modules/messages/messages.service.js';
 import { registerNotificationsRoutes } from './modules/notifications/notifications.routes.js';
@@ -33,6 +33,8 @@ import { registerToolsRoutes } from './modules/tools/tools.routes.js';
 import { ToolsService } from './modules/tools/tools.service.js';
 import { registerUsersRoutes } from './modules/users/users.routes.js';
 import { UsersService } from './modules/users/users.service.js';
+import { registerVideoSearchRoutes } from './modules/video-search/video-search.routes.js';
+import { VideoSearchService } from './modules/video-search/video-search.service.js';
 import { registerWorldsRoutes } from './modules/worlds/worlds.routes.js';
 
 export interface AppDeps {
@@ -64,17 +66,18 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   });
 
   app.register(fastifyJwt, { secret: deps.jwtSecret });
-  // 上限按视频放到 100MB；图片的 10MB 限制在 media.service 内单独校验
-  app.register(fastifyMultipart, { limits: { fileSize: 100 * 1024 * 1024, files: 1 } });
+  // multipart 是注册期静态上限，只做宽松硬顶；真实视频限额（可配置）在 media.service 校验
+  app.register(fastifyMultipart, { limits: { fileSize: 512 * 1024 * 1024, files: 1 } });
 
   const { worldManager, sseHub } = deps;
   const requireAuth = makeRequireAuth(worldManager);
   const optionalAuth = makeOptionalAuth(worldManager);
 
-  const mediaService = new MediaService(worldManager);
+  // 组装层穿针：视频限额/镜像源都存于 media-search.json，避免 media/tools 模块依赖 media-search
+  const mediaService = new MediaService(worldManager, () => videoSettings(readSearchConfig()).maxBytes);
   const mediaSearchService = new MediaSearchService(worldManager);
-  // 组装层穿针：镜像源配置存于 media-search.json 的 tools 段，避免 tools 模块依赖 media-search
   const toolsService = new ToolsService(() => readSearchConfig().tools ?? {});
+  const videoSearchService = new VideoSearchService(worldManager, toolsService, mediaService);
   const linkCardsService = new LinkCardsService(worldManager, mediaService);
   const usersService = new UsersService(worldManager, mediaService);
   const authService = new AuthService(worldManager, usersService);
@@ -99,6 +102,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerMediaRoutes(app, { mediaService, requireAuth });
   registerMediaSearchRoutes(app, { mediaSearchService, requireAuth });
   registerToolsRoutes(app, { toolsService, requireAuth });
+  registerVideoSearchRoutes(app, { videoSearchService, requireAuth });
   registerAuthRoutes(app, { authService, worldManager, requireAuth });
   registerUsersRoutes(app, { usersService, requireAuth, optionalAuth });
   registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });

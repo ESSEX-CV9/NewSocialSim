@@ -13,6 +13,11 @@ export interface MediaRow {
   source: string;
   origin_url: string | null;
   created_at: number;
+  /** 'library' 文件入库 / 'stream' 流式引用（仅存 origin_url 与元数据） */
+  storage: 'library' | 'stream';
+  duration_ms: number | null;
+  /** 视频海报图（独立 image media 行，不挂帖） */
+  poster_media_id: number | null;
 }
 
 export const mediaRepo = {
@@ -29,12 +34,15 @@ export const mediaRepo = {
       source: string;
       originUrl: string | null;
       createdAt: number;
+      storage?: 'library' | 'stream';
+      durationMs?: number | null;
+      posterMediaId?: number | null;
     },
   ): number {
     const result = db
       .prepare(
-        `INSERT INTO media (owner_id, type, file_name, mime, width, height, size_bytes, source, origin_url, created_at)
-         VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO media (owner_id, type, file_name, mime, width, height, size_bytes, source, origin_url, created_at, storage, duration_ms, poster_media_id)
+         VALUES (?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         input.ownerId,
@@ -46,8 +54,25 @@ export const mediaRepo = {
         input.source,
         input.originUrl,
         input.createdAt,
+        input.storage ?? 'library',
+        input.durationMs ?? null,
+        input.posterMediaId ?? null,
       );
     return Number(result.lastInsertRowid);
+  },
+
+  /** 同源去重用：同 origin_url 的视频行（新→旧，最多 10 条） */
+  findVideosByOrigin(db: WorldDb, originUrl: string, storage: 'library' | 'stream'): MediaRow[] {
+    return db
+      .prepare(
+        `SELECT * FROM media WHERE origin_url = ? AND storage = ? AND type = 'video'
+         ORDER BY id DESC LIMIT 10`,
+      )
+      .all(originUrl, storage) as MediaRow[];
+  },
+
+  setPoster(db: WorldDb, id: number, posterMediaId: number): void {
+    db.prepare('UPDATE media SET poster_media_id = ? WHERE id = ?').run(posterMediaId, id);
   },
 
   updateFileName(db: WorldDb, id: number, fileName: string): void {

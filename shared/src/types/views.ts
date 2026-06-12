@@ -17,10 +17,16 @@ export interface UserSummary {
 export interface MediaView {
   id: number;
   type: 'image' | 'video';
-  /** /api/media/<id>/file?w=<worldId>，公开可访问 */
+  /** /api/media/<id>/file?w=<worldId>，公开可访问（流式引用视频为 /stream 端点） */
   url: string;
   width: number | null;
   height: number | null;
+  /** 视频时长（毫秒）；图片或未知为不出现/null */
+  durationMs?: number | null;
+  /** 视频海报图地址（外站引入时随片下载）；无海报为 null */
+  posterUrl?: string | null;
+  /** 视频存储形态：'library' 文件入库 / 'stream' 流式引用（源失效则不可播） */
+  storage?: 'library' | 'stream';
 }
 
 /** 面向展示的帖子：实体 + 作者 + 观察者状态 + 一层引用嵌入 */

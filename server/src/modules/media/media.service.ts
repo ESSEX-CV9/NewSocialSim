@@ -23,7 +23,8 @@ const VIDEO_MIMES: Record<string, string> = {
   'video/webm': 'webm',
 };
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
-const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
+/** 视频上限缺省值；实际限额由组装层注入的 videoLimits 提供（media-search.json 的 video 段可调） */
+const DEFAULT_MAX_VIDEO_BYTES = 150 * 1024 * 1024;
 /** 一条帖子最多挂的媒体数（防呆硬顶，图/视频共享配额且可混排；帖子卡只显示前 4 个） */
 const MAX_PER_POST = 20;
 /** 一条私信消息最多挂的媒体数（对照 X） */
@@ -64,7 +65,11 @@ export function mediaFileUrl(mediaId: number | null, worldId: string): string | 
 }
 
 export class MediaService {
-  constructor(private readonly worldManager: WorldManager) {}
+  constructor(
+    private readonly worldManager: WorldManager,
+    /** 视频体积上限（字节），组装层从实例配置现读注入；默认 150MB */
+    private readonly maxVideoBytes: () => number = () => DEFAULT_MAX_VIDEO_BYTES,
+  ) {}
 
   /** 当前世界的媒体目录；每次现算，热切换安全 */
   private mediaDir(): string {
@@ -175,8 +180,9 @@ export class MediaService {
       });
       await pipeline(source, fs.createWriteStream(tmpPath));
       // multipart 的 fileSize 上限触发时流被截断而不报错，必须显式检查
-      if (source.truncated || size > MAX_VIDEO_BYTES) {
-        throw new ValidationError(`视频最大 ${MAX_VIDEO_BYTES / 1024 / 1024}MB`);
+      const maxBytes = this.maxVideoBytes();
+      if (source.truncated || size > maxBytes) {
+        throw new ValidationError(`视频最大 ${Math.round(maxBytes / 1024 / 1024)}MB`);
       }
       if (size === 0) throw new ValidationError('文件为空');
 
@@ -208,6 +214,106 @@ export class MediaService {
       fs.rmSync(tmpPath, { force: true });
       throw err;
     }
+  }
+
+  /**
+   * 从已下载的临时文件创建视频媒体（外站视频引入用）：插行 → rename 入媒体目录 → 失败回滚。
+   * 调用方负责保证 filePath 与世界目录同卷（data/ 下），rename 才是原子移动。
+   */
+  createVideoFromFile(
+    ownerId: number,
+    filePath: string,
+    meta: {
+      width: number | null;
+      height: number | null;
+      durationMs: number | null;
+      sizeBytes: number;
+      source: string;
+      originUrl: string;
+    },
+  ): MediaView {
+    const { db, clock } = this.worldManager.current();
+    const id = db.transaction(() => {
+      const mediaId = mediaRepo.insert(db, {
+        ownerId,
+        type: 'video',
+        mime: 'video/mp4',
+        width: meta.width,
+        height: meta.height,
+        sizeBytes: meta.sizeBytes,
+        source: meta.source,
+        originUrl: meta.originUrl,
+        createdAt: clock.now(),
+        durationMs: meta.durationMs,
+      });
+      mediaRepo.updateFileName(db, mediaId, `${mediaId}.mp4`);
+      return mediaId;
+    })();
+    try {
+      fs.renameSync(filePath, path.join(this.mediaDir(), `${id}.mp4`));
+    } catch (err) {
+      mediaRepo.delete(db, id);
+      throw err;
+    }
+    return this.toView(mediaRepo.findById(db, id)!);
+  }
+
+  /** 给视频媒体补挂海报图（海报为独立 image media 行，不挂帖不占名额） */
+  setPoster(mediaId: number, posterMediaId: number): MediaView {
+    const { db } = this.worldManager.current();
+    mediaRepo.setPoster(db, mediaId, posterMediaId);
+    return this.toView(mediaRepo.findById(db, mediaId)!);
+  }
+
+  /**
+   * 同源去重：同 origin_url 的已入库（library）视频按需复用。
+   * 本人未挂接的行直接复用；否则以最新有文件的行为源，硬链接复制字节为本人新行
+   * （NTFS 同卷零拷贝；链接失败回退复制）。无可复用返回 null。
+   */
+  reuseVideoByOrigin(ownerId: number, originUrl: string): MediaView | null {
+    const { db, clock } = this.worldManager.current();
+    const rows = mediaRepo.findVideosByOrigin(db, originUrl, 'library');
+    const withFile = rows.filter((r) => r.file_name);
+    if (withFile.length === 0) return null;
+    const attached = mediaRepo.attachedSet(db, withFile.map((r) => r.id));
+    const own = withFile.find((r) => r.owner_id === ownerId && !attached.has(r.id));
+    if (own) return this.toView(own);
+
+    const dir = this.mediaDir();
+    const src = withFile.find((r) => fs.existsSync(path.join(dir, r.file_name)));
+    if (!src) return null;
+    const ext = path.extname(src.file_name).slice(1) || 'mp4';
+    const id = db.transaction(() => {
+      const mediaId = mediaRepo.insert(db, {
+        ownerId,
+        type: 'video',
+        mime: src.mime,
+        width: src.width,
+        height: src.height,
+        sizeBytes: src.size_bytes,
+        source: src.source,
+        originUrl,
+        createdAt: clock.now(),
+        durationMs: src.duration_ms,
+        // 海报行不挂帖、文件端点公开，跨用户引用同一张海报无害
+        posterMediaId: src.poster_media_id,
+      });
+      mediaRepo.updateFileName(db, mediaId, `${mediaId}.${ext}`);
+      return mediaId;
+    })();
+    const srcPath = path.join(dir, src.file_name);
+    const destPath = path.join(dir, `${id}.${ext}`);
+    try {
+      try {
+        fs.linkSync(srcPath, destPath);
+      } catch {
+        fs.copyFileSync(srcPath, destPath);
+      }
+    } catch (err) {
+      mediaRepo.delete(db, id);
+      throw err;
+    }
+    return this.toView(mediaRepo.findById(db, id)!);
   }
 
   /** 文件元信息（公开端点用，Range 由 controller 处理）；w 与活动世界不一致按不存在处理 */
@@ -305,12 +411,19 @@ export class MediaService {
   }
 
   private toView(row: MediaRow): MediaView {
-    return {
+    const view: MediaView = {
       id: row.id,
       type: row.type,
       url: this.fileUrl(row.id),
       width: row.width,
       height: row.height,
     };
+    if (row.type === 'video') {
+      const { worldId } = this.worldManager.current();
+      view.durationMs = row.duration_ms;
+      view.posterUrl = mediaFileUrl(row.poster_media_id, worldId);
+      view.storage = row.storage;
+    }
+    return view;
   }
 }

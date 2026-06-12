@@ -201,6 +201,13 @@ export const api = {
   pixivSubmitCode: (code: string) =>
     http<PixivLoginStatus>('POST', '/api/media-search/pixiv/code', { code }),
 
+  // video ingest（外站视频引入：auto 按形态路由，可能直接返回 embed 不建任务）
+  videoIngest: (url: string, mode: 'auto' | 'download' | 'stream' = 'auto') =>
+    http<VideoIngestResult>('POST', '/api/video/ingest', { url, mode }),
+  videoTasks: () => http<{ tasks: VideoTaskView[] }>('GET', '/api/video/tasks'),
+  videoTaskCancel: (id: string) =>
+    http<{ task: VideoTaskView }>('DELETE', `/api/video/tasks/${id}`),
+
   // video tools (yt-dlp / ffmpeg)
   toolsStatus: () => http<{ tools: ToolStatus[] }>('GET', '/api/tools/status'),
   toolsLatest: () =>
@@ -209,6 +216,28 @@ export const api = {
   toolInstallStatus: (id: ToolId) =>
     http<{ job: ToolInstallJob | null }>('GET', `/api/tools/${id}/install/status`),
 };
+
+export type VideoTaskStatus = 'pending' | 'probing' | 'downloading' | 'done' | 'error' | 'canceled';
+
+export interface VideoTaskView {
+  id: string;
+  url: string;
+  mode: 'download' | 'stream';
+  status: VideoTaskStatus;
+  progress: number;
+  totalBytes?: number | null;
+  title?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  media?: MediaView;
+  createdAt: number;
+}
+
+export interface VideoIngestResult {
+  /** auto 命中嵌入卡：URL 留在正文走链接卡即可，无任务 */
+  embed?: { embedUrl: string; site: string };
+  task?: VideoTaskView;
+}
 
 export type ToolId = 'yt-dlp' | 'ffmpeg';
 

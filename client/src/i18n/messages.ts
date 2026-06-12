@@ -227,6 +227,17 @@ export const messages = {
     'linkCard.play': '播放',
     'linkCard.openOriginal': '打开原链接',
 
+    'composer.urlKindImage': '图片',
+    'composer.urlKindVideo': '视频',
+    'composer.urlPromptVideo': '粘贴视频页面链接（YouTube/X/B 站等）',
+    'composer.videoEmbedHint': '该链接将以嵌入播放器卡片展示，已插入正文',
+    'composer.videoTaskPending': '排队中…',
+    'composer.videoTaskProbing': '解析中…',
+    'composer.videoTaskDownloading': '下载中',
+    'composer.videoTaskFailed': '引入失败',
+    'composer.videoTaskRetry': '重试',
+    'composer.videoTaskDismiss': '移除',
+
     'videoTools.settingsTitle': '视频工具',
     'videoTools.intro': '搜索与引入外站视频需要 yt-dlp（下载器）与 ffmpeg（格式处理），点击安装即可自动下载到本机，无需手动配置。',
     'videoTools.installedVersion': '已安装',
@@ -539,6 +550,17 @@ export const messages = {
 
     'linkCard.play': 'Play',
     'linkCard.openOriginal': 'Open original link',
+
+    'composer.urlKindImage': 'Image',
+    'composer.urlKindVideo': 'Video',
+    'composer.urlPromptVideo': 'Paste a video page link (YouTube/X/Bilibili…)',
+    'composer.videoEmbedHint': 'This link will show as an embedded player card; inserted into the text',
+    'composer.videoTaskPending': 'Queued…',
+    'composer.videoTaskProbing': 'Resolving…',
+    'composer.videoTaskDownloading': 'Downloading',
+    'composer.videoTaskFailed': 'Import failed',
+    'composer.videoTaskRetry': 'Retry',
+    'composer.videoTaskDismiss': 'Dismiss',
 
     'videoTools.settingsTitle': 'Video tools',
     'videoTools.intro': 'Searching and importing external videos requires yt-dlp (downloader) and ffmpeg (format processing). Click install to download them automatically — no manual setup needed.',

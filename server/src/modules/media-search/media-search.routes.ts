@@ -68,6 +68,24 @@ const configBodySchema = {
         ffmpegUrl: { type: 'string', maxLength: 500 },
       },
     },
+    video: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        maxHeight: { type: 'number', minimum: 144, maximum: 4320 },
+        maxDownloadMb: { type: 'number', minimum: 1, maximum: 4096 },
+        defaultMode: { type: 'string', enum: ['download', 'stream'] },
+        hlsFallback: { type: 'string', enum: ['download', 'error'] },
+        siteModes: {
+          type: 'object',
+          additionalProperties: false,
+          properties: {
+            youtube: { type: 'string', enum: ['embed', 'download', 'stream'] },
+            bilibili: { type: 'string', enum: ['embed', 'download', 'stream'] },
+          },
+        },
+      },
+    },
   },
 } as const;
 

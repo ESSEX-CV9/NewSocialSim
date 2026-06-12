@@ -1,11 +1,15 @@
 import type { MediaView, PostView, UserSummary } from '@socialsim/shared';
-import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { api } from '../api/endpoints';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { api, type VideoTaskView } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
+import { IngestTaskTile } from './IngestTaskTile';
 import { MediaSearchPanel } from './MediaSearchPanel';
 import { MentionCandidateList, useMentionCandidates } from './useMentionCandidates';
+
+const ACTIVE_TASK_STATUSES = ['pending', 'probing', 'downloading'];
 
 const MAX_LENGTH = 280;
 /** 与服务端 MAX_PER_POST 一致：图/视频共享配额且可混排 */
@@ -43,10 +47,53 @@ export function Composer({
   const [error, setError] = useState<string | null>(null);
   const [urlInputOpen, setUrlInputOpen] = useState(false);
   const [urlValue, setUrlValue] = useState('');
+  const [urlKind, setUrlKind] = useState<'image' | 'video'>('image');
+  const [notice, setNotice] = useState<string | null>(null);
+  /** 本发帖框创建的视频引入任务 id（任务本体由服务端持有，轮询取回） */
+  const [taskIds, setTaskIds] = useState<string[]>([]);
+  const taskIdsRef = useRef(taskIds);
+  taskIdsRef.current = taskIds;
+  const handledTaskIds = useRef(new Set<string>());
   const [searchOpen, setSearchOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const mentionCtl = useMentionCandidates();
+
+  const tasksQuery = useQuery({
+    queryKey: ['video-tasks'],
+    queryFn: api.videoTasks,
+    enabled: taskIds.length > 0,
+    // 有跟踪中的活跃任务（或刚建还没出现在列表里）时 1.5s 轮询，否则停
+    refetchInterval: (query) => {
+      const tasks = query.state.data?.tasks ?? [];
+      const tracked = tasks.filter((tk) => taskIdsRef.current.includes(tk.id));
+      const anyActive = tracked.some((tk) => ACTIVE_TASK_STATUSES.includes(tk.status));
+      return anyActive || tracked.length < taskIdsRef.current.length ? 1500 : false;
+    },
+  });
+  const trackedTasks: VideoTaskView[] = (tasksQuery.data?.tasks ?? []).filter((tk) =>
+    taskIds.includes(tk.id),
+  );
+  const ingesting = trackedTasks.some((tk) => ACTIVE_TASK_STATUSES.includes(tk.status));
+
+  // 任务完成：媒体进托盘、任务移出跟踪（handled 防 StrictMode/竞态重复追加）
+  useEffect(() => {
+    const tasks = tasksQuery.data?.tasks ?? [];
+    for (const tk of tasks) {
+      if (!taskIdsRef.current.includes(tk.id) || handledTaskIds.current.has(tk.id)) continue;
+      if (tk.status === 'done' && tk.media) {
+        handledTaskIds.current.add(tk.id);
+        const m = tk.media;
+        setMedia((prev) =>
+          prev.length >= MAX_MEDIA || prev.some((x) => x.id === m.id) ? prev : [...prev, m],
+        );
+        setTaskIds((prev) => prev.filter((x) => x !== tk.id));
+      } else if (tk.status === 'canceled') {
+        handledTaskIds.current.add(tk.id);
+        setTaskIds((prev) => prev.filter((x) => x !== tk.id));
+      }
+    }
+  }, [tasksQuery.data]);
 
   // 高亮镜像层内容：命中片段变蓝，其余原样（含尾随零宽字符保持与 textarea 等高）
   const highlightNodes = useMemo(() => {
@@ -116,9 +163,21 @@ export function Composer({
     }
     setUploading(true);
     setError(null);
+    setNotice(null);
     try {
-      const res = await api.mediaFromUrl(url);
-      setMedia((prev) => [...prev, res.media]);
+      if (urlKind === 'video') {
+        // 视频走形态路由：可嵌入站点默认返回 embed（URL 留正文走链接卡），否则建异步任务
+        const res = await api.videoIngest(url, 'auto');
+        if (res.embed) {
+          setContent((prev) => (prev.trim().length > 0 ? `${prev.trimEnd()} ${url}` : url));
+          setNotice(t('composer.videoEmbedHint'));
+        } else if (res.task) {
+          setTaskIds((prev) => [...prev, res.task!.id]);
+        }
+      } else {
+        const res = await api.mediaFromUrl(url);
+        setMedia((prev) => [...prev, res.media]);
+      }
       setUrlValue('');
       setUrlInputOpen(false);
     } catch (e) {
@@ -128,8 +187,30 @@ export function Composer({
     }
   };
 
+  /** 失败任务重试：按任务原模式重新发起（绕过 auto，避免 siteModes 期间被改的歧义） */
+  const retryTask = async (tk: VideoTaskView) => {
+    setError(null);
+    try {
+      const res = await api.videoIngest(tk.url, tk.mode);
+      if (res.task) {
+        setTaskIds((prev) => [...prev.filter((x) => x !== tk.id), res.task!.id]);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const cancelTask = async (id: string) => {
+    try {
+      await api.videoTaskCancel(id);
+    } catch {
+      // 任务可能已终态/被清扫，直接移出跟踪
+    }
+    setTaskIds((prev) => prev.filter((x) => x !== id));
+  };
+
   const submit = async () => {
-    if (empty || remaining < 0 || busy || uploading) return;
+    if (empty || remaining < 0 || busy || uploading || ingesting) return;
     setBusy(true);
     setError(null);
     try {
@@ -231,9 +312,24 @@ export function Composer({
             ))}
           </div>
         )}
+        {/* 视频引入任务托盘：进行中/失败的占位卡，完成自动转入媒体预览 */}
+        {trackedTasks.length > 0 && (
+          <div className="no-scrollbar mb-2 flex gap-2 overflow-x-auto">
+            {trackedTasks.map((tk) => (
+              <IngestTaskTile
+                key={tk.id}
+                task={tk}
+                onCancel={() => void cancelTask(tk.id)}
+                onRetry={() => void retryTask(tk)}
+                onDismiss={() => setTaskIds((prev) => prev.filter((x) => x !== tk.id))}
+              />
+            ))}
+          </div>
+        )}
         {error && (
           <div className="mb-2 text-sm text-x-red">{t('common.error', { message: error })}</div>
         )}
+        {notice && <div className="mb-2 text-sm text-x-dim">{notice}</div>}
         {searchOpen && (
           <MediaSearchPanel
             disabled={media.length >= MAX_MEDIA}
@@ -245,10 +341,24 @@ export function Composer({
         )}
         {urlInputOpen && (
           <div className="mb-2 flex items-center gap-2">
+            {/* 引入类型切换：图片走 from-url 同步入库，视频走异步任务（auto 形态路由） */}
+            <div className="flex shrink-0 overflow-hidden rounded-full border border-x-border text-[12px]">
+              {(['image', 'video'] as const).map((kind) => (
+                <button
+                  key={kind}
+                  onClick={() => setUrlKind(kind)}
+                  className={`px-2.5 py-1 font-bold transition-colors duration-200 ${
+                    urlKind === kind ? 'bg-x-blue text-white' : 'text-x-dim hover:bg-x-hover'
+                  }`}
+                >
+                  {t(kind === 'image' ? 'composer.urlKindImage' : 'composer.urlKindVideo')}
+                </button>
+              ))}
+            </div>
             <input
               value={urlValue}
               onChange={(e) => setUrlValue(e.target.value)}
-              placeholder={t('composer.urlPrompt')}
+              placeholder={t(urlKind === 'video' ? 'composer.urlPromptVideo' : 'composer.urlPrompt')}
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') void addFromUrl();
@@ -311,7 +421,7 @@ export function Composer({
             </span>
             <button
               onClick={() => void submit()}
-              disabled={busy || uploading || empty || remaining < 0}
+              disabled={busy || uploading || ingesting || empty || remaining < 0}
               className="rounded-full bg-x-blue px-5 py-1.5 text-[15px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:cursor-not-allowed disabled:opacity-50"
             >
               {buttonText}
