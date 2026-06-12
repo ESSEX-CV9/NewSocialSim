@@ -4,7 +4,15 @@ import { MediaLightbox } from './MediaLightbox';
 import { attachVideoPlayback, getVideoProgress } from './videoPlayback';
 
 /** 内嵌视频：静音自动播放（50% 进视窗播、出视窗停、同屏只播最新），进度跨页记忆 */
-function InlineVideo({ media, compact }: { media: MediaView; compact?: boolean | undefined }) {
+function InlineVideo({
+  media,
+  compact,
+  postId,
+}: {
+  media: MediaView;
+  compact?: boolean | undefined;
+  postId?: number | undefined;
+}) {
   const [lightbox, setLightbox] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -53,6 +61,7 @@ function InlineVideo({ media, compact }: { media: MediaView; compact?: boolean |
         <MediaLightbox
           media={[media]}
           initialIndex={0}
+          {...(postId !== undefined ? { postId } : {})}
           onClose={() => {
             setLightbox(false);
             // 从查看器回来：同步进度并继续内嵌播放
@@ -69,13 +78,22 @@ function InlineVideo({ media, compact }: { media: MediaView; compact?: boolean |
 }
 
 /** X 式媒体宫格：1=单图、2=两列、3=左一右二、4=2×2；点击开大图查看器；视频为内联播放器 */
-export function MediaGrid({ media, compact }: { media: MediaView[]; compact?: boolean }) {
+export function MediaGrid({
+  media,
+  compact,
+  postId,
+}: {
+  media: MediaView[];
+  compact?: boolean;
+  /** 来源帖子：传入后查看器带互动栏与详情面板 */
+  postId?: number;
+}) {
   const [lightbox, setLightbox] = useState<number | null>(null);
   if (media.length === 0) return null;
 
   // 单独 1 个视频走内联播放器；其余（含图视频混排）一律宫格 + 查看器
   if (media.length === 1 && media[0]!.type === 'video') {
-    return <InlineVideo media={media[0]!} compact={compact} />;
+    return <InlineVideo media={media[0]!} compact={compact} postId={postId} />;
   }
 
   const open = (e: MouseEvent, index: number) => {
@@ -157,7 +175,12 @@ export function MediaGrid({ media, compact }: { media: MediaView[]; compact?: bo
     <div className="mt-2 overflow-hidden rounded-2xl border border-x-border">
       {body}
       {lightbox !== null && (
-        <MediaLightbox media={media} initialIndex={lightbox} onClose={() => setLightbox(null)} />
+        <MediaLightbox
+          media={media}
+          initialIndex={lightbox}
+          {...(postId !== undefined ? { postId } : {})}
+          onClose={() => setLightbox(null)}
+        />
       )}
     </div>
   );

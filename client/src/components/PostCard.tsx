@@ -1,108 +1,21 @@
 import type { PostView, UserSummary } from '@socialsim/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState, type MouseEvent, type ReactNode } from 'react';
+import { useState, type MouseEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { patchAuthorFollow, patchPostById } from '../api/postCache';
 import { useAuth } from '../auth/AuthContext';
-import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
-import { Composer } from './Composer';
 import { LinkCard } from './LinkCard';
+import { PostActions, ActionButton } from './PostActions';
 import { PostContent } from './PostContent';
+import { QuotedCard, Tombstone } from './QuotedCard';
 import { VerifiedBadge } from './VerifiedBadge';
 import { MediaGrid } from './MediaGrid';
 import { TimeAgo } from './TimeAgo';
 import { UserHoverCard } from './UserHoverCard';
 import { useViewTracking } from './useViewTracking';
-
-
-function Tombstone({ children }: { children?: ReactNode }) {
-  const { t } = useI18n();
-  return (
-    <div className="rounded-xl border-2 border-x-border bg-x-card p-4 text-[15px] text-x-dim">
-      {t('post.deleted')}
-      {children}
-    </div>
-  );
-}
-
-/** 被引用帖子的嵌入卡片 */
-function QuotedCard({ quoted }: { quoted: PostView }) {
-  const navigate = useNavigate();
-  if (quoted.deleted) return <Tombstone />;
-  return (
-    <div
-      onClick={(e) => {
-        e.stopPropagation();
-        navigate(`/post/${quoted.id}`);
-      }}
-      className="mt-2 cursor-pointer rounded-xl border-2 border-x-border p-3 transition-colors duration-200 hover:bg-x-hover"
-    >
-      <div className="mb-1 flex items-center gap-1.5 text-[15px]">
-        <UserHoverCard handle={quoted.author.handle}>
-          <span className="flex items-center gap-1.5">
-            <Avatar handle={quoted.author.handle} avatarUrl={quoted.author.avatarUrl} size={20} />
-            <span className="font-bold">{quoted.author.displayName}</span>
-            <VerifiedBadge verified={quoted.author.verified} />
-          </span>
-        </UserHoverCard>
-        <span className="text-x-dim">@{quoted.author.handle}</span>
-        <span className="text-x-dim">·</span>
-        <TimeAgo at={quoted.createdAt} />
-      </div>
-      <PostContent content={quoted.content} />
-      {quoted.media.length > 0 && <MediaGrid media={quoted.media} compact />}
-    </div>
-  );
-}
-
-/** 互动按钮：FA 图标 + 计数，hover 时图标出现同色 10% 圆形气泡 */
-function ActionButton({
-  icon,
-  count,
-  label,
-  color,
-  active,
-  onClick,
-}: {
-  icon: string;
-  count?: number | undefined;
-  label?: string | undefined;
-  color: 'blue' | 'green' | 'pink' | 'red';
-  active?: boolean | undefined;
-  onClick?: ((e: MouseEvent) => void) | undefined;
-}) {
-  const fmt = useFormatCount();
-  const colorClass = {
-    blue: { text: 'hover:text-x-blue', bubble: 'group-hover/act:bg-x-blue/10', on: 'text-x-blue' },
-    green: {
-      text: 'hover:text-x-green',
-      bubble: 'group-hover/act:bg-x-green/10',
-      on: 'text-x-green',
-    },
-    pink: { text: 'hover:text-x-pink', bubble: 'group-hover/act:bg-x-pink/10', on: 'text-x-pink' },
-    red: { text: 'hover:text-x-red', bubble: 'group-hover/act:bg-x-red/10', on: 'text-x-red' },
-  }[color];
-
-  return (
-    <button
-      onClick={onClick}
-      className={`group/act flex items-center text-[13px] transition-colors duration-200 ${
-        active ? colorClass.on : 'text-x-dim'
-      } ${colorClass.text}`}
-    >
-      <span
-        className={`-m-2 flex size-8.5 items-center justify-center rounded-full transition-colors duration-200 ${colorClass.bubble}`}
-      >
-        <i className={`${icon} text-[16px]`} />
-      </span>
-      {count !== undefined && count > 0 && <span className="ml-2.5">{fmt(count)}</span>}
-      {label && <span className="ml-2.5">{label}</span>}
-    </button>
-  );
-}
 
 interface PostCardProps {
   post: PostView;
@@ -132,8 +45,6 @@ export function PostCard({
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [quoteOpen, setQuoteOpen] = useState(false);
-  const [repostMenuOpen, setRepostMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [gone, setGone] = useState(false);
   const viewRef = useViewTracking(post.id, !post.deleted && !gone);
@@ -148,37 +59,6 @@ export function PostCard({
   }
 
   const stop = (e: MouseEvent) => e.stopPropagation();
-
-  const toggleLike = async (e: MouseEvent) => {
-    stop(e);
-    if (!user) return navigate('/login');
-    const res = post.likedByViewer ? await api.unlike(post.id) : await api.like(post.id);
-    patchPostById(queryClient, post.id, () => ({ likedByViewer: res.active, likeCount: res.count }));
-    void queryClient.invalidateQueries({ queryKey: ['user-likes', user.handle], refetchType: 'none' });
-  };
-
-  const toggleRepost = async () => {
-    const res = post.repostedByViewer ? await api.unrepost(post.id) : await api.repost(post.id);
-    patchPostById(queryClient, post.id, () => ({
-      repostedByViewer: res.active,
-      repostCount: res.count,
-    }));
-    if (user) {
-      void queryClient.invalidateQueries({ queryKey: ['timeline'], refetchType: 'none' });
-      void queryClient.invalidateQueries({
-        queryKey: ['user-timeline', user.handle],
-        refetchType: 'none',
-      });
-    }
-  };
-
-  const toggleBookmark = async (e: MouseEvent) => {
-    stop(e);
-    if (!user) return navigate('/login');
-    const res = post.bookmarkedByViewer ? await api.unbookmark(post.id) : await api.bookmark(post.id);
-    patchPostById(queryClient, post.id, () => ({ bookmarkedByViewer: res.active }));
-    void queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
-  };
 
   const remove = async () => {
     if (!window.confirm(t('post.deleteConfirm'))) return;
@@ -382,129 +262,12 @@ export function PostCard({
           <div className={large ? 'mt-2 text-xl' : 'mt-0.5'}>
             <PostContent content={post.content} />
           </div>
-          {post.media.length > 0 && <MediaGrid media={post.media} />}
+          {post.media.length > 0 && <MediaGrid media={post.media} postId={post.id} />}
           {post.linkCard && <LinkCard card={post.linkCard} />}
           {post.quoted && <QuotedCard quoted={post.quoted} />}
-          {/* 各按钮包 flex-1 左对齐单元格：图标位置不随数字宽度移动（与 X 一致） */}
-          <div className="mt-3 flex items-center">
-            <div className="flex-1">
-              <ActionButton icon="ri-chat-3-line" count={post.replyCount} color="blue" />
-            </div>
-            {/* 转发/引用合并：点击弹原地下拉菜单（与 X 一致） */}
-            <div className="flex-1">
-            <span className="relative">
-              <ActionButton
-                icon="ri-repeat-2-line"
-                count={post.repostCount + post.quoteCount}
-                color="green"
-                active={post.repostedByViewer}
-                onClick={(e) => {
-                  stop(e);
-                  if (!user) return navigate('/login');
-                  setRepostMenuOpen((v) => !v);
-                }}
-              />
-              {repostMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-20"
-                    onClick={(e) => {
-                      stop(e);
-                      setRepostMenuOpen(false);
-                    }}
-                  />
-                  <div className="absolute top-6 left-0 z-30 w-36 overflow-hidden rounded-xl border border-x-border bg-x-card shadow-lg">
-                    <button
-                      onClick={(e) => {
-                        stop(e);
-                        setRepostMenuOpen(false);
-                        void toggleRepost();
-                      }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold text-x-text transition-colors duration-200 hover:bg-x-input"
-                    >
-                      <i className="ri-repeat-2-line" />
-                      {post.repostedByViewer ? t('post.unrepost') : t('post.repost')}
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        stop(e);
-                        setRepostMenuOpen(false);
-                        setQuoteOpen(true);
-                      }}
-                      className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold text-x-text transition-colors duration-200 hover:bg-x-input"
-                    >
-                      <i className="ri-edit-line" />
-                      {t('post.quote')}
-                    </button>
-                  </div>
-                </>
-              )}
-            </span>
-            </div>
-            <div className="flex-1">
-              <ActionButton
-                icon={post.likedByViewer ? 'ri-heart-3-fill' : 'ri-heart-3-line'}
-                count={post.likeCount}
-                color="pink"
-                active={post.likedByViewer}
-                onClick={(e) => void toggleLike(e)}
-              />
-            </div>
-            {/* 浏览量：仅展示，无动作（stopPropagation 防整卡跳详情） */}
-            <div className="flex-1">
-              <ActionButton icon="ri-bar-chart-2-line" count={post.viewCount} color="blue" onClick={stop} />
-            </div>
-            <ActionButton
-              icon={post.bookmarkedByViewer ? 'ri-bookmark-fill' : 'ri-bookmark-line'}
-              color="blue"
-              active={post.bookmarkedByViewer}
-              onClick={(e) => void toggleBookmark(e)}
-            />
-          </div>
+          <PostActions post={post} />
         </div>
       </div>
-
-      {quoteOpen && (
-        <div
-          onClick={(e) => {
-            stop(e);
-            setQuoteOpen(false);
-          }}
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20"
-        >
-          <div
-            onClick={stop}
-            className="w-full max-w-xl rounded-2xl border border-x-border bg-x-bg"
-          >
-            <div className="flex items-center p-2">
-              <button
-                onClick={(e) => {
-                  stop(e);
-                  setQuoteOpen(false);
-                }}
-                className="flex size-9 items-center justify-center rounded-full text-x-text transition-colors duration-200 hover:bg-x-input"
-              >
-                <i className="ri-close-line text-[18px]" />
-              </button>
-            </div>
-            <Composer
-              quoteOfId={post.id}
-              placeholder={t('composer.quotePlaceholder')}
-              buttonText={t('composer.send')}
-              autoFocus
-              bordered={false}
-              onPosted={(p) => {
-                setQuoteOpen(false);
-                patchPostById(queryClient, post.id, (old) => ({ quoteCount: old.quoteCount + 1 }));
-                navigate(`/post/${p.id}`);
-              }}
-            />
-            <div className="px-4 pb-4">
-              <QuotedCard quoted={post} />
-            </div>
-          </div>
-        </div>
-      )}
     </article>
   );
 }

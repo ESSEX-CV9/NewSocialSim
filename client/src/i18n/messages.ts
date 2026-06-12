@@ -53,6 +53,8 @@ export const messages = {
     'media.prev': '上一张',
     'media.next': '下一张',
     'media.viewPost': '查看帖子',
+    'media.showDetail': '展开帖子详情',
+    'media.hideDetail': '收起帖子详情',
     'crop.title': '编辑图片',
     'crop.apply': '应用',
 
@@ -343,6 +345,8 @@ export const messages = {
     'media.prev': 'Previous',
     'media.next': 'Next',
     'media.viewPost': 'View post',
+    'media.showDetail': 'Show post details',
+    'media.hideDetail': 'Hide post details',
     'crop.title': 'Edit image',
     'crop.apply': 'Apply',
 
