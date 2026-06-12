@@ -1,6 +1,6 @@
 # NewSocialSim 交接说明
 
-本地运行的社交媒体模拟器（仿 X/Twitter），全 TypeScript。两阶段计划：第一阶段是真实可用的社交网站（**已完成**，前后端可运行，处于 UI 持续打磨期）；第二阶段以网站 HTTP API 为唯一接口构建模拟器（**未开始**），虚拟用户与真人走相同 API。用途：观察娱乐 + 小说世界观创作辅助 + 信息传播研究。
+本地运行的社交媒体模拟器（仿 X/Twitter），全 TypeScript。两阶段计划：第一阶段是真实可用的社交网站（**已完成**，含完整媒体系统，当前处于 UX 体验修改期）；第二阶段以网站 HTTP API 为唯一接口构建模拟器（**未开始**），虚拟用户与真人走相同 API。用途：观察娱乐 + 小说世界观创作辅助 + 信息传播研究。
 
 ## 运行
 
@@ -25,7 +25,8 @@ npm workspaces monorepo：
 - `client/` — React 19 + Vite + Tailwind 4 + react-query + Remix Icon（均 npm 本地，离线可用）。
   - `src/api/` fetch 封装与全部接口；`src/auth|world|i18n|theme/` 四个全局 Context；`src/components/` 通用组件（Layout、PostCard、Composer、usePagedQuery 等）；`src/features/<页面>/` 按页面组织。
 - `simulator/` — 空，第二阶段使用。
-- `data/worlds/<id>/` — 运行时数据（不入 git）：world.db（该世界全部数据）+ world.json（元数据与时钟状态）。复制文件夹 = 备份/平行宇宙。
+- `data/worlds/<id>/` — 运行时数据（不入 git）：world.db（该世界全部数据）+ world.json（元数据与时钟状态）+ media/（该世界全部媒体文件）。复制文件夹 = 备份/平行宇宙。
+- `data/media-search.json` — 实例级搜图配置（不入 git，含 Pixiv refresh token、HTTP 代理、各源 API key）。本机已配置代理 127.0.0.1:7897 与 Pixiv 登录态。
 - 文档：`docs/design.md`（设计决策、架构约束、M5 路线与待办）、`docs/devlog/<日期>.md`（每日开发日志，新一天的工作结束后按既有格式追加一篇）、`plan.md`（最初的项目计划）。
 - `参考文件/` — 用户提供的参考项目（Vue 版 X 克隆，借鉴样式用）与其他资料，**只读，不入 git，不要修改**。
 
@@ -40,6 +41,7 @@ npm workspaces monorepo：
 - **主题系统**：`client/src/index.css` 中 `[data-theme]` 变量块 + `@theme inline` 映射；组件只用 `bg-x-*` 等令牌类，禁止写死颜色。新主题 = 加一个变量块 + `client/src/theme/themes.ts` 注册。
 - **多账号**：客户端 localStorage 存账号数组（token+快照），401 自动剔除失效账号。
 - **i18n**：所有界面文案经 `useI18n().t(key)`，中英文案都在 `client/src/i18n/messages.ts`，新增文案必须双语。
+- **媒体系统**：外部图片一律下载入库不热链；媒体文件 URL 带 `?w=<worldId>` 防跨世界缓存撞号；一条媒体只挂一个帖子（≤4 图或 1 视频不混排）；外链抓取走 `core/safe-fetch.ts`（SSRF 防护）。Fastify 流式响应必须 `return reply.send(stream)`（async handler 竞争会吞空 body）。详见 docs/design.md。
 - 服务端读 JSON 文件须容忍 UTF-8 BOM（已有 readJsonFile 工具）。
 
 ## 环境注意（Windows + PowerShell 5.1）
@@ -49,6 +51,9 @@ npm workspaces monorepo：
 - 单个 PSCustomObject 的 `.Count` 返回空（PS6 才有），断言前用 `@()` 包装。
 - git 多行中文提交信息：写入临时文件后 `git commit -F <file>`（here-string 内英文双引号会拆参数）。
 - Vite 绑定 localhost（IPv6），探测用 `http://localhost:5173` 而非 127.0.0.1。
+- 多部分上传验证用 `curl.exe -F`（`Invoke-RestMethod -Form` 是 PS6+ 才有）；流式接口的断言必须含 body 字节数。
+- PS 5.1 不支持三元运算符与 `&&`；`Invoke-RestMethod` 直接发含中文的 JSON body 会乱码（验证脚本避免中文 body 或改用临时文件）。
+- Node fetch 不走系统代理；外网访问（pixiv/pinterest 等）依赖 data/media-search.json 的 proxy 字段（undici 全局 ProxyAgent）。
 
 ## 工作惯例
 
@@ -59,7 +64,7 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 短期：继续响应用户的 UI/交互打磨需求。
-- 中期：M5 模拟器（ECS 架构虚拟用户、ContentGenerator 接口先模板后 LLM、上帝控制台、数据导出）；其前置后端能力（世界时钟控制 API、虚拟用户管理 API）与无排期待办清单见 docs/design.md 的"后续路线"。
+- 短期：**全站 UX 体验修改**——用户将逐项提出修改清单（先计划确认再动手），这是当前对话周期的工作内容。
+- 中期：M5 模拟器（ECS 架构虚拟用户、ContentGenerator 接口先模板后 LLM、上帝控制台、数据导出）；其前置后端能力（世界时钟控制 API、虚拟用户管理 API）与无排期待办清单见 docs/design.md 的"后续路线"。虚拟用户发图帖的链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 媒体系统四期（A 图片地基 / B 视频 / C URL 引入+OG 链接卡片 / D 关键字搜图）已全部完成，设计细节见 docs/design.md。
 - 未实现的大块：自定义历法换算、生产构建流程。
