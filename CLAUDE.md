@@ -27,7 +27,7 @@ npm workspaces monorepo：
 - `simulator/` — 空，第二阶段使用。
 - `data/worlds/<id>/` — 运行时数据（不入 git）：world.db（该世界全部数据）+ world.json（元数据与时钟状态）+ media/（该世界全部媒体文件）。复制文件夹 = 备份/平行宇宙。
 - `data/media-search.json` — 实例级搜图配置（不入 git，含 Pixiv refresh token、HTTP 代理、各源 API key）。本机已配置代理 127.0.0.1:7897 与 Pixiv 登录态。
-- 文档：`docs/design.md`（设计决策、架构约束、M5 路线与待办）、`docs/devlog/<日期>.md`（每日开发日志，新一天的工作结束后按既有格式追加一篇）、`plan.md`（最初的项目计划）。
+- 文档：`docs/design.md`（设计决策、架构约束、M5 路线与待办）、`docs/devlog/<日期>.md`（每日开发日志，新一天的工作结束后按既有格式追加一篇；当日内容多时主日志只留概要/周期一览/数据状态，细节拆到 `<日期>-<主题>.md` 子日志）、`plan.md`（最初的项目计划）。
 - `参考文件/` — 用户提供的参考项目（Vue 版 X 克隆，借鉴样式用）与其他资料，**只读，不入 git，不要修改**。
 
 ## 关键机制（动代码前必须知道）
