@@ -7,8 +7,13 @@ import { patchAuthorFollow } from '../api/postCache';
 import { useAuth } from '../auth/AuthContext';
 import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
+import { professionLabel } from '../i18n/professions';
 import { Avatar } from './Avatar';
+import { PostContent } from './PostContent';
 import { VerifiedBadge } from './VerifiedBadge';
+
+/** 卡片估算高度：底部剩余空间不足时向上翻转 */
+const CARD_ESTIMATED_HEIGHT = 340;
 
 /**
  * 用户悬浮卡：包住头像/昵称等锚点，悬停 400ms 弹出个人简介概览（X 同款）。
@@ -16,10 +21,12 @@ import { VerifiedBadge } from './VerifiedBadge';
  */
 export function UserHoverCard({ handle, children }: { handle: string; children: ReactNode }) {
   const { user: viewer } = useAuth();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const fmt = useFormatCount();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [flipUp, setFlipUp] = useState(false);
+  const anchorRef = useRef<HTMLSpanElement | null>(null);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -52,11 +59,17 @@ export function UserHoverCard({ handle, children }: { handle: string; children: 
 
   return (
     <span
+      ref={anchorRef}
       className="relative inline-flex"
       onMouseEnter={() => {
         if (closeTimer.current) clearTimeout(closeTimer.current);
         if (openTimer.current) clearTimeout(openTimer.current);
-        openTimer.current = setTimeout(() => setOpen(true), 400);
+        openTimer.current = setTimeout(() => {
+          // 底部空间不足时向上翻转展开
+          const rect = anchorRef.current?.getBoundingClientRect();
+          setFlipUp(rect ? window.innerHeight - rect.bottom < CARD_ESTIMATED_HEIGHT : false);
+          setOpen(true);
+        }, 400);
       }}
       onMouseLeave={() => {
         if (openTimer.current) clearTimeout(openTimer.current);
@@ -67,7 +80,9 @@ export function UserHoverCard({ handle, children }: { handle: string; children: 
       {open && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute top-full left-0 z-40 mt-1 w-72 cursor-default rounded-2xl border border-x-border bg-x-bg p-4 shadow-lg"
+          className={`absolute left-0 z-40 w-72 cursor-default rounded-2xl border border-x-border bg-x-bg p-4 shadow-lg ${
+            flipUp ? 'bottom-full mb-1' : 'top-full mt-1'
+          }`}
         >
           {u ? (
             <>
@@ -97,7 +112,33 @@ export function UserHoverCard({ handle, children }: { handle: string; children: 
               </Link>
               <div className="text-[14px] text-x-dim">@{u.handle}</div>
               {u.bio && (
-                <p className="mt-2 line-clamp-3 text-[14px] whitespace-pre-wrap">{u.bio}</p>
+                <div className="mt-2">
+                  <PostContent content={u.bio} />
+                </div>
+              )}
+              {/* 专业类别与个人链接（设置了才显示） */}
+              {(u.profession || u.website) && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-x-dim">
+                  {u.profession && (
+                    <span className="flex items-center gap-1">
+                      <i className="ri-briefcase-line" />
+                      <span>{professionLabel(u.profession, locale)}</span>
+                    </span>
+                  )}
+                  {u.website && (
+                    <span className="flex items-center gap-1">
+                      <i className="ri-links-line" />
+                      <a
+                        href={u.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-x-blue hover:underline"
+                      >
+                        {u.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+                      </a>
+                    </span>
+                  )}
+                </div>
               )}
               <div className="mt-2 flex gap-4 text-[13px] text-x-dim">
                 <Link to={`/u/${u.handle}/following`} className="hover:underline">
