@@ -28,6 +28,8 @@ import { registerSearchRoutes } from './modules/search/search.routes.js';
 import { SearchService } from './modules/search/search.service.js';
 import { registerTimelineRoutes } from './modules/timeline/timeline.routes.js';
 import { TimelineService } from './modules/timeline/timeline.service.js';
+import { registerToolsRoutes } from './modules/tools/tools.routes.js';
+import { ToolsService } from './modules/tools/tools.service.js';
 import { registerUsersRoutes } from './modules/users/users.routes.js';
 import { UsersService } from './modules/users/users.service.js';
 import { registerWorldsRoutes } from './modules/worlds/worlds.routes.js';
@@ -70,6 +72,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   const mediaService = new MediaService(worldManager);
   const mediaSearchService = new MediaSearchService(worldManager);
+  const toolsService = new ToolsService();
   const linkCardsService = new LinkCardsService(worldManager, mediaService);
   const usersService = new UsersService(worldManager, mediaService);
   const authService = new AuthService(worldManager, usersService);
@@ -93,6 +96,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerWorldsRoutes(app, { worldManager });
   registerMediaRoutes(app, { mediaService, requireAuth });
   registerMediaSearchRoutes(app, { mediaSearchService, requireAuth });
+  registerToolsRoutes(app, { toolsService, requireAuth });
   registerAuthRoutes(app, { authService, worldManager, requireAuth });
   registerUsersRoutes(app, { usersService, requireAuth, optionalAuth });
   registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });

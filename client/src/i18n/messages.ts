@@ -227,6 +227,17 @@ export const messages = {
     'linkCard.play': '播放',
     'linkCard.openOriginal': '打开原链接',
 
+    'videoTools.settingsTitle': '视频工具',
+    'videoTools.intro': '搜索与引入外站视频需要 yt-dlp（下载器）与 ffmpeg（格式处理），点击安装即可自动下载到本机，无需手动配置。',
+    'videoTools.installedVersion': '已安装',
+    'videoTools.latestVersion': '最新',
+    'videoTools.notInstalled': '未安装',
+    'videoTools.updateAvailable': '有更新',
+    'videoTools.install': '安装',
+    'videoTools.update': '更新',
+    'videoTools.extracting': '解压中…',
+    'videoTools.installFailed': '安装失败',
+
     'mediaSearch.title': '搜索图片',
     'mediaSearch.queryPrompt': '输入关键字搜图',
     'mediaSearch.search': '搜索',
@@ -522,6 +533,17 @@ export const messages = {
 
     'linkCard.play': 'Play',
     'linkCard.openOriginal': 'Open original link',
+
+    'videoTools.settingsTitle': 'Video tools',
+    'videoTools.intro': 'Searching and importing external videos requires yt-dlp (downloader) and ffmpeg (format processing). Click install to download them automatically — no manual setup needed.',
+    'videoTools.installedVersion': 'Installed',
+    'videoTools.latestVersion': 'latest',
+    'videoTools.notInstalled': 'Not installed',
+    'videoTools.updateAvailable': 'Update available',
+    'videoTools.install': 'Install',
+    'videoTools.update': 'Update',
+    'videoTools.extracting': 'Extracting…',
+    'videoTools.installFailed': 'Install failed',
 
     'mediaSearch.title': 'Search images',
     'mediaSearch.queryPrompt': 'Search images by keyword',

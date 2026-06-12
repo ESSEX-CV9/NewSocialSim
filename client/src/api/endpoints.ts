@@ -200,7 +200,31 @@ export const api = {
   pixivLoginStatus: () => http<PixivLoginStatus>('GET', '/api/media-search/pixiv/login/status'),
   pixivSubmitCode: (code: string) =>
     http<PixivLoginStatus>('POST', '/api/media-search/pixiv/code', { code }),
+
+  // video tools (yt-dlp / ffmpeg)
+  toolsStatus: () => http<{ tools: ToolStatus[] }>('GET', '/api/tools/status'),
+  toolsLatest: () =>
+    http<{ latest: { ytdlp: string | null; ffmpeg: string | null } }>('GET', '/api/tools/latest'),
+  toolInstall: (id: ToolId) => http<{ job: ToolInstallJob }>('POST', `/api/tools/${id}/install`, {}),
+  toolInstallStatus: (id: ToolId) =>
+    http<{ job: ToolInstallJob | null }>('GET', `/api/tools/${id}/install/status`),
 };
+
+export type ToolId = 'yt-dlp' | 'ffmpeg';
+
+export interface ToolInstallJob {
+  state: 'downloading' | 'extracting' | 'done' | 'error';
+  progress: number;
+  message?: string;
+}
+
+export interface ToolStatus {
+  id: ToolId;
+  installed: boolean;
+  version: string | null;
+  path: string | null;
+  job: ToolInstallJob | null;
+}
 
 /** 搜图候选（与服务端 SearchResult 对应） */
 export interface MediaSearchResult {

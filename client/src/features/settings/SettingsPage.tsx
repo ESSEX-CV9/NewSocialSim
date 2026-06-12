@@ -5,6 +5,7 @@ import type { Locale } from '../../i18n/messages';
 import { THEMES, type ThemeId } from '../../theme/themes';
 import { useTheme } from '../../theme/ThemeContext';
 import { MediaSearchSettings } from './MediaSearchSettings';
+import { VideoToolsSettings } from './VideoToolsSettings';
 
 const LOCALES: { id: Locale; label: string }[] = [
   { id: 'zh-CN', label: '中文' },
@@ -80,6 +81,9 @@ export function SettingsPage() {
 
       {/* 媒体搜索配置（需登录：接口走 requireAuth） */}
       {user && <MediaSearchSettings />}
+
+      {/* 视频工具（yt-dlp/ffmpeg 一键安装，视频搜索与引入的前置依赖） */}
+      {user && <VideoToolsSettings />}
     </div>
   );
 }
