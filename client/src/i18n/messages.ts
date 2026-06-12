@@ -52,6 +52,7 @@ export const messages = {
     'media.viewerClose': '关闭',
     'media.prev': '上一张',
     'media.next': '下一张',
+    'media.viewPost': '查看帖子',
 
     'post.deleted': '此帖子已被删除',
     'post.delete': '删除',
@@ -266,6 +267,7 @@ export const messages = {
     'media.viewerClose': 'Close',
     'media.prev': 'Previous',
     'media.next': 'Next',
+    'media.viewPost': 'View post',
 
     'post.deleted': 'This post has been deleted',
     'post.delete': 'Delete',

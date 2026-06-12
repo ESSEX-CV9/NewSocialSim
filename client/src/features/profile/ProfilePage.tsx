@@ -1,4 +1,4 @@
-import type { UserProfile } from '@socialsim/shared';
+import type { MediaView, UserProfile } from '@socialsim/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -8,6 +8,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
+import { MediaLightbox } from '../../components/MediaLightbox';
 import { PostCard } from '../../components/PostCard';
 import { usePagedQuery } from '../../components/usePagedQuery';
 import { useFormatCount } from '../../i18n/formatCount';
@@ -171,6 +172,12 @@ export function ProfilePage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<ProfileTab>('posts');
+  // 媒体 Tab 的查看器：点击缩略图直接放大（同帖多媒体可左右切换），不跳详情
+  const [mediaViewer, setMediaViewer] = useState<{
+    media: MediaView[];
+    index: number;
+    postId: number;
+  } | null>(null);
 
   const profile = useQuery({
     queryKey: ['user', handle],
@@ -394,10 +401,10 @@ export function ProfilePage() {
           {mediaPosts.isError && <ErrorBox error={mediaPosts.error} />}
           <div className="grid grid-cols-3 gap-0.5 p-0.5">
             {mediaPosts.items.flatMap((post) =>
-              post.media.map((m) => (
+              post.media.map((m, mi) => (
                 <button
                   key={`${post.id}-${m.id}`}
-                  onClick={() => navigate(`/post/${post.id}`)}
+                  onClick={() => setMediaViewer({ media: post.media, index: mi, postId: post.id })}
                   className="relative aspect-square overflow-hidden bg-x-input"
                 >
                   {m.type === 'video' ? (
@@ -420,6 +427,14 @@ export function ProfilePage() {
             isFetching={mediaPosts.isFetchingNextPage}
             onClick={() => void mediaPosts.fetchNextPage()}
           />
+          {mediaViewer && (
+            <MediaLightbox
+              media={mediaViewer.media}
+              initialIndex={mediaViewer.index}
+              postId={mediaViewer.postId}
+              onClose={() => setMediaViewer(null)}
+            />
+          )}
         </>
       )}
       {tab === 'posts' && (
