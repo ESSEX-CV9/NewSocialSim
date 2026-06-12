@@ -241,7 +241,7 @@ export function Layout({ children }: { children: ReactNode }) {
       {composeOpen && (
         <div
           onClick={() => setComposeOpen(false)}
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20"
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-10"
         >
           <div
             onClick={(e) => e.stopPropagation()}
