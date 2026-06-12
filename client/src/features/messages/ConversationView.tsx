@@ -1,6 +1,6 @@
 import type { MessageView } from '@socialsim/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
@@ -8,6 +8,7 @@ import { Avatar } from '../../components/Avatar';
 import { usePagedQuery } from '../../components/usePagedQuery';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useI18n } from '../../i18n/I18nContext';
+import { ConversationInfoModal } from './ConversationInfoModal';
 import { useDmStream } from './DmStreamContext';
 import { MessageBubble } from './MessageBubble';
 import { MessageComposer } from './MessageComposer';
@@ -19,6 +20,7 @@ export function ConversationView({ conversationId }: { conversationId: number })
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { connected } = useDmStream();
+  const [infoOpen, setInfoOpen] = useState(false);
 
   const detailQuery = useQuery({
     queryKey: ['dm-conversation', conversationId],
@@ -168,14 +170,17 @@ export function ConversationView({ conversationId }: { conversationId: number })
           </div>
         </button>
         <button
-          aria-label={t('dm.deleteConversation')}
-          title={t('dm.deleteConversation')}
-          onClick={() => void hideConversation()}
-          className="ml-auto flex size-9 items-center justify-center rounded-full text-x-dim transition-colors duration-200 hover:bg-x-input hover:text-x-red"
+          aria-label={t('dm.conversationInfo')}
+          title={t('dm.conversationInfo')}
+          onClick={() => setInfoOpen(true)}
+          className="ml-auto flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
         >
-          <i className="ri-delete-bin-line text-[17px]" />
+          <i className="ri-more-fill text-[17px]" />
         </button>
       </div>
+      {infoOpen && (
+        <ConversationInfoModal conversation={detail} onClose={() => setInfoOpen(false)} />
+      )}
 
       {/* 消息区 */}
       <div ref={scrollRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-3">

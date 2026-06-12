@@ -22,6 +22,10 @@ function ConversationListItem({
 }) {
   const { t } = useI18n();
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  // 右键上下文菜单（鼠标坐标定位，向上/向左钳制防溢出视口）
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const other = conversation.otherParticipant;
   const last = conversation.lastMessage;
   const unread = conversation.unreadCount > 0;
@@ -35,10 +39,31 @@ function ConversationListItem({
     }
   }
 
+  const deleteConversation = async () => {
+    setMenu(null);
+    if (!window.confirm(t('dm.deleteConversationConfirm'))) return;
+    await api.dmHideConversation(conversation.id);
+    void queryClient.invalidateQueries({ queryKey: ['dm-conversations'] });
+    void queryClient.invalidateQueries({ queryKey: ['dm-unread'] });
+    if (active) navigate('/messages');
+  };
+
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
-      className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors duration-200 hover:bg-x-hover-strong ${
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') onClick();
+      }}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        setMenu({
+          x: Math.min(e.clientX, window.innerWidth - 240),
+          y: Math.min(e.clientY, window.innerHeight - 110),
+        });
+      }}
+      className={`flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left transition-colors duration-200 hover:bg-x-hover-strong ${
         active ? 'border-r-2 border-x-blue bg-x-input' : ''
       }`}
     >
@@ -64,7 +89,45 @@ function ConversationListItem({
         </div>
       </div>
       {unread && <span className="mt-2 size-2.5 shrink-0 rounded-full bg-x-blue" />}
-    </button>
+      {menu && (
+        <>
+          <div
+            className="fixed inset-0 z-40"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenu(null);
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu(null);
+            }}
+          />
+          <div
+            className="fixed z-50 w-56 overflow-hidden rounded-2xl border border-x-border bg-x-card py-1.5 shadow-lg"
+            style={{ left: menu.x, top: menu.y }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setMenu(null);
+                window.open(`/messages/${conversation.id}`, '_blank');
+              }}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+            >
+              <i className="ri-external-link-line text-[17px]" />
+              {t('dm.openInNewTab')}
+            </button>
+            <button
+              onClick={() => void deleteConversation()}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold text-x-red transition-colors duration-200 hover:bg-x-hover-strong"
+            >
+              <i className="ri-delete-bin-line text-[17px]" />
+              {t('dm.deleteConversation')}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 
