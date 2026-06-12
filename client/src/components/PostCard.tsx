@@ -13,6 +13,7 @@ import { LinkCard } from './LinkCard';
 import { VerifiedBadge } from './VerifiedBadge';
 import { MediaGrid } from './MediaGrid';
 import { TimeAgo } from './TimeAgo';
+import { UserHoverCard } from './UserHoverCard';
 import { useViewTracking } from './useViewTracking';
 
 /** 帖子正文：URL 转外链，#话题 转搜索链接，@用户名 转主页链接（个人简介等处复用） */
@@ -89,9 +90,13 @@ function QuotedCard({ quoted }: { quoted: PostView }) {
       className="mt-2 cursor-pointer rounded-xl border-2 border-x-border p-3 transition-colors duration-200 hover:bg-x-hover"
     >
       <div className="mb-1 flex items-center gap-1.5 text-[15px]">
-        <Avatar handle={quoted.author.handle} avatarUrl={quoted.author.avatarUrl} size={20} />
-        <span className="font-bold">{quoted.author.displayName}</span>
-        <VerifiedBadge verified={quoted.author.verified} />
+        <UserHoverCard handle={quoted.author.handle}>
+          <span className="flex items-center gap-1.5">
+            <Avatar handle={quoted.author.handle} avatarUrl={quoted.author.avatarUrl} size={20} />
+            <span className="font-bold">{quoted.author.displayName}</span>
+            <VerifiedBadge verified={quoted.author.verified} />
+          </span>
+        </UserHoverCard>
         <span className="text-x-dim">@{quoted.author.handle}</span>
         <span className="text-x-dim">·</span>
         <TimeAgo at={quoted.createdAt} />
@@ -316,27 +321,37 @@ export function PostCard({
       {repostedBy && (
         <div className="mb-1 ml-8 flex items-center gap-2 text-[13px] font-bold text-x-dim">
           <i className="ri-repeat-2-line" />
-          {t('timeline.repostedBy', { name: repostedBy.displayName })}
+          <UserHoverCard handle={repostedBy.handle}>
+            <span>
+              {user && repostedBy.id === user.id
+                ? t('timeline.repostedByYou')
+                : t('timeline.repostedBy', { name: repostedBy.displayName })}
+            </span>
+          </UserHoverCard>
         </div>
       )}
       <div className="flex gap-3">
         <div className="flex flex-col items-center">
-          <Link to={`/u/${post.author.handle}`} onClick={stop}>
-            <Avatar handle={post.author.handle} avatarUrl={post.author.avatarUrl} />
-          </Link>
+          <UserHoverCard handle={post.author.handle}>
+            <Link to={`/u/${post.author.handle}`} onClick={stop}>
+              <Avatar handle={post.author.handle} avatarUrl={post.author.avatarUrl} />
+            </Link>
+          </UserHoverCard>
           {/* 对话串连接线：从头像下缘延伸到卡片底部，与下方回复卡的头像相接 */}
           {threadTop && <div className="mt-1 -mb-3 w-0.5 flex-1 bg-x-border" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-x-1 text-[15px]">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1">
-              <Link
-                to={`/u/${post.author.handle}`}
-                onClick={stop}
-                className="font-bold hover:underline"
-              >
-                {post.author.displayName}
-              </Link>
+              <UserHoverCard handle={post.author.handle}>
+                <Link
+                  to={`/u/${post.author.handle}`}
+                  onClick={stop}
+                  className="font-bold hover:underline"
+                >
+                  {post.author.displayName}
+                </Link>
+              </UserHoverCard>
               <VerifiedBadge verified={post.author.verified} />
               {post.author.isBot && (
                 <span className="ml-0.5 rounded bg-x-input px-1 text-xs text-x-dim">

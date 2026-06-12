@@ -83,6 +83,7 @@ export const messages = {
     'timeline.suggestions': '推荐关注',
     'timeline.followerCount': '{n} 位粉丝',
     'timeline.repostedBy': '{name} 转发了',
+    'timeline.repostedByYou': '你已转帖',
 
     'common.loadMore': '加载更多',
     'common.loading': '加载中…',
@@ -321,6 +322,7 @@ export const messages = {
     'timeline.suggestions': 'Who to follow',
     'timeline.followerCount': '{n} followers',
     'timeline.repostedBy': '{name} reposted',
+    'timeline.repostedByYou': 'You reposted',
 
     'common.loadMore': 'Load more',
     'common.loading': 'Loading…',
