@@ -201,6 +201,60 @@ const migrations: Migration[] = [
       ALTER TABLE users ADD COLUMN verified_at INTEGER;
     `,
   },
+  {
+    version: 11,
+    name: 'direct-messages',
+    sql: `
+      CREATE TABLE conversations (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        type            TEXT    NOT NULL DEFAULT 'dm',
+        dm_key          TEXT    UNIQUE,
+        created_by      INTEGER NOT NULL REFERENCES users(id),
+        created_at      INTEGER NOT NULL,
+        last_message_id INTEGER,
+        last_message_at INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_conversations_last ON conversations(last_message_at DESC);
+
+      CREATE TABLE conversation_participants (
+        conversation_id      INTEGER NOT NULL REFERENCES conversations(id),
+        user_id              INTEGER NOT NULL REFERENCES users(id),
+        state                TEXT    NOT NULL DEFAULT 'inbox',
+        last_read_message_id INTEGER NOT NULL DEFAULT 0,
+        hidden_at            INTEGER,
+        joined_at            INTEGER NOT NULL,
+        PRIMARY KEY (conversation_id, user_id)
+      );
+      CREATE INDEX idx_participants_user ON conversation_participants(user_id, state);
+
+      CREATE TABLE messages (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        conversation_id INTEGER NOT NULL REFERENCES conversations(id),
+        sender_id       INTEGER NOT NULL REFERENCES users(id),
+        content         TEXT    NOT NULL DEFAULT '',
+        created_at      INTEGER NOT NULL,
+        deleted         INTEGER NOT NULL DEFAULT 0
+      );
+      CREATE INDEX idx_messages_conv ON messages(conversation_id, id DESC);
+
+      CREATE TABLE message_media (
+        message_id INTEGER NOT NULL REFERENCES messages(id),
+        media_id   INTEGER NOT NULL REFERENCES media(id),
+        position   INTEGER NOT NULL,
+        PRIMARY KEY (message_id, position)
+      );
+      CREATE INDEX idx_message_media_media ON message_media(media_id);
+
+      CREATE TABLE message_reactions (
+        message_id INTEGER NOT NULL REFERENCES messages(id),
+        user_id    INTEGER NOT NULL REFERENCES users(id),
+        emoji      TEXT    NOT NULL,
+        created_at INTEGER NOT NULL,
+        PRIMARY KEY (message_id, user_id)
+      );
+      CREATE INDEX idx_message_reactions_msg ON message_reactions(message_id);
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {
