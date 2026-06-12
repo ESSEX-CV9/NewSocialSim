@@ -2,6 +2,8 @@ import {
   MESSAGE_REACTION_EMOJIS,
   type ConversationDetailView,
   type ConversationView,
+  type DmConversationFilter,
+  type DmSearchResults,
   type DmStreamEvent,
   type DmUnreadCount,
   type MessageReactionView,
@@ -30,6 +32,9 @@ const MAX_PAGE_SIZE = 50;
 const MAX_CONTENT_LENGTH = 1000;
 /** 会话列表预览截断长度 */
 const PREVIEW_LENGTH = 80;
+/** 私信搜索各段返回上限（不分页） */
+const SEARCH_CONVERSATION_LIMIT = 10;
+const SEARCH_MESSAGE_LIMIT = 20;
 
 /** DM 实时事件发布口：B3 由 SseHub 实现；缺省 no-op（虚拟用户走纯轮询不受影响） */
 export interface DmEventPublisher {
@@ -78,7 +83,7 @@ export class MessagesService {
 
   listConversations(
     viewerId: number,
-    filter: 'inbox' | 'requests' = 'inbox',
+    filter: DmConversationFilter = 'inbox',
     cursor?: string,
     limit?: number,
   ): Page<ConversationView> {
@@ -166,9 +171,9 @@ export class MessagesService {
       if (isFirstMessage && !messagesRepo.recipientFollowsSender(db, other.user_id, viewerId)) {
         messagesRepo.updateParticipantState(db, conversationId, other.user_id, 'request');
       }
-      // 在请求态会话中回复 = 隐式接受
+      // 在请求态会话中回复 = 隐式接受（含解除隐藏）
       if (me.state === 'request') {
-        messagesRepo.updateParticipantState(db, conversationId, viewerId, 'inbox');
+        messagesRepo.acceptRequest(db, conversationId, viewerId);
       }
       // 自己发的消息天然已读
       messagesRepo.updateLastRead(db, conversationId, viewerId, id);
@@ -205,11 +210,11 @@ export class MessagesService {
     return { lastReadMessageId: value };
   }
 
-  /** 接受消息请求；幂等 */
+  /** 接受消息请求（含从"隐藏"恢复被拒绝的请求）；幂等 */
   acceptRequest(viewerId: number, conversationId: number): ConversationDetailView {
     const { db } = this.worldManager.current();
     this.requireParticipant(conversationId, viewerId);
-    messagesRepo.updateParticipantState(db, conversationId, viewerId, 'inbox');
+    messagesRepo.acceptRequest(db, conversationId, viewerId);
     return this.getConversation(viewerId, conversationId);
   }
 
@@ -273,6 +278,40 @@ export class MessagesService {
   unreadCount(viewerId: number): DmUnreadCount {
     const { db } = this.worldManager.current();
     return messagesRepo.unreadCounts(db, viewerId);
+  }
+
+  /** 收件箱全部标为已读（请求态会话不动，接受前不暴露已读） */
+  markAllRead(viewerId: number): void {
+    const { db } = this.worldManager.current();
+    messagesRepo.markAllRead(db, viewerId);
+  }
+
+  /** 私信搜索：按对方用户名/昵称命中会话 + 按内容命中消息（各取前若干，不分页） */
+  search(viewerId: number, query: string): DmSearchResults {
+    const q = query.trim();
+    if (q.length === 0) throw new ValidationError('搜索关键词不能为空');
+    const { db, worldId } = this.worldManager.current();
+    const conversations = messagesRepo
+      .searchConversations(db, viewerId, q, SEARCH_CONVERSATION_LIMIT)
+      .map((r) => toConversationView(r, worldId));
+    const messages = messagesRepo
+      .searchMessages(db, viewerId, q, SEARCH_MESSAGE_LIMIT)
+      .map((r) => ({
+        conversationId: r.conversation_id,
+        messageId: r.message_id,
+        excerpt: r.content.slice(0, PREVIEW_LENGTH),
+        senderId: r.sender_id,
+        otherParticipant: {
+          id: r.other_user_id,
+          handle: r.other_handle,
+          displayName: r.other_display_name,
+          isBot: r.other_is_bot === 1,
+          avatarUrl: mediaFileUrl(r.other_avatar_media_id, worldId),
+          verified: r.other_verified as VerifiedType,
+        },
+        createdAt: r.created_at,
+      }));
+    return { conversations, messages };
   }
 
   /** 参与者校验；非参与者一律 404（不泄露会话存在性） */

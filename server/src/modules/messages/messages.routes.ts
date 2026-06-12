@@ -1,4 +1,4 @@
-import { MESSAGE_REACTION_EMOJIS } from '@socialsim/shared';
+import { MESSAGE_REACTION_EMOJIS, type DmConversationFilter } from '@socialsim/shared';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { AuthTokenPayload } from '../../core/auth/auth-guard.js';
 import { UnauthorizedError } from '../../core/errors/app-error.js';
@@ -23,10 +23,17 @@ const listConversationsQuerySchema = {
   type: 'object',
   additionalProperties: false,
   properties: {
-    filter: { type: 'string', enum: ['inbox', 'requests'] },
+    filter: { type: 'string', enum: ['inbox', 'unread', 'requests', 'hidden'] },
     cursor: { type: 'string' },
     limit: { type: 'integer', minimum: 1, maximum: 50 },
   },
+} as const;
+
+const searchQuerySchema = {
+  type: 'object',
+  required: ['q'],
+  additionalProperties: false,
+  properties: { q: { type: 'string', minLength: 1, maxLength: 100 } },
 } as const;
 
 const pageQuerySchema = {
@@ -91,12 +98,18 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
     { ...auth, schema: { body: createConversationBodySchema } },
     controller.createConversation,
   );
-  app.get<{ Querystring: { filter?: 'inbox' | 'requests'; cursor?: string; limit?: number } }>(
+  app.get<{ Querystring: { filter?: DmConversationFilter; cursor?: string; limit?: number } }>(
     '/api/messages/conversations',
     { ...auth, schema: { querystring: listConversationsQuerySchema } },
     controller.listConversations,
   );
   app.get('/api/messages/unread-count', auth, controller.unreadCount);
+  app.post('/api/messages/read-all', auth, controller.markAllRead);
+  app.get<{ Querystring: { q: string } }>(
+    '/api/messages/search',
+    { ...auth, schema: { querystring: searchQuerySchema } },
+    controller.search,
+  );
   app.get<{ Params: { id: number } }>(
     '/api/messages/conversations/:id',
     { ...auth, schema: { params: idParamsSchema } },

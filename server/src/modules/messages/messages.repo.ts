@@ -1,5 +1,10 @@
-import type { ConversationState } from '@socialsim/shared';
+import type { ConversationState, DmConversationFilter } from '@socialsim/shared';
 import type { WorldDb } from '../../core/db/database.js';
+
+/** LIKE 通配符转义：让用户输入的 % _ 按字面匹配 */
+function escapeLike(q: string): string {
+  return q.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
 
 /** conversations 表原始行 */
 export interface ConversationRow {
@@ -60,6 +65,21 @@ export interface ReactionRow {
   message_id: number;
   user_id: number;
   emoji: string;
+}
+
+/** 私信消息搜索命中行：消息 + 所属会话的对方用户摘要 */
+export interface MessageSearchRow {
+  message_id: number;
+  conversation_id: number;
+  content: string;
+  sender_id: number;
+  created_at: number;
+  other_user_id: number;
+  other_handle: string;
+  other_display_name: string;
+  other_is_bot: number;
+  other_avatar_media_id: number | null;
+  other_verified: string;
 }
 
 /** 隐藏的会话不出现在列表与未读统计；对方再发消息（last_message_at 推进）后自然重现 */
@@ -191,11 +211,17 @@ export const messagesRepo = {
   listConversations(
     db: WorldDb,
     userId: number,
-    filter: 'inbox' | 'requests',
+    filter: DmConversationFilter,
     cursor: { ts: number; id: number } | null,
     limit: number,
   ): ConversationListRow[] {
-    const stateClause = filter === 'requests' ? "AND cp.state = 'request'" : "AND cp.state = 'inbox'";
+    // hidden = 已拒绝的请求（state 仍为 request 且被自己隐藏），其余过滤器都排除隐藏会话
+    const filterClause = {
+      inbox: `AND cp.state = 'inbox' ${NOT_HIDDEN}`,
+      unread: `AND cp.state = 'inbox' ${NOT_HIDDEN} AND ${UNREAD_COUNT_SQL} > 0`,
+      requests: `AND cp.state = 'request' ${NOT_HIDDEN}`,
+      hidden: `AND cp.state = 'request' AND cp.hidden_at IS NOT NULL AND c.last_message_at <= cp.hidden_at`,
+    }[filter];
     const cursorClause =
       cursor !== null
         ? 'AND (c.last_message_at < @cursorTs OR (c.last_message_at = @cursorTs AND c.id < @cursorId))'
@@ -204,7 +230,7 @@ export const messagesRepo = {
       .prepare(
         `${CONVERSATION_SELECT}
            AND c.last_message_id IS NOT NULL
-           ${stateClause} ${NOT_HIDDEN} ${cursorClause}
+           ${filterClause} ${cursorClause}
          ORDER BY c.last_message_at DESC, c.id DESC
          LIMIT @limit`,
       )
@@ -213,6 +239,54 @@ export const messagesRepo = {
         limit,
         ...(cursor !== null ? { cursorTs: cursor.ts, cursorId: cursor.id } : {}),
       }) as ConversationListRow[];
+  },
+
+  /** 收件箱全部标为已读：各会话的已读位置推进到其最新消息（只增不减） */
+  markAllRead(db: WorldDb, userId: number): void {
+    db.prepare(
+      `UPDATE conversation_participants
+       SET last_read_message_id = MAX(
+         last_read_message_id,
+         COALESCE((SELECT c.last_message_id FROM conversations c WHERE c.id = conversation_id), 0)
+       )
+       WHERE user_id = @userId AND state = 'inbox'`,
+    ).run({ userId });
+  },
+
+  /** 按对方用户名/昵称搜自己的会话（含请求态，排除隐藏） */
+  searchConversations(db: WorldDb, userId: number, query: string, limit: number): ConversationListRow[] {
+    return db
+      .prepare(
+        `${CONVERSATION_SELECT}
+           AND c.last_message_id IS NOT NULL ${NOT_HIDDEN}
+           AND (u.handle LIKE @pattern ESCAPE '\\' OR u.display_name LIKE @pattern ESCAPE '\\')
+         ORDER BY c.last_message_at DESC, c.id DESC
+         LIMIT @limit`,
+      )
+      .all({ userId, pattern: `%${escapeLike(query)}%`, limit }) as ConversationListRow[];
+  },
+
+  /** 按内容搜自己全部会话里的消息（排除墓碑与隐藏会话），新消息在前 */
+  searchMessages(db: WorldDb, userId: number, query: string, limit: number): MessageSearchRow[] {
+    return db
+      .prepare(
+        `SELECT m.id AS message_id, m.conversation_id, m.content, m.sender_id, m.created_at,
+                u.id              AS other_user_id,
+                u.handle          AS other_handle,
+                u.display_name    AS other_display_name,
+                u.is_bot          AS other_is_bot,
+                u.avatar_media_id AS other_avatar_media_id,
+                u.verified        AS other_verified
+         FROM messages m
+         JOIN conversations c ON c.id = m.conversation_id
+         JOIN conversation_participants cp ON cp.conversation_id = m.conversation_id AND cp.user_id = @userId
+         JOIN conversation_participants op ON op.conversation_id = m.conversation_id AND op.user_id != @userId
+         JOIN users u ON u.id = op.user_id
+         WHERE m.deleted = 0 AND m.content LIKE @pattern ESCAPE '\\' ${NOT_HIDDEN}
+         ORDER BY m.id DESC
+         LIMIT @limit`,
+      )
+      .all({ userId, pattern: `%${escapeLike(query)}%`, limit }) as MessageSearchRow[];
   },
 
   /** 导航角标：主收件箱含未读的会话数 + 待处理请求会话数 */
@@ -310,6 +384,14 @@ export const messagesRepo = {
     db.prepare(
       'UPDATE conversation_participants SET state = ? WHERE conversation_id = ? AND user_id = ?',
     ).run(state, conversationId, userId);
+  },
+
+  /** 接受请求（显式或回复隐式）：转入收件箱并解除隐藏（拒绝过的请求可从"隐藏"里恢复） */
+  acceptRequest(db: WorldDb, conversationId: number, userId: number): void {
+    db.prepare(
+      `UPDATE conversation_participants SET state = 'inbox', hidden_at = NULL
+       WHERE conversation_id = ? AND user_id = ?`,
+    ).run(conversationId, userId);
   },
 
   /** 已读位置只增不减（幂等、防乱序请求回退） */

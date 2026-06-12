@@ -11,6 +11,7 @@
   --th-card: #16181c;
   --th-input: #202327;
   --th-hover: rgba(231, 233, 234, 0.03);
+  --th-hover-strong: rgba(231, 233, 234, 0.08);
   --th-border: #2f3336;
   --th-text: #e7e9ea;
   --th-dim: #71767b;
@@ -28,6 +29,7 @@
   --th-card: #f7f9f9;
   --th-input: #eff3f4;
   --th-hover: rgba(15, 20, 25, 0.03);
+  --th-hover-strong: rgba(15, 20, 25, 0.08);
   --th-border: #eff3f4;
   --th-text: #0f1419;
   --th-dim: #536471;
@@ -45,6 +47,7 @@
   --color-x-card: var(--th-card);
   --color-x-input: var(--th-input);
   --color-x-hover: var(--th-hover);
+  --color-x-hover-strong: var(--th-hover-strong);
   --color-x-border: var(--th-border);
   --color-x-text: var(--th-text);
   --color-x-dim: var(--th-dim);

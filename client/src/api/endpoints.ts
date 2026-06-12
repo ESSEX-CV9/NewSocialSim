@@ -4,6 +4,8 @@ import type {
   ConversationDetailView,
   ConversationView,
   CreatePostRequest,
+  DmConversationFilter,
+  DmSearchResults,
   DmUnreadCount,
   LoginRequest,
   MediaView,
@@ -119,8 +121,11 @@ export const api = {
   markRead: (ids: number[]) => http<void>('POST', '/api/notifications/read', { ids }),
 
   // direct messages
-  dmConversations: (filter: 'inbox' | 'requests', cursor?: string) =>
+  dmConversations: (filter: DmConversationFilter, cursor?: string) =>
     http<Page<ConversationView>>('GET', withPage('/api/messages/conversations', cursor, { filter })),
+  dmSearch: (q: string) =>
+    http<DmSearchResults>('GET', `/api/messages/search?q=${encodeURIComponent(q)}`),
+  dmMarkAllRead: () => http<void>('POST', '/api/messages/read-all', {}),
   dmFindOrCreate: (userId: number) =>
     http<{ conversation: ConversationDetailView }>('POST', '/api/messages/conversations', { userId }),
   dmGetConversation: (id: number) =>

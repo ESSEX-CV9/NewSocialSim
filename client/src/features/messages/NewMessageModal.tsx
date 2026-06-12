@@ -1,4 +1,5 @@
 import type { UserSummary } from '@socialsim/shared';
+import { useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/endpoints';
@@ -7,7 +8,7 @@ import { Avatar } from '../../components/Avatar';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useI18n } from '../../i18n/I18nContext';
 
-/** 新建私信弹窗：搜索用户（300ms 防抖）→ 找或建会话 → 跳转 */
+/** 新建私信弹窗（居中）：默认候选为我关注的人，输入后切换为用户搜索（300ms 防抖） */
 export function NewMessageModal({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const { user } = useAuth();
@@ -16,6 +17,13 @@ export function NewMessageModal({ onClose }: { onClose: () => void }) {
   const [results, setResults] = useState<UserSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // 默认候选：我关注的人（X 同款）
+  const following = useQuery({
+    queryKey: ['dm-follow-candidates', user?.handle],
+    queryFn: () => api.following(user!.handle),
+    enabled: !!user,
+  });
 
   useEffect(() => {
     const keyword = q.trim();
@@ -31,6 +39,8 @@ export function NewMessageModal({ onClose }: { onClose: () => void }) {
     }, 300);
     return () => clearTimeout(timer);
   }, [q, user?.id]);
+
+  const candidates = q.trim().length > 0 ? results : (following.data?.items ?? []);
 
   const pick = async (target: UserSummary) => {
     if (busy) return;
@@ -49,11 +59,11 @@ export function NewMessageModal({ onClose }: { onClose: () => void }) {
   return (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="flex max-h-[70vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-x-border bg-x-bg"
+        className="flex h-[65vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-x-border bg-x-bg"
       >
         <div className="flex items-center gap-4 p-3">
           <button
@@ -76,12 +86,12 @@ export function NewMessageModal({ onClose }: { onClose: () => void }) {
         </div>
         {error && <div className="px-4 py-2 text-sm text-x-red">{error}</div>}
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-1">
-          {results.map((u) => (
+          {candidates.map((u) => (
             <button
               key={u.id}
               disabled={busy}
               onClick={() => void pick(u)}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-x-input disabled:opacity-60"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 hover:bg-x-hover-strong disabled:opacity-60"
             >
               <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={40} />
               <div className="min-w-0">

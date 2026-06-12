@@ -135,6 +135,27 @@ Assert "删除会话后列表为空" (@((Invoke-RestMethod "$api/messages/conver
 Post-Json "$api/messages/conversations/$($c12.id)/messages" @{ content = 'are you there' } $u1 | Out-Null
 Assert "对方再发消息会话重现" (@((Invoke-RestMethod "$api/messages/conversations" -Headers $u2).items).Count -eq 1)
 
+# --- 过滤器 / 全部已读 / 搜索 ---
+Assert "unread 过滤含未读会话" (@((Invoke-RestMethod "$api/messages/conversations?filter=unread" -Headers $u2).items).Count -eq 1)
+Invoke-RestMethod -Method Post -Uri "$api/messages/read-all" -Headers $u2 -ContentType $json -Body '{}' | Out-Null
+Assert "全部已读后 unread 过滤为空" (@((Invoke-RestMethod "$api/messages/conversations?filter=unread" -Headers $u2).items).Count -eq 0)
+Assert "全部已读后角标清零" ((Invoke-RestMethod "$api/messages/unread-count" -Headers $u2).count -eq 0)
+$sr = Invoke-RestMethod "$api/messages/search?q=$h1" -Headers $u2
+Assert "搜索按对方用户名命中会话" (@($sr.conversations).Count -eq 1 -and $sr.conversations[0].id -eq $c12.id)
+$sr2 = Invoke-RestMethod "$api/messages/search?q=$([uri]::EscapeDataString('are you there'))" -Headers $u2
+Assert "搜索按内容命中消息" (@($sr2.messages).Count -ge 1 -and $sr2.messages[0].conversationId -eq $c12.id)
+Assert "搜索不命中墓碑" (@((Invoke-RestMethod "$api/messages/search?q=hello" -Headers $u2).messages).Count -eq 0)
+
+# --- 隐藏的请求（拒绝后进"隐藏"，可从中恢复）---
+$c32 = (Post-Json "$api/messages/conversations" @{ userId = $uid[$h2] } $u3).conversation
+Post-Json "$api/messages/conversations/$($c32.id)/messages" @{ content = 'request to hide' } $u3 | Out-Null
+Invoke-RestMethod -Method Delete -Uri "$api/messages/conversations/$($c32.id)" -Headers $u2 | Out-Null
+Assert "拒绝的请求进 hidden 过滤" (@((Invoke-RestMethod "$api/messages/conversations?filter=hidden" -Headers $u2).items).Count -eq 1)
+Assert "拒绝后不在 requests" (@((Invoke-RestMethod "$api/messages/conversations?filter=requests" -Headers $u2).items).Count -eq 0)
+Post-Json "$api/messages/conversations/$($c32.id)/accept" @{} $u2 | Out-Null
+Assert "从隐藏接受后回收件箱" (@((Invoke-RestMethod "$api/messages/conversations?filter=inbox" -Headers $u2).items | Where-Object { $_.id -eq $c32.id }).Count -eq 1)
+Assert "接受后 hidden 为空" (@((Invoke-RestMethod "$api/messages/conversations?filter=hidden" -Headers $u2).items).Count -eq 0)
+
 # --- 媒体：发图与互斥占用 ---
 $pngPath = Join-Path $env:TEMP 'dm-verify-1px.png'
 [System.IO.File]::WriteAllBytes($pngPath, [Convert]::FromBase64String('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='))

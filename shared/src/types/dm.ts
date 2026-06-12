@@ -76,6 +76,29 @@ export interface DmUnreadCount {
   requestCount: number;
 }
 
+/**
+ * 会话列表过滤器：inbox 收件箱全部 / unread 收件箱未读 /
+ * requests 待处理请求 / hidden 已拒绝（隐藏）的请求（对方再发消息会回到 requests）
+ */
+export type DmConversationFilter = 'inbox' | 'unread' | 'requests' | 'hidden';
+
+/** 私信搜索：命中消息（点击跳转所属会话） */
+export interface DmMessageMatch {
+  conversationId: number;
+  messageId: number;
+  /** 命中消息的内容截断 */
+  excerpt: string;
+  senderId: number;
+  otherParticipant: UserSummary;
+  createdAt: number;
+}
+
+/** 私信搜索结果：按对方用户名/昵称命中的会话 + 按内容命中的消息 */
+export interface DmSearchResults {
+  conversations: ConversationView[];
+  messages: DmMessageMatch[];
+}
+
 /** SSE 推送事件（data 为 JSON；event 字段即 type） */
 export type DmStreamEvent =
   | { type: 'message:new'; conversationId: number; message: MessageView }

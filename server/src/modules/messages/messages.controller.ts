@@ -1,3 +1,4 @@
+import type { DmConversationFilter } from '@socialsim/shared';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { MessagesService } from './messages.service.js';
 
@@ -13,7 +14,7 @@ export class MessagesController {
 
   listConversations = async (
     req: FastifyRequest<{
-      Querystring: { filter?: 'inbox' | 'requests'; cursor?: string; limit?: number };
+      Querystring: { filter?: DmConversationFilter; cursor?: string; limit?: number };
     }>,
     reply: FastifyReply,
   ) => {
@@ -103,5 +104,14 @@ export class MessagesController {
 
   unreadCount = async (req: FastifyRequest, reply: FastifyReply) => {
     reply.send(this.service.unreadCount(req.user.sub));
+  };
+
+  markAllRead = async (req: FastifyRequest, reply: FastifyReply) => {
+    this.service.markAllRead(req.user.sub);
+    reply.status(204).send();
+  };
+
+  search = async (req: FastifyRequest<{ Querystring: { q: string } }>, reply: FastifyReply) => {
+    reply.send(this.service.search(req.user.sub, req.query.q));
   };
 }
