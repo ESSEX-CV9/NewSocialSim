@@ -158,8 +158,10 @@ export function MediaLightbox({
   postId?: number;
 }) {
   const { t } = useI18n();
+  const queryClient = useQueryClient();
   const [index, setIndex] = useState(initialIndex);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [replyOpen, setReplyOpen] = useState(false);
   const current = media[index];
 
   const post = useQuery({
@@ -267,10 +269,10 @@ export function MediaLightbox({
             </div>
           )}
         </div>
-        {/* 媒体下方互动栏（与时间线一致，写穿共享缓存） */}
+        {/* 媒体下方互动栏（与时间线一致，写穿共享缓存）；贴底所以转发菜单向上弹 */}
         {view !== undefined && !view.deleted && (
           <div onClick={stop} className="mx-auto w-full max-w-150 px-8 pb-3">
-            <PostActions post={view} onReply={() => setPanelOpen(true)} />
+            <PostActions post={view} menuUp onReply={() => setReplyOpen(true)} />
           </div>
         )}
       </div>
@@ -283,6 +285,47 @@ export function MediaLightbox({
         >
           <PostPanel postId={postId!} />
         </aside>
+      )}
+
+      {/* 互动栏回复按钮的回复弹窗（X 同款） */}
+      {replyOpen && view !== undefined && (
+        <div
+          onClick={(e) => {
+            stop(e);
+            setReplyOpen(false);
+          }}
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20"
+        >
+          <div onClick={stop} className="w-full max-w-xl rounded-2xl border border-x-border bg-x-bg">
+            <div className="flex items-center p-2">
+              <button
+                onClick={(e) => {
+                  stop(e);
+                  setReplyOpen(false);
+                }}
+                className="flex size-9 items-center justify-center rounded-full text-x-text transition-colors duration-200 hover:bg-x-input"
+              >
+                <i className="ri-close-line text-[18px]" />
+              </button>
+            </div>
+            <div className="px-4 text-[14px] text-x-dim">
+              {t('post.replyingTo', { handle: view.author.handle })}
+            </div>
+            <Composer
+              replyToId={view.id}
+              placeholder={t('composer.replyPlaceholder')}
+              buttonText={t('composer.reply')}
+              autoFocus
+              bordered={false}
+              onPosted={() => {
+                setReplyOpen(false);
+                patchPostById(queryClient, view.id, (p) => ({ replyCount: p.replyCount + 1 }));
+                void queryClient.invalidateQueries({ queryKey: ['replies', view.id] });
+                void queryClient.invalidateQueries({ queryKey: ['post', view.id] });
+              }}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

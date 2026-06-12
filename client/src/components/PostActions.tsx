@@ -63,9 +63,12 @@ export function ActionButton({
 export function PostActions({
   post,
   onReply,
+  menuUp,
 }: {
   post: PostView;
   onReply?: (() => void) | undefined;
+  /** 转发菜单向上弹出（贴屏幕底的场景，如媒体查看器的互动栏） */
+  menuUp?: boolean | undefined;
 }) {
   const { user } = useAuth();
   const { t } = useI18n();
@@ -149,7 +152,11 @@ export function PostActions({
                     setRepostMenuOpen(false);
                   }}
                 />
-                <div className="absolute top-6 left-0 z-30 w-36 overflow-hidden rounded-xl border border-x-border bg-x-card shadow-lg">
+                <div
+                  className={`absolute left-0 z-30 w-36 overflow-hidden rounded-xl border border-x-border bg-x-card shadow-lg ${
+                    menuUp ? 'bottom-6' : 'top-6'
+                  }`}
+                >
                   <button
                     onClick={(e) => {
                       stop(e);
