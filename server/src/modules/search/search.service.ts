@@ -54,7 +54,8 @@ export class SearchService {
   }
 
   users(query: string, cursor?: string, limit?: number): Page<UserSummary> {
-    const q = normalizeQuery(query);
+    // 用户习惯输入 @handle 形式，前导 @ 不参与匹配（否则进 LIKE 当字面量必然落空）
+    const q = normalizeQuery(query.trim().replace(/^@+/, ''));
     const { db, worldId } = this.worldManager.current();
     const pageSize = clampLimit(limit);
     const rows = searchRepo.searchUsers(db, q, parseIdCursor(cursor), pageSize + 1);

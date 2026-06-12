@@ -146,7 +146,7 @@ export function MessageComposer({
               void send();
             }
           }}
-          className="max-h-40 min-w-0 flex-1 resize-none self-center bg-transparent py-1 text-[15px] outline-none placeholder:text-x-dim"
+          className="themed-scrollbar max-h-40 min-w-0 flex-1 resize-none self-center bg-transparent py-1 text-[15px] outline-none placeholder:text-x-dim"
         />
         <button
           aria-label={t('dm.send')}

@@ -121,3 +121,23 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* 主题化细滚动条（私信输入框等）：轨道常驻防布局抖动，滑块颜色随主题 */
+.themed-scrollbar {
+  overflow-y: scroll;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--th-dim) 55%, transparent) transparent;
+}
+.themed-scrollbar::-webkit-scrollbar {
+  width: 7px;
+}
+.themed-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--th-dim) 55%, transparent);
+  border-radius: 4px;
+}
+.themed-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--th-dim);
+}
+.themed-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}

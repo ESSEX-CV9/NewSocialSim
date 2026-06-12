@@ -216,6 +216,16 @@ export function ProfilePage() {
     void queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
   };
 
+  /** 私信按钮：找或建与该用户的会话并跳转（屏蔽等不可发起时弹错误提示） */
+  const openDm = async () => {
+    try {
+      const res = await api.dmFindOrCreate(u.id);
+      navigate(`/messages/${res.conversation.id}`);
+    } catch (e) {
+      window.alert(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   /** "获得认证"下拉直接套用认证类型（本人页） */
   const applyVerified = async (v: VerifiedType) => {
     setVerifyMenuOpen(false);
@@ -311,7 +321,7 @@ export function ProfilePage() {
           >
             <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={80} />
           </div>
-          <div className="mt-13 pt-1">
+          <div className="mt-13 flex items-center gap-2 pt-1">
             {isMe ? (
               <button
                 onClick={() => setEditing((v) => !v)}
@@ -329,16 +339,26 @@ export function ProfilePage() {
                   {t('profile.unblock')}
                 </button>
               ) : (
-                <button
-                  onClick={() => void toggleFollow()}
-                  className={`rounded-full px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 ${
-                    isFollowing
-                      ? 'border border-x-dim text-x-text hover:border-x-red/60 hover:bg-x-red/10 hover:text-x-red'
-                      : 'bg-x-text text-x-bg hover:opacity-90'
-                  }`}
-                >
-                  {isFollowing ? t('profile.unfollow') : t('profile.follow')}
-                </button>
+                <>
+                  <button
+                    aria-label={t('profile.message')}
+                    title={t('profile.message')}
+                    onClick={() => void openDm()}
+                    className="flex size-8.5 items-center justify-center rounded-full border border-x-dim transition-colors duration-200 hover:bg-x-input"
+                  >
+                    <i className="ri-chat-1-line text-[16px]" />
+                  </button>
+                  <button
+                    onClick={() => void toggleFollow()}
+                    className={`rounded-full px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 ${
+                      isFollowing
+                        ? 'border border-x-dim text-x-text hover:border-x-red/60 hover:bg-x-red/10 hover:text-x-red'
+                        : 'bg-x-text text-x-bg hover:opacity-90'
+                    }`}
+                  >
+                    {isFollowing ? t('profile.unfollow') : t('profile.follow')}
+                  </button>
+                </>
               ))
             )}
           </div>
