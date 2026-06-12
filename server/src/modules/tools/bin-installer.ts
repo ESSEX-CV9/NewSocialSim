@@ -49,19 +49,23 @@ export async function downloadToFile(
   }
 }
 
-/** 经 PowerShell Expand-Archive 解压（项目 Windows 优先，不引 zip 依赖） */
+/**
+ * 经 PowerShell Expand-Archive 解压（项目 Windows 优先，不引 zip 依赖）。
+ * 命令经 -EncodedCommand（UTF-16LE base64）传递——含中文的路径不经任何代码页转换；
+ * 命令内先把输出编码切到 UTF-8，stderr 报错不再按 GBK 输出导致乱码。
+ */
 export function expandZip(zipPath: string, destDir: string): Promise<void> {
+  if (!fs.existsSync(zipPath)) {
+    return Promise.reject(new Error(`压缩包不存在：${zipPath}`));
+  }
+  const psCommand =
+    '[Console]::OutputEncoding=[System.Text.Encoding]::UTF8; ' +
+    `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${destDir}' -Force`;
+  const encoded = Buffer.from(psCommand, 'utf16le').toString('base64');
   return new Promise((resolve, reject) => {
     const proc = spawn(
       'powershell.exe',
-      [
-        '-NoProfile',
-        '-NonInteractive',
-        '-ExecutionPolicy',
-        'Bypass',
-        '-Command',
-        `Expand-Archive -LiteralPath '${zipPath}' -DestinationPath '${destDir}' -Force`,
-      ],
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
       { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true },
     );
     let stderr = '';

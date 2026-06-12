@@ -194,7 +194,8 @@ export class ToolsService {
   }
 
   private async runInstall(id: ToolId, job: InstallJobView): Promise<void> {
-    const tmpDir = path.join(config.binDir, 'tmp');
+    // 每任务独立 tmp 子目录：两个工具并行安装时互不删除对方的下载中间产物
+    const tmpDir = path.join(config.binDir, 'tmp', id);
     const url = this.downloadUrl(id);
     job.url = url;
     job.file = id === 'yt-dlp' ? 'yt-dlp.exe' : 'ffmpeg-master-latest-win64-gpl.zip';
