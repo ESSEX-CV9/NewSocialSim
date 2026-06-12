@@ -1,17 +1,11 @@
 import type { VideoSearchAdapter, VideoSearchDeps, VideoSearchResult } from './types.js';
 
-/**
- * Pornhub 关键字搜索：yt-dlp 内置 extractor 支持搜索结果页 flat-playlist。
- * 仅 contentRating='all' 世界可用。
- */
+/** Pornhub 关键字搜索：yt-dlp 内置 extractor 支持搜索结果页 flat-playlist */
 export class PornhubVideoAdapter implements VideoSearchAdapter {
   readonly name = 'pornhub';
-  readonly adultOnly = true;
 
-  available(ctx: { ytdlpOk: boolean; contentRating: 'safe' | 'all' }) {
-    if (!ctx.ytdlpOk) return { ok: false, reason: 'no-ytdlp' };
-    if (ctx.contentRating !== 'all') return { ok: false, reason: 'world-rating' };
-    return { ok: true };
+  available(ctx: { ytdlpOk: boolean }) {
+    return ctx.ytdlpOk ? { ok: true } : { ok: false, reason: 'no-ytdlp' };
   }
 
   async search(query: string, limit: number, deps: VideoSearchDeps): Promise<VideoSearchResult[]> {

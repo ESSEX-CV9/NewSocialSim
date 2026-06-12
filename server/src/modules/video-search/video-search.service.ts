@@ -18,7 +18,6 @@ import { YtDlp, type ProbeResult, type YtDlpRequestOpts } from './ytdlp.js';
 
 export interface VideoSourceStatus extends VideoSourceAvailability {
   id: string;
-  adultOnly: boolean;
 }
 
 /** 按目标站点组装 yt-dlp 请求选项：全局代理 + 站点 Cookie（B站 412 风控需浏览器 Cookie） */
@@ -37,9 +36,6 @@ export function requestOptsFor(url: string): YtDlpRequestOpts {
   return opts;
 }
 
-/** 成人站域名清单：contentRating!=='all' 的世界拒绝引入（D/E 期搜索源沿用同清单） */
-const ADULT_HOSTS = ['pornhub.com', 'rule34video.com'];
-
 export type IngestMode = 'auto' | 'download' | 'stream';
 
 export interface IngestResult {
@@ -48,16 +44,12 @@ export interface IngestResult {
   task?: VideoTaskView;
 }
 
-function hostOf(url: string): string {
+function assertValidUrl(url: string): void {
   try {
-    return new URL(url).hostname.toLowerCase();
+    new URL(url);
   } catch {
     throw new AppError(400, 'VALIDATION', '链接格式不正确');
   }
-}
-
-function isAdultHost(host: string): boolean {
-  return ADULT_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
 }
 
 const PER_SOURCE_LIMIT = 20;
@@ -97,15 +89,13 @@ export class VideoSearchService {
     this.resolver.invalidate(mediaId);
   }
 
-  /** 各视频源可用状态（yt-dlp 未装则全不可用；成人源在 safe 世界标 world-rating） */
+  /** 各视频源可用状态（唯一条件：yt-dlp 是否安装；视频源不设内容分级，见 adapters/types） */
   sources(): VideoSourceStatus[] {
     const ytdlpOk = this.ytdlp.available();
-    const { meta } = this.worldManager.current();
     return this.adapters.map((a) => {
-      const avail = a.available({ ytdlpOk, contentRating: meta.contentRating });
+      const avail = a.available({ ytdlpOk });
       return {
         id: a.name,
-        adultOnly: a.adultOnly,
         ok: avail.ok,
         ...(avail.reason ? { reason: avail.reason } : {}),
       };
@@ -117,7 +107,6 @@ export class VideoSearchService {
     const q = query.trim();
     if (!q) throw new AppError(400, 'VALIDATION', '搜索关键词不能为空');
     const cfg = readSearchConfig();
-    const { meta } = this.worldManager.current();
     const ytdlpOk = this.ytdlp.available();
     const deps = { ytdlp: this.ytdlp, cfg, proxy: cfg.proxy?.trim() || undefined };
 
@@ -125,11 +114,11 @@ export class VideoSearchService {
     if (source) {
       const adapter = this.adapters.find((a) => a.name === source);
       if (!adapter) throw new AppError(400, 'VALIDATION', `未知的视频源：${source}`);
-      const avail = adapter.available({ ytdlpOk, contentRating: meta.contentRating });
+      const avail = adapter.available({ ytdlpOk });
       if (!avail.ok) throw new AppError(400, 'VALIDATION', `视频源 ${source} 不可用：${avail.reason ?? ''}`);
       chosen = [adapter];
     } else {
-      chosen = this.adapters.filter((a) => a.available({ ytdlpOk, contentRating: meta.contentRating }).ok);
+      chosen = this.adapters.filter((a) => a.available({ ytdlpOk }).ok);
     }
 
     const settled = await Promise.allSettled(chosen.map((a) => a.search(q, PER_SOURCE_LIMIT, deps)));
@@ -147,7 +136,7 @@ export class VideoSearchService {
    * 非可嵌入站点按全局 defaultMode。显式 mode 无条件按指定模式。
    */
   ingest(userId: number, url: string, mode: IngestMode): IngestResult {
-    const host = hostOf(url);
+    assertValidUrl(url);
     const settings = videoSettings(readSearchConfig());
 
     let resolved: 'download' | 'stream';
@@ -167,10 +156,8 @@ export class VideoSearchService {
     if (!this.ytdlp.available()) {
       throw new AppError(400, 'TOOL_MISSING', 'yt-dlp 未安装，请到设置页"视频工具"安装');
     }
-    const { worldId, meta, clock } = this.worldManager.current();
-    if (isAdultHost(host) && meta.contentRating !== 'all') {
-      throw new AppError(400, 'RATING_BLOCKED', '当前世界的内容分级不允许引入该站点的视频');
-    }
+    // 视频源/引入不设内容分级：平台性质本身决定可见内容，不受世界 contentRating 约束
+    const { worldId, clock } = this.worldManager.current();
 
     const task = this.tasks.enqueue(
       userId,

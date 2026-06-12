@@ -116,12 +116,9 @@ export function MediaSearchPanel({
     }
   };
 
+  // 视频源唯一不可用原因是 yt-dlp 未装
   const reasonText = (reason?: string): string =>
-    reason === 'world-rating'
-      ? t('videoSearch.reasonRating')
-      : reason === 'no-ytdlp'
-        ? t('videoSearch.reasonNoTool')
-        : t('mediaSearch.sourceNeedsConfig');
+    reason === 'no-ytdlp' ? t('videoSearch.reasonNoTool') : t('mediaSearch.sourceNeedsConfig');
 
   return (
     <div className="mb-2 rounded-2xl border border-x-border p-3">

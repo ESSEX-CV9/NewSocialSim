@@ -3,7 +3,6 @@ import type { VideoSearchAdapter, VideoSearchDeps, VideoSearchResult } from './t
 /** YouTube 关键字搜索：yt-dlp ytsearchN: 原生支持，免 key，最稳的源 */
 export class YouTubeVideoAdapter implements VideoSearchAdapter {
   readonly name = 'youtube';
-  readonly adultOnly = false;
 
   available(ctx: { ytdlpOk: boolean }) {
     return ctx.ytdlpOk ? { ok: true } : { ok: false, reason: 'no-ytdlp' };

@@ -245,7 +245,6 @@ export interface VideoTaskView {
 
 export interface VideoSourceStatus {
   id: string;
-  adultOnly: boolean;
   ok: boolean;
   reason?: string;
 }

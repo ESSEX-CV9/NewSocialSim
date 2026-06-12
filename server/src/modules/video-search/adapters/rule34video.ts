@@ -3,16 +3,13 @@ import type { VideoSearchAdapter, VideoSearchDeps, VideoSearchResult } from './t
 
 /**
  * Rule34Video 关键字搜索：自抓搜索页 HTML（站点无公开 API，仿 pinterest 自抓模式）。
- * 下载仍走 yt-dlp。仅 contentRating='all' 世界可用；HTML 改版会失效（单源静默降级）。
+ * 下载仍走 yt-dlp。HTML 改版会失效（单源静默降级）。
  */
 export class Rule34VideoAdapter implements VideoSearchAdapter {
   readonly name = 'rule34video';
-  readonly adultOnly = true;
 
-  available(ctx: { ytdlpOk: boolean; contentRating: 'safe' | 'all' }) {
-    if (!ctx.ytdlpOk) return { ok: false, reason: 'no-ytdlp' };
-    if (ctx.contentRating !== 'all') return { ok: false, reason: 'world-rating' };
-    return { ok: true };
+  available(ctx: { ytdlpOk: boolean }) {
+    return ctx.ytdlpOk ? { ok: true } : { ok: false, reason: 'no-ytdlp' };
   }
 
   async search(query: string, limit: number, deps: VideoSearchDeps): Promise<VideoSearchResult[]> {

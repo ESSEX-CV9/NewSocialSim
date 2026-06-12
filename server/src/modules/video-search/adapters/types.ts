@@ -15,7 +15,7 @@ export interface VideoSearchResult {
 
 export interface VideoSourceAvailability {
   ok: boolean;
-  /** 不可用原因标识（i18n key 由前端映射）：no-ytdlp / world-rating */
+  /** 不可用原因标识（i18n key 由前端映射）：no-ytdlp */
   reason?: string;
 }
 
@@ -25,10 +25,13 @@ export interface VideoSearchDeps {
   proxy: string | undefined;
 }
 
+/**
+ * 视频源不设内容分级：平台性质本身决定可见内容（YouTube 天然搜不到 R18，
+ * Rule34Video 本身即成人站），分级概念无意义，也不受世界 contentRating 约束。
+ * 唯一可用性条件是 yt-dlp 是否安装。
+ */
 export interface VideoSearchAdapter {
   readonly name: string;
-  /** 仅 contentRating='all' 世界可用（成人站点） */
-  readonly adultOnly: boolean;
-  available(ctx: { ytdlpOk: boolean; contentRating: 'safe' | 'all' }): VideoSourceAvailability;
+  available(ctx: { ytdlpOk: boolean }): VideoSourceAvailability;
   search(query: string, limit: number, deps: VideoSearchDeps): Promise<VideoSearchResult[]>;
 }
