@@ -255,6 +255,15 @@ const migrations: Migration[] = [
       CREATE INDEX idx_message_reactions_msg ON message_reactions(message_id);
     `,
   },
+  {
+    version: 12,
+    name: 'conversation-participant-flags',
+    sql: `
+      ALTER TABLE conversation_participants ADD COLUMN marked_unread INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE conversation_participants ADD COLUMN muted INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE conversation_participants ADD COLUMN pinned_at INTEGER;
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

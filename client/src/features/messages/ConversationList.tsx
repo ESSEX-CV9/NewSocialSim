@@ -28,7 +28,7 @@ function ConversationListItem({
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const other = conversation.otherParticipant;
   const last = conversation.lastMessage;
-  const unread = conversation.unreadCount > 0;
+  const unread = conversation.unreadCount > 0 || conversation.markedUnread;
 
   let preview = '';
   if (last) {
@@ -38,6 +38,14 @@ function ConversationListItem({
       preview = last.senderId === user?.id ? `${t('dm.you')}${text}` : text;
     }
   }
+
+  /** 菜单动作公共收尾：关菜单 → 执行 → 失效列表与角标缓存 */
+  const menuAction = async (fn: () => Promise<unknown>) => {
+    setMenu(null);
+    await fn();
+    void queryClient.invalidateQueries({ queryKey: ['dm-conversations'] });
+    void queryClient.invalidateQueries({ queryKey: ['dm-unread'] });
+  };
 
   const deleteConversation = async () => {
     setMenu(null);
@@ -60,7 +68,7 @@ function ConversationListItem({
         e.preventDefault();
         setMenu({
           x: Math.min(e.clientX, window.innerWidth - 240),
-          y: Math.min(e.clientY, window.innerHeight - 110),
+          y: Math.min(e.clientY, window.innerHeight - 270),
         });
       }}
       className={`flex w-full cursor-pointer items-start gap-3 px-4 py-3 text-left transition-colors duration-200 hover:bg-x-hover-strong ${
@@ -80,6 +88,12 @@ function ConversationListItem({
                 <TimeAgo at={last.createdAt} />
               </span>
             </>
+          )}
+          {conversation.pinned && (
+            <i className="ri-pushpin-fill shrink-0 text-[13px] text-x-dim" title={t('dm.pin')} />
+          )}
+          {conversation.muted && (
+            <i className="ri-volume-mute-line shrink-0 text-[13px] text-x-dim" title={t('dm.mute')} />
           )}
         </div>
         <div
@@ -116,6 +130,45 @@ function ConversationListItem({
             >
               <i className="ri-external-link-line text-[17px]" />
               {t('dm.openInNewTab')}
+            </button>
+            <button
+              onClick={() =>
+                void menuAction(() =>
+                  unread ? api.dmMarkRead(conversation.id) : api.dmMarkUnread(conversation.id),
+                )
+              }
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+            >
+              <i
+                className={`${unread ? 'ri-chat-check-line' : 'ri-chat-unread-line'} text-[17px]`}
+              />
+              {unread ? t('dm.markReadAction') : t('dm.markUnreadAction')}
+            </button>
+            <button
+              onClick={() =>
+                void menuAction(() =>
+                  conversation.muted ? api.dmUnmute(conversation.id) : api.dmMute(conversation.id),
+                )
+              }
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+            >
+              <i
+                className={`${conversation.muted ? 'ri-volume-up-line' : 'ri-volume-mute-line'} text-[17px]`}
+              />
+              {conversation.muted ? t('dm.unmute') : t('dm.mute')}
+            </button>
+            <button
+              onClick={() =>
+                void menuAction(() =>
+                  conversation.pinned ? api.dmUnpin(conversation.id) : api.dmPin(conversation.id),
+                )
+              }
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+            >
+              <i
+                className={`${conversation.pinned ? 'ri-unpin-line' : 'ri-pushpin-line'} text-[17px]`}
+              />
+              {conversation.pinned ? t('dm.unpin') : t('dm.pin')}
             </button>
             <button
               onClick={() => void deleteConversation()}

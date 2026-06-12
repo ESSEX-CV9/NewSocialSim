@@ -72,7 +72,7 @@ NewSocialSim/
 └── data/worlds/<id>/       # 运行时数据（不入 git）：world.db + world.json
 ```
 
-### 数据库 schema（当前 version 11）
+### 数据库 schema（当前 version 12）
 
 - `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at, pinned_post_id, avatar_media_id, banner_media_id, verified, website, location, birth_date, profession, verified_at)` —— `verified` 为 'none'/'personal'/'org'（蓝标/金标，PATCH /api/users/me 自助设定，变更时以模拟时间打点 `verified_at`），`website` 为个人链接（存储时无协议自动补 https://），`location` 为自由文本地名（可虚构），`birth_date` 为 YYYY-MM-DD，`profession` 为专业类别 key（前端 i18n 映射展示）
 - `posts(id, author_id, content, reply_to_id, quote_of_id, created_at, like_count, repost_count, quote_count, reply_count, view_count, deleted)`
@@ -83,7 +83,7 @@ NewSocialSim/
 - `media(id, owner_id, type, file_name, mime, width, height, size_bytes, source, origin_url, created_at)`、`post_media(post_id, media_id, position)` —— 主键 (post_id, position)
 - `link_cards(url PRIMARY KEY, title, description, image_media_id, site_name, status, fetched_at)` —— OG 元数据按 URL 缓存（失败也缓存）
 - `conversations(id, type, dm_key UNIQUE, created_by, created_at, last_message_id, last_message_at)` —— 私信会话；`type` 为 'dm'/'group'（群聊预留，当前 API 只产出 dm）；`dm_key` 为 `'<小用户id>:<大用户id>'`，保证同一对用户唯一会话且天然防并发双建；`last_message_*` 为反规范化的列表预览与排序字段
-- `conversation_participants(conversation_id, user_id, state, last_read_message_id, hidden_at, joined_at)` —— 主键 (conversation_id, user_id)；`state` 为 'inbox'/'request'（消息请求放参与者维度：发起方永远 inbox，接收方视角才可能是 request）；`hidden_at` 实现"删除会话/拒绝请求 = 只对自己隐藏"
+- `conversation_participants(conversation_id, user_id, state, last_read_message_id, hidden_at, joined_at, marked_unread, muted, pinned_at)` —— 主键 (conversation_id, user_id)；`state` 为 'inbox'/'request'（消息请求放参与者维度：发起方永远 inbox，接收方视角才可能是 request）；`hidden_at` 实现"删除会话/拒绝请求 = 只对自己隐藏"；`marked_unread` 为手动未读标记（任何已读动作清除）、`muted` 静音（不计导航角标）、`pinned_at` 置顶（收件箱浮顶，列表用 [置顶位,时间,id] 三段游标）
 - `messages(id, conversation_id, sender_id, content, created_at, deleted)` —— 软删除墓碑同 posts；`message_media(message_id, media_id, position)` 同 post_media 形态；`message_reactions(message_id, user_id, emoji, created_at)` 主键 (message_id, user_id)——每人每消息一个回应，换 emoji 为 UPSERT 覆盖
 
 所有 `created_at` 存储的是世界模拟时间（unix 毫秒形式）。`users.is_bot` 为第二阶段虚拟用户预留。计数字段（like_count 等）为反规范化，由 service 在事务内随互动维护；`view_count` 为曝光计数，由客户端经 `POST /api/posts/views` 批量上报（会话内去重），service 另留 `addViews(postId, delta)` 任意增量方法供未来管理端注入模拟浏览量。

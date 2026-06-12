@@ -144,6 +144,11 @@ export const api = {
   dmAccept: (id: number) =>
     http<{ conversation: ConversationDetailView }>('POST', `/api/messages/conversations/${id}/accept`, {}),
   dmHideConversation: (id: number) => http<void>('DELETE', `/api/messages/conversations/${id}`),
+  dmMarkUnread: (id: number) => http<void>('POST', `/api/messages/conversations/${id}/unread`, {}),
+  dmMute: (id: number) => http<void>('POST', `/api/messages/conversations/${id}/mute`, {}),
+  dmUnmute: (id: number) => http<void>('DELETE', `/api/messages/conversations/${id}/mute`),
+  dmPin: (id: number) => http<void>('POST', `/api/messages/conversations/${id}/pin`, {}),
+  dmUnpin: (id: number) => http<void>('DELETE', `/api/messages/conversations/${id}/pin`),
   dmDeleteMessage: (messageId: number) =>
     http<{ message: MessageView }>('DELETE', `/api/messages/${messageId}`),
   dmSetReaction: (messageId: number, emoji: string) =>

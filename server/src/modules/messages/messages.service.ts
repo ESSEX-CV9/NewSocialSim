@@ -89,19 +89,24 @@ export class MessagesService {
   ): Page<ConversationView> {
     const { db, worldId } = this.worldManager.current();
     const pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, limit ?? DEFAULT_PAGE_SIZE));
+    // inbox 置顶浮顶，游标多一段置顶位；其余过滤器置顶位恒为 0
     const rows = messagesRepo.listConversations(
       db,
       viewerId,
       filter,
-      decodeTsIdCursor(cursor),
+      parsePinnedTsIdCursor(cursor, filter === 'inbox'),
       pageSize + 1,
     );
     const hasMore = rows.length > pageSize;
     const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     const last = pageRows[pageRows.length - 1];
+    const lastCursor = (row: typeof last) =>
+      filter === 'inbox'
+        ? encodeCursor([row!.my_pinned_at !== null ? 1 : 0, row!.last_message_at, row!.id])
+        : encodeCursor([row!.last_message_at, row!.id]);
     return {
       items: pageRows.map((r) => toConversationView(r, worldId)),
-      nextCursor: hasMore && last ? encodeCursor([last.last_message_at, last.id]) : null,
+      nextCursor: hasMore && last ? lastCursor(last) : null,
     };
   }
 
@@ -286,6 +291,27 @@ export class MessagesService {
     messagesRepo.markAllRead(db, viewerId);
   }
 
+  /** 手动标记未读（蓝点重现；打开会话或任意已读动作清除） */
+  markUnread(viewerId: number, conversationId: number): void {
+    const { db } = this.worldManager.current();
+    this.requireParticipant(conversationId, viewerId);
+    messagesRepo.setMarkedUnread(db, conversationId, viewerId, true);
+  }
+
+  /** 静音开关：静音会话不计入导航角标 */
+  setMuted(viewerId: number, conversationId: number, muted: boolean): void {
+    const { db } = this.worldManager.current();
+    this.requireParticipant(conversationId, viewerId);
+    messagesRepo.setMuted(db, conversationId, viewerId, muted);
+  }
+
+  /** 置顶开关：收件箱列表浮顶 */
+  setPinned(viewerId: number, conversationId: number, pinned: boolean): void {
+    const { db, clock } = this.worldManager.current();
+    this.requireParticipant(conversationId, viewerId);
+    messagesRepo.setPinned(db, conversationId, viewerId, pinned ? clock.now() : null);
+  }
+
   /** 私信搜索：按对方用户名/昵称命中会话 + 按内容命中消息（各取前若干，不分页） */
   search(viewerId: number, query: string): DmSearchResults {
     const q = query.trim();
@@ -392,6 +418,9 @@ function toConversationView(row: ConversationListRow, worldId: string): Conversa
       verified: row.other_verified as VerifiedType,
     },
     state: row.my_state,
+    markedUnread: row.my_marked_unread === 1,
+    muted: row.my_muted === 1,
+    pinned: row.my_pinned_at !== null,
     lastMessage:
       row.last_message_id !== null && row.last_msg_created_at !== null
         ? {
@@ -412,4 +441,23 @@ function toConversationView(row: ConversationListRow, worldId: string): Conversa
 function parseIdCursor(cursor: string | undefined): number | null {
   const parts = decodeCursor(cursor);
   return parts && parts.length === 1 && typeof parts[0] === 'number' ? parts[0] : null;
+}
+
+/** 会话列表游标：inbox 为 [置顶位, 时间, id] 三段，其余为 [时间, id] 双段（置顶位补 0） */
+function parsePinnedTsIdCursor(
+  cursor: string | undefined,
+  withPin: boolean,
+): { pinned: number; ts: number; id: number } | null {
+  if (withPin) {
+    const parts = decodeCursor(cursor);
+    return parts &&
+      parts.length === 3 &&
+      typeof parts[0] === 'number' &&
+      typeof parts[1] === 'number' &&
+      typeof parts[2] === 'number'
+      ? { pinned: parts[0], ts: parts[1], id: parts[2] }
+      : null;
+  }
+  const tsId = decodeTsIdCursor(cursor);
+  return tsId ? { pinned: 0, ...tsId } : null;
 }

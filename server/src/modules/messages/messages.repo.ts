@@ -31,6 +31,9 @@ export interface ParticipantRow {
 export interface ConversationListRow extends ConversationRow {
   my_state: ConversationState;
   my_last_read_message_id: number;
+  my_marked_unread: number;
+  my_muted: number;
+  my_pinned_at: number | null;
   other_user_id: number;
   other_handle: string;
   other_display_name: string;
@@ -99,6 +102,9 @@ const CONVERSATION_SELECT = `
   SELECT c.*,
          cp.state                 AS my_state,
          cp.last_read_message_id  AS my_last_read_message_id,
+         cp.marked_unread         AS my_marked_unread,
+         cp.muted                 AS my_muted,
+         cp.pinned_at             AS my_pinned_at,
          u.id                     AS other_user_id,
          u.handle                 AS other_handle,
          u.display_name           AS other_display_name,
@@ -207,48 +213,82 @@ export const messagesRepo = {
       .get({ userId, conversationId }) as ConversationListRow | undefined;
   },
 
-  /** 会话列表：只列有消息的会话，按最后消息时间倒序，双段游标 */
+  /**
+   * 会话列表：只列有消息的会话。inbox 置顶浮顶（三段游标 [置顶位, 时间, id]），
+   * 其余过滤器按最后消息时间倒序（双段游标 [时间, id]）。
+   */
   listConversations(
     db: WorldDb,
     userId: number,
     filter: DmConversationFilter,
-    cursor: { ts: number; id: number } | null,
+    cursor: { pinned: number; ts: number; id: number } | null,
     limit: number,
   ): ConversationListRow[] {
     // hidden = 已拒绝的请求（state 仍为 request 且被自己隐藏），其余过滤器都排除隐藏会话
     const filterClause = {
       inbox: `AND cp.state = 'inbox' ${NOT_HIDDEN}`,
-      unread: `AND cp.state = 'inbox' ${NOT_HIDDEN} AND ${UNREAD_COUNT_SQL} > 0`,
+      unread: `AND cp.state = 'inbox' ${NOT_HIDDEN} AND (${UNREAD_COUNT_SQL} > 0 OR cp.marked_unread = 1)`,
       requests: `AND cp.state = 'request' ${NOT_HIDDEN}`,
       hidden: `AND cp.state = 'request' AND cp.hidden_at IS NOT NULL AND c.last_message_at <= cp.hidden_at`,
     }[filter];
+    const pinnedExpr = 'CASE WHEN cp.pinned_at IS NOT NULL THEN 1 ELSE 0 END';
+    const tsIdCursor =
+      'c.last_message_at < @cursorTs OR (c.last_message_at = @cursorTs AND c.id < @cursorId)';
+    const withPin = filter === 'inbox';
     const cursorClause =
       cursor !== null
-        ? 'AND (c.last_message_at < @cursorTs OR (c.last_message_at = @cursorTs AND c.id < @cursorId))'
+        ? withPin
+          ? `AND (${pinnedExpr} < @cursorPinned OR (${pinnedExpr} = @cursorPinned AND (${tsIdCursor})))`
+          : `AND (${tsIdCursor})`
         : '';
+    const orderClause = withPin
+      ? `ORDER BY ${pinnedExpr} DESC, c.last_message_at DESC, c.id DESC`
+      : 'ORDER BY c.last_message_at DESC, c.id DESC';
     return db
       .prepare(
         `${CONVERSATION_SELECT}
            AND c.last_message_id IS NOT NULL
            ${filterClause} ${cursorClause}
-         ORDER BY c.last_message_at DESC, c.id DESC
+         ${orderClause}
          LIMIT @limit`,
       )
       .all({
         userId,
         limit,
-        ...(cursor !== null ? { cursorTs: cursor.ts, cursorId: cursor.id } : {}),
+        ...(cursor !== null
+          ? { cursorPinned: cursor.pinned, cursorTs: cursor.ts, cursorId: cursor.id }
+          : {}),
       }) as ConversationListRow[];
   },
 
-  /** 收件箱全部标为已读：各会话的已读位置推进到其最新消息（只增不减） */
+  /** 手动未读标记（打开会话/标记已读时由 updateLastRead 清除） */
+  setMarkedUnread(db: WorldDb, conversationId: number, userId: number, value: boolean): void {
+    db.prepare(
+      'UPDATE conversation_participants SET marked_unread = ? WHERE conversation_id = ? AND user_id = ?',
+    ).run(value ? 1 : 0, conversationId, userId);
+  },
+
+  setMuted(db: WorldDb, conversationId: number, userId: number, value: boolean): void {
+    db.prepare(
+      'UPDATE conversation_participants SET muted = ? WHERE conversation_id = ? AND user_id = ?',
+    ).run(value ? 1 : 0, conversationId, userId);
+  },
+
+  setPinned(db: WorldDb, conversationId: number, userId: number, pinnedAt: number | null): void {
+    db.prepare(
+      'UPDATE conversation_participants SET pinned_at = ? WHERE conversation_id = ? AND user_id = ?',
+    ).run(pinnedAt, conversationId, userId);
+  },
+
+  /** 收件箱全部标为已读：各会话的已读位置推进到其最新消息（只增不减），并清手动未读标记 */
   markAllRead(db: WorldDb, userId: number): void {
     db.prepare(
       `UPDATE conversation_participants
        SET last_read_message_id = MAX(
          last_read_message_id,
          COALESCE((SELECT c.last_message_id FROM conversations c WHERE c.id = conversation_id), 0)
-       )
+       ),
+       marked_unread = 0
        WHERE user_id = @userId AND state = 'inbox'`,
     ).run({ userId });
   },
@@ -289,12 +329,13 @@ export const messagesRepo = {
       .all({ userId, pattern: `%${escapeLike(query)}%`, limit }) as MessageSearchRow[];
   },
 
-  /** 导航角标：主收件箱含未读的会话数 + 待处理请求会话数 */
+  /** 导航角标：主收件箱含未读（真未读或手动标记）的会话数（静音会话不计）+ 待处理请求会话数 */
   unreadCounts(db: WorldDb, userId: number): { count: number; requestCount: number } {
     const row = db
       .prepare(
         `SELECT
-           COUNT(CASE WHEN cp.state = 'inbox' AND ${UNREAD_COUNT_SQL} > 0 THEN 1 END) AS inbox_unread,
+           COUNT(CASE WHEN cp.state = 'inbox' AND cp.muted = 0
+                       AND (${UNREAD_COUNT_SQL} > 0 OR cp.marked_unread = 1) THEN 1 END) AS inbox_unread,
            COUNT(CASE WHEN cp.state = 'request' THEN 1 END) AS request_count
          FROM conversations c
          JOIN conversation_participants cp ON cp.conversation_id = c.id AND cp.user_id = @userId
@@ -394,11 +435,11 @@ export const messagesRepo = {
     ).run(conversationId, userId);
   },
 
-  /** 已读位置只增不减（幂等、防乱序请求回退） */
+  /** 已读位置只增不减（幂等、防乱序请求回退）；同时清除手动未读标记 */
   updateLastRead(db: WorldDb, conversationId: number, userId: number, messageId: number): number {
     db.prepare(
       `UPDATE conversation_participants
-       SET last_read_message_id = MAX(last_read_message_id, @messageId)
+       SET last_read_message_id = MAX(last_read_message_id, @messageId), marked_unread = 0
        WHERE conversation_id = @conversationId AND user_id = @userId`,
     ).run({ conversationId, userId, messageId });
     const row = db

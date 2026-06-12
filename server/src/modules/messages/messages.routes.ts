@@ -135,6 +135,31 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
     { ...auth, schema: { params: idParamsSchema } },
     controller.acceptRequest,
   );
+  app.post<{ Params: { id: number } }>(
+    '/api/messages/conversations/:id/unread',
+    { ...auth, schema: { params: idParamsSchema } },
+    controller.markUnread,
+  );
+  app.post<{ Params: { id: number } }>(
+    '/api/messages/conversations/:id/mute',
+    { ...auth, schema: { params: idParamsSchema } },
+    controller.mute,
+  );
+  app.delete<{ Params: { id: number } }>(
+    '/api/messages/conversations/:id/mute',
+    { ...auth, schema: { params: idParamsSchema } },
+    controller.unmute,
+  );
+  app.post<{ Params: { id: number } }>(
+    '/api/messages/conversations/:id/pin',
+    { ...auth, schema: { params: idParamsSchema } },
+    controller.pin,
+  );
+  app.delete<{ Params: { id: number } }>(
+    '/api/messages/conversations/:id/pin',
+    { ...auth, schema: { params: idParamsSchema } },
+    controller.unpin,
+  );
   app.delete<{ Params: { id: number } }>(
     '/api/messages/conversations/:id',
     { ...auth, schema: { params: idParamsSchema } },

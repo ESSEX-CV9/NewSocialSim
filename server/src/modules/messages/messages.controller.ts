@@ -79,6 +79,31 @@ export class MessagesController {
     reply.status(204).send();
   };
 
+  markUnread = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {
+    this.service.markUnread(req.user.sub, req.params.id);
+    reply.status(204).send();
+  };
+
+  mute = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {
+    this.service.setMuted(req.user.sub, req.params.id, true);
+    reply.status(204).send();
+  };
+
+  unmute = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {
+    this.service.setMuted(req.user.sub, req.params.id, false);
+    reply.status(204).send();
+  };
+
+  pin = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {
+    this.service.setPinned(req.user.sub, req.params.id, true);
+    reply.status(204).send();
+  };
+
+  unpin = async (req: FastifyRequest<{ Params: { id: number } }>, reply: FastifyReply) => {
+    this.service.setPinned(req.user.sub, req.params.id, false);
+    reply.status(204).send();
+  };
+
   deleteMessage = async (
     req: FastifyRequest<{ Params: { messageId: number } }>,
     reply: FastifyReply,

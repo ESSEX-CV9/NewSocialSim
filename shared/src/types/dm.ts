@@ -48,6 +48,12 @@ export interface ConversationView {
   lastMessage: LastMessagePreview | null;
   /** 观察者未读消息数 */
   unreadCount: number;
+  /** 手动标记的未读点（打开会话或标记已读时清除） */
+  markedUnread: boolean;
+  /** 静音：不计入导航未读角标，列表仍显示未读点 */
+  muted: boolean;
+  /** 置顶：收件箱列表浮顶 */
+  pinned: boolean;
   createdAt: number;
 }
 

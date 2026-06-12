@@ -79,16 +79,21 @@ export function ConversationView({ conversationId }: { conversationId: number })
     if (el) el.scrollTop = el.scrollHeight;
   };
 
-  // —— 已读上报：对方新消息出现即上报（请求态不上报，接受前不暴露已读，与 X 一致）——
+  // —— 已读上报：对方新消息出现、或带手动未读标记打开时上报（请求态不上报，接受前不暴露已读，与 X 一致）——
   const conversationState = detail?.state;
+  const markedUnread = detail?.markedUnread ?? false;
   useEffect(() => {
-    if (latestId === undefined || !latestFromOther) return;
+    if (latestId === undefined) return;
     if (conversationState !== 'inbox') return;
+    if (!latestFromOther && !markedUnread) return;
     void api.dmMarkRead(conversationId).then(() => {
       void queryClient.invalidateQueries({ queryKey: ['dm-unread'] });
       void queryClient.invalidateQueries({ queryKey: ['dm-conversations'] });
+      if (markedUnread) {
+        void queryClient.invalidateQueries({ queryKey: ['dm-conversation', conversationId] });
+      }
     });
-  }, [latestId, latestFromOther, conversationState, conversationId, queryClient]);
+  }, [latestId, latestFromOther, conversationState, markedUnread, conversationId, queryClient]);
 
   // 对方已读到的最后一条本人消息（在其下方显示「已读」）
   const seenMessageId = useMemo(() => {

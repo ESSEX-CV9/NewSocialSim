@@ -146,6 +146,35 @@ $sr2 = Invoke-RestMethod "$api/messages/search?q=$([uri]::EscapeDataString('are 
 Assert "搜索按内容命中消息" (@($sr2.messages).Count -ge 1 -and $sr2.messages[0].conversationId -eq $c12.id)
 Assert "搜索不命中墓碑" (@((Invoke-RestMethod "$api/messages/search?q=hello" -Headers $u2).messages).Count -eq 0)
 
+# --- 标记未读 / 静音 / 置顶 ---
+Invoke-RestMethod -Method Post -Uri "$api/messages/conversations/$($c12.id)/unread" -Headers $u2 -ContentType $json -Body '{}' | Out-Null
+$mu = (Invoke-RestMethod "$api/messages/conversations?filter=inbox" -Headers $u2).items | Where-Object { $_.id -eq $c12.id }
+Assert "标记未读后 markedUnread=true" ($mu.markedUnread -eq $true)
+Assert "标记未读计入角标" ((Invoke-RestMethod "$api/messages/unread-count" -Headers $u2).count -eq 1)
+Assert "标记未读出现在 unread 过滤" (@((Invoke-RestMethod "$api/messages/conversations?filter=unread" -Headers $u2).items).Count -eq 1)
+Post-Json "$api/messages/conversations/$($c12.id)/read" @{} $u2 | Out-Null
+$mu2 = (Invoke-RestMethod "$api/messages/conversations?filter=inbox" -Headers $u2).items | Where-Object { $_.id -eq $c12.id }
+Assert "标记已读清除未读标记" ($mu2.markedUnread -eq $false -and (Invoke-RestMethod "$api/messages/unread-count" -Headers $u2).count -eq 0)
+Invoke-RestMethod -Method Post -Uri "$api/messages/conversations/$($c12.id)/mute" -Headers $u2 -ContentType $json -Body '{}' | Out-Null
+Post-Json "$api/messages/conversations/$($c12.id)/messages" @{ content = 'muted ping' } $u1 | Out-Null
+Assert "静音会话的未读不计入角标" ((Invoke-RestMethod "$api/messages/unread-count" -Headers $u2).count -eq 0)
+$muted = (Invoke-RestMethod "$api/messages/conversations?filter=inbox" -Headers $u2).items | Where-Object { $_.id -eq $c12.id }
+Assert "静音后列表仍显示未读数" ($muted.muted -eq $true -and $muted.unreadCount -ge 1)
+Invoke-RestMethod -Method Delete -Uri "$api/messages/conversations/$($c12.id)/mute" -Headers $u2 | Out-Null
+Assert "取消静音恢复计入角标" ((Invoke-RestMethod "$api/messages/unread-count" -Headers $u2).count -eq 1)
+Post-Json "$api/messages/conversations/$($c12.id)/read" @{} $u2 | Out-Null
+# 置顶：先让 c13 成为最新会话，再置顶 c12 验证浮顶
+Post-Json "$api/messages/conversations/$($c13.id)/messages" @{ content = 'newest in c13' } $u1 | Out-Null
+Assert "置顶前时间排序首位是 c13" ((Invoke-RestMethod "$api/messages/conversations?filter=inbox" -Headers $u1).items[0].id -eq $c13.id)
+Invoke-RestMethod -Method Post -Uri "$api/messages/conversations/$($c12.id)/pin" -Headers $u1 -ContentType $json -Body '{}' | Out-Null
+$pinnedList = (Invoke-RestMethod "$api/messages/conversations?filter=inbox" -Headers $u1).items
+Assert "置顶会话浮到列表首位" ($pinnedList[0].id -eq $c12.id -and $pinnedList[0].pinned -eq $true)
+$paged = Invoke-RestMethod "$api/messages/conversations?filter=inbox&limit=1" -Headers $u1
+$paged2 = Invoke-RestMethod "$api/messages/conversations?filter=inbox&limit=2&cursor=$($paged.nextCursor)" -Headers $u1
+Assert "置顶下分页游标接续无重复" ($paged.items[0].id -eq $c12.id -and (@($paged2.items | Where-Object { $_.id -eq $c12.id }).Count -eq 0))
+Invoke-RestMethod -Method Delete -Uri "$api/messages/conversations/$($c12.id)/pin" -Headers $u1 | Out-Null
+Assert "取消置顶恢复时间排序" ((Invoke-RestMethod "$api/messages/conversations?filter=inbox" -Headers $u1).items[0].id -ne $c12.id)
+
 # --- 隐藏的请求（拒绝后进"隐藏"，可从中恢复）---
 $c32 = (Post-Json "$api/messages/conversations" @{ userId = $uid[$h2] } $u3).conversation
 Post-Json "$api/messages/conversations/$($c32.id)/messages" @{ content = 'request to hide' } $u3 | Out-Null
