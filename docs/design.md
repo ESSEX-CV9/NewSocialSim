@@ -54,11 +54,13 @@ NewSocialSim/
 │       │   ├── db/         # SQLite 连接 + 版本化 migration
 │       │   ├── world/      # WorldManager（热切换核心）
 │       │   ├── auth/       # JWT 密钥、requireAuth / optionalAuth 守卫
+│       │   ├── events/     # SseHub（SSE 连接中枢：心跳/按用户推送/热切换清场）
 │       │   ├── errors/     # AppError 体系
 │       │   └── pagination.ts
 │       └── modules/        # 每模块四件套 routes/controller/service/repo
 │           ├── worlds / auth / users / posts / interactions
 │           ├── follows / timeline / notifications / search
+│           ├── blocks / media / media-search / link-cards / messages
 ├── client/                 # React 前端（Vite 端口 5173，/api 代理到 3000）
 │   └── src/
 │       ├── api/            # fetch 封装与全部接口定义
@@ -70,7 +72,7 @@ NewSocialSim/
 └── data/worlds/<id>/       # 运行时数据（不入 git）：world.db + world.json
 ```
 
-### 数据库 schema（当前 version 10）
+### 数据库 schema（当前 version 11）
 
 - `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at, pinned_post_id, avatar_media_id, banner_media_id, verified, website, location, birth_date, profession, verified_at)` —— `verified` 为 'none'/'personal'/'org'（蓝标/金标，PATCH /api/users/me 自助设定，变更时以模拟时间打点 `verified_at`），`website` 为个人链接（存储时无协议自动补 https://），`location` 为自由文本地名（可虚构），`birth_date` 为 YYYY-MM-DD，`profession` 为专业类别 key（前端 i18n 映射展示）
 - `posts(id, author_id, content, reply_to_id, quote_of_id, created_at, like_count, repost_count, quote_count, reply_count, view_count, deleted)`
@@ -80,12 +82,19 @@ NewSocialSim/
 - `notifications(id, user_id, type, actor_id, post_id, read, created_at)`
 - `media(id, owner_id, type, file_name, mime, width, height, size_bytes, source, origin_url, created_at)`、`post_media(post_id, media_id, position)` —— 主键 (post_id, position)
 - `link_cards(url PRIMARY KEY, title, description, image_media_id, site_name, status, fetched_at)` —— OG 元数据按 URL 缓存（失败也缓存）
+- `conversations(id, type, dm_key UNIQUE, created_by, created_at, last_message_id, last_message_at)` —— 私信会话；`type` 为 'dm'/'group'（群聊预留，当前 API 只产出 dm）；`dm_key` 为 `'<小用户id>:<大用户id>'`，保证同一对用户唯一会话且天然防并发双建；`last_message_*` 为反规范化的列表预览与排序字段
+- `conversation_participants(conversation_id, user_id, state, last_read_message_id, hidden_at, joined_at)` —— 主键 (conversation_id, user_id)；`state` 为 'inbox'/'request'（消息请求放参与者维度：发起方永远 inbox，接收方视角才可能是 request）；`hidden_at` 实现"删除会话/拒绝请求 = 只对自己隐藏"
+- `messages(id, conversation_id, sender_id, content, created_at, deleted)` —— 软删除墓碑同 posts；`message_media(message_id, media_id, position)` 同 post_media 形态；`message_reactions(message_id, user_id, emoji, created_at)` 主键 (message_id, user_id)——每人每消息一个回应，换 emoji 为 UPSERT 覆盖
 
 所有 `created_at` 存储的是世界模拟时间（unix 毫秒形式）。`users.is_bot` 为第二阶段虚拟用户预留。计数字段（like_count 等）为反规范化，由 service 在事务内随互动维护；`view_count` 为曝光计数，由客户端经 `POST /api/posts/views` 批量上报（会话内去重），service 另留 `addViews(postId, delta)` 任意增量方法供未来管理端注入模拟浏览量。
 
 屏蔽为单向隐藏：被屏蔽者的帖子/转发从屏蔽者的关注流、为你推荐、全站流、搜索、回复区消失，其互动产生的通知（含未读数）被过滤，推荐关注排除；个人主页时间线、书签与喜欢列表、帖子详情主体不过滤（主动访问场景）。`hidden_posts`（隐藏单帖）在相同范围生效。置顶为每用户一条（`users.pinned_post_id`），个人主页时间线排除置顶帖、由前端单独渲染在顶部。
 
 媒体系统：文件存 `data/worlds/<id>/media/<mediaId>.<ext>`（世界自包含，复制文件夹即含全部媒体），路径每次经活动世界现算保证热切换安全。文件端点 `GET /api/media/:id/file?w=<worldId>` 公开（img 标签带不了 JWT）、支持 Range/206（视频拖进度条）并返回 immutable 缓存头，`?w=` 防止切世界后媒体 id 撞号造成浏览器缓存污染。一条媒体只能挂一个帖子（一帖最多 20 个媒体，图/视频可混排；帖子卡宫格只显示前 4 个、超出在第 4 格叠 "+N" 角标，全部媒体在大图查看器里滑动），头像/Banner 不占名额；纯媒体帖允许空文案；软删帖保留媒体文件与关联。外部图片（URL 引入/搜图）一律经 `POST /api/media/from-url` 下载入库不热链（safe-fetch 做 SSRF 防护与限量下载；i.pximg.net 等防盗链站点自动带 Referer）。正文首个 URL 在发帖时抓取 OG 元数据生成链接卡片（link_cards 表按 URL 缓存：成功条目永久缓存，失败条目在下次有帖引用同 URL 时重试；抓取带 Chrome UA、10s/2MB——YouTube 等重型页 og 标签在 ~650KB 处；B 站 og:image 自动剥 @WxH 低清后缀取原图；缩略图入库；有媒体的帖不显示卡片；抓取失败不阻断发帖）。媒体系统 A 图片地基 / B 视频 / C URL 引入+OG 链接卡片 / D 关键字搜图四期已全部完成。
+
+私信系统（messages 模块）：1v1 会话经 `POST /api/messages/conversations` find-or-create（屏蔽双向任一即 403；自己 400；目标不存在 404），消息请求在**首条消息发送时**判定——接收方未关注发送方则其参与行置 'request'，接受（`POST .../accept`）或回复（隐式接受）后转 'inbox'；接受前会话页不上报已读，对方看不到已读回执。非参与者访问一律 404（不泄露会话存在性）。消息列表是全站唯一"倒序查、升序展示"的列表（`id DESC` + beforeId 游标，前端 reverse 渲染、向上滚动加载更早页）。已读/未读/Seen/游标全部基于消息 id 而非时间戳（模拟时钟可被设回过去）；`markRead` 只增不减。消息软删除为墓碑（同 posts），墓碑禁止回应且仍占用媒体；消息媒体上限 4，媒体占用与帖子互斥（`mediaRepo.attachedSet` 为 post_media UNION message_media）。未读角标 `GET /api/messages/unread-count` 返回 `{ count: 收件箱含未读的会话数, requestCount: 待处理请求数 }`，DM 不写 notifications 表（独立未读体系，同 X）。删除会话/拒绝请求只置自己的 `hidden_at`，对方再发消息（`last_message_at > hidden_at`）后会话重现且显示全部历史（不做 X 的"清除到某点"截断，已知简化）。
+
+私信实时推送（core/events/sse-hub.ts）：`GET /api/messages/stream?token=<jwt>` 为 SSE 长连接——EventSource 带不了 Authorization 头，token 走 query 在路由内手动验签并核对 worldId；handler 用 `reply.hijack()` 自管原始连接，注销挂 `req.raw.on('close')`。SseHub 维护进程内连接表（25 秒注释行心跳、按用户推送、多标签页全收），事件四类 message:new / message:read / message:reaction / message:deleted；发送者本人不回推（前端 mutation 已写穿缓存）。WorldManager 提供 `onActivated(cb)` 钩子（新上下文就绪后触发），热切换与进程退出时 `closeAll()` 清场，旧世界 token 重连即 401。前端 DmStreamProvider 以 user.id 为依赖挂 EventSource（切账号/登出重建），断线回退 10 秒轮询，角标与会话列表保持 30 秒轮询兜底；虚拟用户（第二阶段）不依赖 SSE，纯轮询可完成全部私信操作。后端回归脚本 `scripts/verify-dm.ps1`（51 项断言）。
 
 关键字搜图（media-search 模块）：`GET /api/media-search?q=&source=` 七源（pinterest 匿名优先、pixiv、danbooru、gelbooru、yandere、pexels、wikimedia）统一候选格式，单源直查或全可用源并行；候选经 from-url 入库挂帖——虚拟用户（第二阶段）走同一组 API 即可"一次检索拿图发帖"。实例级配置在 `data/media-search.json`（读容忍 BOM、写无 BOM）：`proxy` 字段经 undici 全局 ProxyAgent 作用于本进程全部出站 fetch（取消代理需重启服务）；各源凭证按需配置，`GET /api/media-search/sources` 报告可用状态。Pixiv 登录采用 CDP 引导：服务端 spawn 本机 Chrome/Edge（独立调试端口 + 临时 profile）打开 OAuth PKCE 登录页，监听 `pixiv://` 回调自动换 refresh token，手动粘贴 code 兜底；不引入 Playwright、不写注册表。内容分级由世界设定 `WorldMeta.contentRating`（safe/all，旧世界缺省 safe）映射到各源过滤参数，R-18G 另由实例配置 `pixiv.allowR18G` 把门。防盗链站点预览经 `GET /api/media-search/preview?url=`（白名单 host）代理。
 

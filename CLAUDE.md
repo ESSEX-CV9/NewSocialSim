@@ -12,7 +12,7 @@ npm run typecheck    # 三个工作区 tsc --noEmit
 ```
 
 - 演示账号（"现代地球"世界）：alice / bob / carol / dave，密码均 `secret123`。
-- 后端 API 回归脚本：`scripts/verify-m3.ps1`（需后端已启动）。
+- 后端 API 回归脚本：`scripts/verify-m3.ps1`、`scripts/verify-dm.ps1`（私信，51 项断言）；均需后端已启动。
 
 ## 结构速览
 
@@ -20,8 +20,8 @@ npm workspaces monorepo：
 
 - `shared/` — 前后端共用纯类型（贫血实体 + 视图类型 + API DTO），改接口先改这里。
 - `server/` — Fastify + better-sqlite3。
-  - `src/core/` 基础设施：`clock/`（SimClock 模拟时钟）、`db/`（连接 + 版本化 migration，当前 v10）、`world/`（WorldManager 多世界热切换）、`auth/`（JWT 密钥与 requireAuth/optionalAuth 守卫）、`pagination.ts`（游标工具）。
-  - `src/modules/` 按功能域分层，每模块四件套 `*.routes.ts / *.controller.ts / *.service.ts / *.repo.ts`：worlds、auth、users、posts、media（上传/外链入库/文件流，文件存各世界 media/ 目录）、media-search（七源关键字搜图 + Pixiv CDP 引导登录，凭证在 data/media-search.json）、link-cards（OG 链接卡片，无路由）、interactions（赞/转发/书签/隐藏帖）、follows、blocks、timeline、notifications、search。
+  - `src/core/` 基础设施：`clock/`（SimClock 模拟时钟）、`db/`（连接 + 版本化 migration，当前 v11）、`world/`（WorldManager 多世界热切换，含 onActivated 钩子）、`auth/`（JWT 密钥与 requireAuth/optionalAuth 守卫）、`events/`（SseHub：SSE 连接中枢，心跳/按用户推送/热切换清场）、`pagination.ts`（游标工具）。
+  - `src/modules/` 按功能域分层，每模块四件套 `*.routes.ts / *.controller.ts / *.service.ts / *.repo.ts`：worlds、auth、users、posts、media（上传/外链入库/文件流，文件存各世界 media/ 目录）、media-search（七源关键字搜图 + Pixiv CDP 引导登录，凭证在 data/media-search.json）、link-cards（OG 链接卡片，无路由）、interactions（赞/转发/书签/隐藏帖）、follows、blocks、timeline、notifications、search、messages（私信：1v1 会话/消息请求/已读回执/表情回应/SSE 流）。
 - `client/` — React 19 + Vite + Tailwind 4 + react-query + Remix Icon（均 npm 本地，离线可用）。
   - `src/api/` fetch 封装与全部接口；`src/auth|world|i18n|theme/` 四个全局 Context；`src/components/` 通用组件（Layout、PostCard、Composer、usePagedQuery 等）；`src/features/<页面>/` 按页面组织。
 - `simulator/` — 空，第二阶段使用。
@@ -41,7 +41,8 @@ npm workspaces monorepo：
 - **主题系统**：`client/src/index.css` 中 `[data-theme]` 变量块 + `@theme inline` 映射；组件只用 `bg-x-*` 等令牌类，禁止写死颜色。新主题 = 加一个变量块 + `client/src/theme/themes.ts` 注册。
 - **多账号**：客户端 localStorage 存账号数组（token+快照），401 自动剔除失效账号。
 - **i18n**：所有界面文案经 `useI18n().t(key)`，中英文案都在 `client/src/i18n/messages.ts`，新增文案必须双语。
-- **媒体系统**：外部图片一律下载入库不热链；媒体文件 URL 带 `?w=<worldId>` 防跨世界缓存撞号；一条媒体只挂一个帖子（一帖 ≤20 个媒体，图视频可混排，帖子卡只显示前 4 个）；外链抓取走 `core/safe-fetch.ts`（SSRF 防护）。Fastify 流式响应必须 `return reply.send(stream)`（async handler 竞争会吞空 body）。详见 docs/design.md。
+- **媒体系统**：外部图片一律下载入库不热链；媒体文件 URL 带 `?w=<worldId>` 防跨世界缓存撞号；一条媒体只挂一处——帖子或私信消息（一帖 ≤20 个、一条消息 ≤4 个，图视频可混排，帖子卡只显示前 4 个）；外链抓取走 `core/safe-fetch.ts`（SSRF 防护）。Fastify 流式响应必须 `return reply.send(stream)`（async handler 竞争会吞空 body）。详见 docs/design.md。
+- **私信与 SSE**：DM 不写 notifications 表（独立未读角标）；已读/未读/游标全基于消息 id 而非时间戳（模拟时钟可回拨）；SSE 流 token 走 query 验证（EventSource 带不了 header），SSE 路由必须 `reply.hijack()` 自管连接；世界热切换会 closeAll 全部 SSE 连接。详见 docs/design.md。
 - 服务端读 JSON 文件须容忍 UTF-8 BOM（已有 readJsonFile 工具）。
 
 ## 环境注意（Windows + PowerShell 5.1）
@@ -64,7 +65,7 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 短期：UX 体验修改 11 项清单（第九周期）与个人资料页增强批次（第十周期：认证体系、位置/生日/专业类别/个人链接、用户悬浮卡、通知缩略图、链接卡片修复）均已实施并验收，详见 devlog 2026-06-12。用户可能继续逐批提出 UI/UX 改进。
+- 短期：UX 体验修改 11 项清单（第九周期）与个人资料页增强批次（第十周期：认证体系、位置/生日/专业类别/个人链接、用户悬浮卡、通知缩略图、链接卡片修复）均已实施并验收；私信系统（第十一周期：1v1 会话/消息请求/已读回执/表情回应/SSE 实时推送，migration v11）已实施、后端 51 项断言通过，**待用户人工端到端验收**。详见 devlog 2026-06-12。用户可能继续逐批提出 UI/UX 改进。
 - 中期：M5 模拟器（ECS 架构虚拟用户、ContentGenerator 接口先模板后 LLM、上帝控制台、数据导出）；其前置后端能力（世界时钟控制 API、虚拟用户管理 API）与无排期待办清单见 docs/design.md 的"后续路线"。虚拟用户发图帖的链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 媒体系统四期（A 图片地基 / B 视频 / C URL 引入+OG 链接卡片 / D 关键字搜图）已全部完成，设计细节见 docs/design.md。
 - 未实现的大块：自定义历法换算、生产构建流程。
