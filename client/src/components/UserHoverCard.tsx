@@ -14,6 +14,8 @@ import { VerifiedBadge } from './VerifiedBadge';
 
 /** 卡片估算高度：底部剩余空间不足时向上翻转 */
 const CARD_ESTIMATED_HEIGHT = 340;
+/** 卡片宽度（w-72）：右侧空间不足时贴右展开（如私信里靠右的本人消息） */
+const CARD_WIDTH = 288;
 
 /**
  * 用户悬浮卡：包住头像/昵称等锚点，悬停 400ms 弹出个人简介概览（X 同款）。
@@ -26,6 +28,7 @@ export function UserHoverCard({ handle, children }: { handle: string; children: 
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [flipUp, setFlipUp] = useState(false);
+  const [flipLeft, setFlipLeft] = useState(false);
   const anchorRef = useRef<HTMLSpanElement | null>(null);
   const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,9 +68,10 @@ export function UserHoverCard({ handle, children }: { handle: string; children: 
         if (closeTimer.current) clearTimeout(closeTimer.current);
         if (openTimer.current) clearTimeout(openTimer.current);
         openTimer.current = setTimeout(() => {
-          // 底部空间不足时向上翻转展开
+          // 底部/右侧空间不足时向上/向左翻转展开
           const rect = anchorRef.current?.getBoundingClientRect();
           setFlipUp(rect ? window.innerHeight - rect.bottom < CARD_ESTIMATED_HEIGHT : false);
+          setFlipLeft(rect ? rect.left + CARD_WIDTH > window.innerWidth - 8 : false);
           setOpen(true);
         }, 400);
       }}
@@ -77,12 +81,12 @@ export function UserHoverCard({ handle, children }: { handle: string; children: 
       }}
     >
       {children}
-      {open && (
+      {open && !profile.isError && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute left-0 z-40 w-72 cursor-default rounded-2xl border border-x-border bg-x-bg p-4 shadow-lg ${
+          className={`absolute z-40 w-72 cursor-default rounded-2xl border border-x-border bg-x-bg p-4 shadow-lg ${
             flipUp ? 'bottom-full mb-1' : 'top-full mt-1'
-          }`}
+          } ${flipLeft ? 'right-0' : 'left-0'}`}
         >
           {u ? (
             <>

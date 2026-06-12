@@ -6,6 +6,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { LinkCard } from '../../components/LinkCard';
 import { MediaGrid } from '../../components/MediaGrid';
 import { PostContent } from '../../components/PostContent';
+import { UserHoverCard } from '../../components/UserHoverCard';
 import { useI18n } from '../../i18n/I18nContext';
 import { ReactionPicker } from './ReactionPicker';
 
@@ -86,6 +87,9 @@ export function MessageBubble({
               <PostContent
                 content={message.content}
                 linkClass={isOwn ? 'text-white underline hover:opacity-80' : undefined}
+                renderMention={(handle, link) => (
+                  <UserHoverCard handle={handle}>{link}</UserHoverCard>
+                )}
               />
             </div>
           )}
