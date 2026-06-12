@@ -62,6 +62,17 @@ export class VideoSearchController {
     reply.send({ task: this.service.tasks.cancel(req.user.sub, req.params.id) });
   };
 
+  sources = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send({ sources: this.service.sources() });
+  };
+
+  search = async (
+    req: FastifyRequest<{ Querystring: { q: string; source?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    reply.send({ results: await this.service.search(req.query.q, req.query.source) });
+  };
+
   /**
    * 流式引用视频的播放代理（公开，video 标签带不了 JWT）：
    * 解直链（缓存）→ Range 透传 → 字节流管回；上游拒绝时重解析一次再失败。

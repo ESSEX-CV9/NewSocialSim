@@ -189,11 +189,11 @@ export function Composer({
     }
   };
 
-  /** 失败任务重试：按任务原模式重新发起（绕过 auto，避免 siteModes 期间被改的歧义） */
-  const retryTask = async (tk: VideoTaskView) => {
+  /** 失败任务重试：按指定模式重新发起（默认原模式；HLS_ONLY 转投传 download） */
+  const retryTask = async (tk: VideoTaskView, mode: 'download' | 'stream' = tk.mode) => {
     setError(null);
     try {
-      const res = await api.videoIngest(tk.url, tk.mode);
+      const res = await api.videoIngest(tk.url, mode);
       if (res.task) {
         setTaskIds((prev) => [...prev.filter((x) => x !== tk.id), res.task!.id]);
       }
@@ -333,6 +333,7 @@ export function Composer({
                 task={tk}
                 onCancel={() => void cancelTask(tk.id)}
                 onRetry={() => void retryTask(tk)}
+                onSwitchDownload={() => void retryTask(tk, 'download')}
                 onDismiss={() => setTaskIds((prev) => prev.filter((x) => x !== tk.id))}
               />
             ))}
@@ -348,6 +349,15 @@ export function Composer({
             onPicked={(m) => {
               if (media.length >= MAX_MEDIA) return;
               setMedia((prev) => [...prev, m]);
+            }}
+            onVideoTask={(res) => {
+              if (res.taskId) setTaskIds((prev) => [...prev, res.taskId!]);
+              else if (res.embedUrl) {
+                setContent((prev) =>
+                  prev.trim().length > 0 ? `${prev.trimEnd()} ${res.embedUrl}` : res.embedUrl!,
+                );
+                setNotice(t('composer.videoEmbedHint'));
+              }
             }}
           />
         )}

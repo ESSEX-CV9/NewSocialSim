@@ -6,15 +6,19 @@ export function IngestTaskTile({
   task,
   onCancel,
   onRetry,
+  onSwitchDownload,
   onDismiss,
 }: {
   task: VideoTaskView;
   onCancel: () => void;
   onRetry: () => void;
+  onSwitchDownload: () => void;
   onDismiss: () => void;
 }) {
   const { t } = useI18n();
   const failed = task.status === 'error';
+  // 流式源无单文件直链：直接给"改用下载"一键转投，不必回去重选模式
+  const hlsOnly = failed && task.errorCode === 'HLS_ONLY';
   const stageText =
     task.status === 'pending'
       ? t('composer.videoTaskPending')
@@ -41,13 +45,23 @@ export function IngestTaskTile({
           <span className="line-clamp-3 text-[11px] leading-tight text-x-red" title={task.errorMessage}>
             {task.errorMessage ?? t('composer.videoTaskFailed')}
           </span>
-          <div className="flex gap-2">
-            <button
-              onClick={onRetry}
-              className="rounded-full border border-x-dim px-2 py-0.5 text-[11px] font-bold transition-colors duration-200 hover:bg-x-hover"
-            >
-              {t('composer.videoTaskRetry')}
-            </button>
+          <div className="flex flex-wrap gap-2">
+            {/* HLS-only：直接给"改用下载"一键转投，免回去重选模式 */}
+            {hlsOnly ? (
+              <button
+                onClick={onSwitchDownload}
+                className="rounded-full border border-x-blue px-2 py-0.5 text-[11px] font-bold text-x-blue transition-colors duration-200 hover:bg-x-blue/10"
+              >
+                {t('composer.videoTaskSwitchDownload')}
+              </button>
+            ) : (
+              <button
+                onClick={onRetry}
+                className="rounded-full border border-x-dim px-2 py-0.5 text-[11px] font-bold transition-colors duration-200 hover:bg-x-hover"
+              >
+                {t('composer.videoTaskRetry')}
+              </button>
+            )}
             <button
               onClick={onDismiss}
               className="rounded-full border border-x-dim px-2 py-0.5 text-[11px] font-bold transition-colors duration-200 hover:bg-x-hover"

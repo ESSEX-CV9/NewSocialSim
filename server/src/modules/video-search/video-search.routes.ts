@@ -33,6 +33,16 @@ const streamQuerySchema = {
   properties: { w: { type: 'string', minLength: 1, maxLength: 100 } },
 } as const;
 
+const searchQuerySchema = {
+  type: 'object',
+  required: ['q'],
+  additionalProperties: false,
+  properties: {
+    q: { type: 'string', minLength: 1, maxLength: 100 },
+    source: { type: 'string', maxLength: 20 },
+  },
+} as const;
+
 export interface VideoSearchRoutesDeps {
   videoSearchService: VideoSearchService;
   requireAuth: preHandlerHookHandler;
@@ -46,6 +56,12 @@ export function registerVideoSearchRoutes(app: FastifyInstance, deps: VideoSearc
     '/api/video/ingest',
     { ...auth, schema: { body: ingestBodySchema } },
     controller.ingest,
+  );
+  app.get('/api/video/sources', auth, controller.sources);
+  app.get<{ Querystring: { q: string; source?: string } }>(
+    '/api/video/search',
+    { ...auth, schema: { querystring: searchQuerySchema } },
+    controller.search,
   );
   app.get('/api/video/tasks', auth, controller.tasks);
   app.get<{ Params: { id: string } }>(

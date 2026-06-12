@@ -8,9 +8,18 @@ import { deriveEmbed, type EmbedSite } from '../link-cards/embed.js';
 import type { MediaService } from '../media/media.service.js';
 import { readSearchConfig, videoSettings, type VideoSettings } from '../media-search/search-config.js';
 import type { ToolsService } from '../tools/tools.service.js';
+import { PornhubVideoAdapter } from './adapters/pornhub.js';
+import { Rule34VideoAdapter } from './adapters/rule34video.js';
+import type { VideoSearchAdapter, VideoSearchResult, VideoSourceAvailability } from './adapters/types.js';
+import { YouTubeVideoAdapter } from './adapters/youtube.js';
 import { StreamResolver, type ResolvedStream } from './stream-resolver.js';
 import { VideoTaskError, VideoTaskManager, type VideoTask, type VideoTaskView } from './video-tasks.js';
 import { YtDlp, type ProbeResult, type YtDlpRequestOpts } from './ytdlp.js';
+
+export interface VideoSourceStatus extends VideoSourceAvailability {
+  id: string;
+  adultOnly: boolean;
+}
 
 /** 按目标站点组装 yt-dlp 请求选项：全局代理 + 站点 Cookie（B站 412 风控需浏览器 Cookie） */
 export function requestOptsFor(url: string): YtDlpRequestOpts {
@@ -51,9 +60,16 @@ function isAdultHost(host: string): boolean {
   return ADULT_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
 }
 
+const PER_SOURCE_LIMIT = 20;
+
 export class VideoSearchService {
   private readonly ytdlp: YtDlp;
   private readonly resolver: StreamResolver;
+  private readonly adapters: VideoSearchAdapter[] = [
+    new YouTubeVideoAdapter(),
+    new PornhubVideoAdapter(),
+    new Rule34VideoAdapter(),
+  ];
   readonly tasks = new VideoTaskManager();
 
   constructor(
@@ -79,6 +95,50 @@ export class VideoSearchService {
 
   invalidateStream(mediaId: number): void {
     this.resolver.invalidate(mediaId);
+  }
+
+  /** 各视频源可用状态（yt-dlp 未装则全不可用；成人源在 safe 世界标 world-rating） */
+  sources(): VideoSourceStatus[] {
+    const ytdlpOk = this.ytdlp.available();
+    const { meta } = this.worldManager.current();
+    return this.adapters.map((a) => {
+      const avail = a.available({ ytdlpOk, contentRating: meta.contentRating });
+      return {
+        id: a.name,
+        adultOnly: a.adultOnly,
+        ok: avail.ok,
+        ...(avail.reason ? { reason: avail.reason } : {}),
+      };
+    });
+  }
+
+  /** 单源直查 / 缺省全可用源并行（单源失败静默吞掉） */
+  async search(query: string, source?: string): Promise<VideoSearchResult[]> {
+    const q = query.trim();
+    if (!q) throw new AppError(400, 'VALIDATION', '搜索关键词不能为空');
+    const cfg = readSearchConfig();
+    const { meta } = this.worldManager.current();
+    const ytdlpOk = this.ytdlp.available();
+    const deps = { ytdlp: this.ytdlp, cfg, proxy: cfg.proxy?.trim() || undefined };
+
+    let chosen: VideoSearchAdapter[];
+    if (source) {
+      const adapter = this.adapters.find((a) => a.name === source);
+      if (!adapter) throw new AppError(400, 'VALIDATION', `未知的视频源：${source}`);
+      const avail = adapter.available({ ytdlpOk, contentRating: meta.contentRating });
+      if (!avail.ok) throw new AppError(400, 'VALIDATION', `视频源 ${source} 不可用：${avail.reason ?? ''}`);
+      chosen = [adapter];
+    } else {
+      chosen = this.adapters.filter((a) => a.available({ ytdlpOk, contentRating: meta.contentRating }).ok);
+    }
+
+    const settled = await Promise.allSettled(chosen.map((a) => a.search(q, PER_SOURCE_LIMIT, deps)));
+    const results: VideoSearchResult[] = [];
+    for (const s of settled) {
+      if (s.status === 'fulfilled') results.push(...s.value);
+      else console.error('[video-search] 单源失败：', s.reason);
+    }
+    return results;
   }
 
   /**

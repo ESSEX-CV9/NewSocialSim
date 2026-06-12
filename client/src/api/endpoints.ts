@@ -203,6 +203,14 @@ export const api = {
   biliLogin: () => http<PixivLoginStatus>('POST', '/api/media-search/bilibili/login', {}),
   biliLoginStatus: () => http<PixivLoginStatus>('GET', '/api/media-search/bilibili/login/status'),
 
+  // video search（关键字搜视频：各源适配器，下载统一走 ingest）
+  videoSources: () =>
+    http<{ sources: VideoSourceStatus[] }>('GET', '/api/video/sources'),
+  videoSearch: (q: string, source?: string) =>
+    http<{ results: VideoSearchResult[] }>(
+      'GET',
+      `/api/video/search?q=${encodeURIComponent(q)}${source ? `&source=${encodeURIComponent(source)}` : ''}`,
+    ),
   // video ingest（外站视频引入：auto 按形态路由，可能直接返回 embed 不建任务）
   videoIngest: (url: string, mode: 'auto' | 'download' | 'stream' = 'auto') =>
     http<VideoIngestResult>('POST', '/api/video/ingest', { url, mode }),
@@ -233,6 +241,22 @@ export interface VideoTaskView {
   errorMessage?: string;
   media?: MediaView;
   createdAt: number;
+}
+
+export interface VideoSourceStatus {
+  id: string;
+  adultOnly: boolean;
+  ok: boolean;
+  reason?: string;
+}
+
+export interface VideoSearchResult {
+  url: string;
+  title: string;
+  thumbnail: string | null;
+  durationMs: number | null;
+  source: string;
+  uploader?: string;
 }
 
 export interface VideoIngestResult {
