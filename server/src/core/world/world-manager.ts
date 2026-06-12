@@ -44,6 +44,7 @@ const CLOCK_PERSIST_INTERVAL_MS = 30_000;
 export class WorldManager {
   private context: WorldContext | null = null;
   private persistTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly activatedListeners: Array<() => void> = [];
 
   constructor(
     private readonly worldsDir: string,
@@ -166,7 +167,13 @@ export class WorldManager {
     }
     this.context = { worldId, db, clock: new SimClock(meta.clock), meta };
     this.writeServerState({ activeWorldId: worldId });
+    for (const cb of this.activatedListeners) cb();
     return this.context;
+  }
+
+  /** 热切换成功（新上下文已就绪）后的回调；切到同一世界的空操作不触发 */
+  onActivated(cb: () => void): void {
+    this.activatedListeners.push(cb);
   }
 
   /** 把当前世界的时钟快照写回 world.json */

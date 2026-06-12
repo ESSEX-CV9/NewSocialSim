@@ -1,5 +1,9 @@
 import { MESSAGE_REACTION_EMOJIS } from '@socialsim/shared';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import type { AuthTokenPayload } from '../../core/auth/auth-guard.js';
+import { UnauthorizedError } from '../../core/errors/app-error.js';
+import type { SseHub } from '../../core/events/sse-hub.js';
+import type { WorldManager } from '../../core/world/world-manager.js';
 import { MessagesController } from './messages.controller.js';
 import type { MessagesService } from './messages.service.js';
 
@@ -64,8 +68,17 @@ const reactionBodySchema = {
   properties: { emoji: { type: 'string', enum: [...MESSAGE_REACTION_EMOJIS] } },
 } as const;
 
+const streamQuerySchema = {
+  type: 'object',
+  required: ['token'],
+  additionalProperties: false,
+  properties: { token: { type: 'string' } },
+} as const;
+
 export interface MessagesRoutesDeps {
   messagesService: MessagesService;
+  sseHub: SseHub;
+  worldManager: WorldManager;
   requireAuth: preHandlerHookHandler;
 }
 
@@ -128,5 +141,33 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
     '/api/messages/:messageId/reaction',
     { ...auth, schema: { params: messageIdParamsSchema } },
     controller.removeReaction,
+  );
+
+  // SSE 实时流。EventSource 带不了 Authorization 头，token 走 query 手动验证；
+  // hijack 后自管原始连接生命周期（规避 async handler 与流式响应的竞争）
+  app.get<{ Querystring: { token: string } }>(
+    '/api/messages/stream',
+    { schema: { querystring: streamQuerySchema } },
+    (req, reply) => {
+      let payload: AuthTokenPayload;
+      try {
+        payload = app.jwt.verify<AuthTokenPayload>(req.query.token);
+      } catch {
+        throw new UnauthorizedError('未登录或登录已过期');
+      }
+      if (payload.worldId !== deps.worldManager.current().worldId) {
+        throw new UnauthorizedError('登录态属于另一个世界，请重新登录');
+      }
+
+      reply.hijack();
+      reply.raw.writeHead(200, {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache',
+        connection: 'keep-alive',
+      });
+      reply.raw.write(': connected\n\n');
+      const unregister = deps.sseHub.addClient(payload.sub, payload.worldId, reply.raw);
+      req.raw.on('close', unregister);
+    },
   );
 }

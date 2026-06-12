@@ -3,6 +3,7 @@ import fastifyMultipart from '@fastify/multipart';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { makeOptionalAuth, makeRequireAuth } from './core/auth/auth-guard.js';
 import { AppError } from './core/errors/app-error.js';
+import type { SseHub } from './core/events/sse-hub.js';
 import type { WorldManager } from './core/world/world-manager.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
 import { AuthService } from './modules/auth/auth.service.js';
@@ -33,6 +34,7 @@ import { registerWorldsRoutes } from './modules/worlds/worlds.routes.js';
 
 export interface AppDeps {
   worldManager: WorldManager;
+  sseHub: SseHub;
   jwtSecret: string;
 }
 
@@ -62,7 +64,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   // 上限按视频放到 100MB；图片的 10MB 限制在 media.service 内单独校验
   app.register(fastifyMultipart, { limits: { fileSize: 100 * 1024 * 1024, files: 1 } });
 
-  const { worldManager } = deps;
+  const { worldManager, sseHub } = deps;
   const requireAuth = makeRequireAuth(worldManager);
   const optionalAuth = makeOptionalAuth(worldManager);
 
@@ -84,7 +86,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const blocksService = new BlocksService(worldManager, usersService, followsService);
   const timelineService = new TimelineService(worldManager, postsService, usersService);
   const searchService = new SearchService(worldManager, postsService);
-  const messagesService = new MessagesService(worldManager, mediaService);
+  const messagesService = new MessagesService(worldManager, mediaService, sseHub);
 
   app.get('/api/health', async () => ({ ok: true }));
 
@@ -98,7 +100,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerFollowsRoutes(app, { followsService, requireAuth });
   registerBlocksRoutes(app, { blocksService, requireAuth });
   registerNotificationsRoutes(app, { notificationsService, requireAuth });
-  registerMessagesRoutes(app, { messagesService, requireAuth });
+  registerMessagesRoutes(app, { messagesService, sseHub, worldManager, requireAuth });
   registerTimelineRoutes(app, { timelineService, requireAuth, optionalAuth });
   registerSearchRoutes(app, { searchService, optionalAuth });
 
