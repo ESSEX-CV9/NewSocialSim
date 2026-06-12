@@ -89,6 +89,14 @@ export function MediaLightbox({
       >
         <i className="ri-close-line text-[20px]" />
       </button>
+      {media.length > 1 && (
+        <div
+          onClick={stop}
+          className="absolute top-5 left-1/2 -translate-x-1/2 rounded-full bg-white/10 px-3 py-1 text-[13px] text-white"
+        >
+          {index + 1} / {media.length}
+        </div>
+      )}
       {postId !== undefined && (
         <button
           onClick={(e) => {

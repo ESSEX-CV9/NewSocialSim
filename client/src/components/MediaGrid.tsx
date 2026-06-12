@@ -73,8 +73,8 @@ export function MediaGrid({ media, compact }: { media: MediaView[]; compact?: bo
   const [lightbox, setLightbox] = useState<number | null>(null);
   if (media.length === 0) return null;
 
-  // 视频与图片不混排（后端保证），有视频即单元素内联播放器
-  if (media[0]!.type === 'video') {
+  // 单独 1 个视频走内联播放器；其余（含图视频混排）一律宫格 + 查看器
+  if (media.length === 1 && media[0]!.type === 'video') {
     return <InlineVideo media={media[0]!} compact={compact} />;
   }
 
@@ -83,16 +83,39 @@ export function MediaGrid({ media, compact }: { media: MediaView[]; compact?: bo
     setLightbox(index);
   };
 
-  const img = (item: MediaView, index: number, className = '') => (
-    <img
+  /** 宫格格子：图片直接展示；视频格为首帧 + 播放角标（不自动播放，点开查看器播）；
+      第 4 格在媒体超过 4 个时叠 "+N" 角标，其余媒体在查看器里滑动 */
+  const tile = (item: MediaView, index: number) => (
+    <div
       key={item.id}
-      src={item.url}
-      alt=""
       onClick={(e) => open(e, index)}
-      className={`h-full w-full cursor-zoom-in object-cover ${className}`}
-      loading="lazy"
-      draggable={false}
-    />
+      className="relative h-full w-full cursor-zoom-in overflow-hidden"
+    >
+      {item.type === 'video' ? (
+        <>
+          <video
+            src={item.url}
+            preload="metadata"
+            muted
+            className="pointer-events-none h-full w-full object-cover"
+          />
+          <i className="ri-play-circle-fill absolute right-1.5 bottom-1.5 text-[22px] text-white drop-shadow" />
+        </>
+      ) : (
+        <img
+          src={item.url}
+          alt=""
+          className="h-full w-full object-cover"
+          loading="lazy"
+          draggable={false}
+        />
+      )}
+      {index === 3 && media.length > 4 && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-2xl font-bold text-white">
+          +{media.length - 4}
+        </div>
+      )}
+    </div>
   );
 
   const maxHeight = compact ? 'max-h-72' : 'max-h-128';
@@ -103,29 +126,29 @@ export function MediaGrid({ media, compact }: { media: MediaView[]; compact?: bo
     const ratio = m.width && m.height ? `${m.width} / ${m.height}` : '16 / 9';
     body = (
       <div className={`w-full ${maxHeight}`} style={{ aspectRatio: ratio }}>
-        {img(m, 0)}
+        {tile(m, 0)}
       </div>
     );
   } else if (media.length === 2) {
     body = (
       <div className="grid aspect-2/1 grid-cols-2 gap-0.5">
-        {media.map((m, i) => img(m, i))}
+        {media.map((m, i) => tile(m, i))}
       </div>
     );
   } else if (media.length === 3) {
     body = (
       <div className="grid aspect-2/1 grid-cols-2 gap-0.5">
-        {img(media[0]!, 0)}
+        {tile(media[0]!, 0)}
         <div className="grid grid-rows-2 gap-0.5">
-          {img(media[1]!, 1)}
-          {img(media[2]!, 2)}
+          {tile(media[1]!, 1)}
+          {tile(media[2]!, 2)}
         </div>
       </div>
     );
   } else {
     body = (
       <div className="grid aspect-2/1 grid-cols-2 grid-rows-2 gap-0.5">
-        {media.slice(0, 4).map((m, i) => img(m, i))}
+        {media.slice(0, 4).map((m, i) => tile(m, i))}
       </div>
     );
   }

@@ -14,7 +14,8 @@ const createPostBodySchema = {
     mediaIds: {
       type: 'array',
       items: { type: 'integer', minimum: 1 },
-      maxItems: 4,
+      // 与 media.service 的 MAX_PER_POST 一致
+      maxItems: 20,
       uniqueItems: true,
     },
   },

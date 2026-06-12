@@ -31,7 +31,7 @@ export interface PostView extends Post {
   quoted: PostView | null;
   /** 观察者是否已关注作者（本人帖与匿名时为 false；供帖子菜单的关注快捷项） */
   authorFollowedByViewer: boolean;
-  /** 附加媒体（最多 4 张图或 1 个视频），按 position 排序；墓碑帖为空数组 */
+  /** 附加媒体（最多 20 个，图/视频可混排），按 position 排序；墓碑帖为空数组 */
   media: MediaView[];
   /** 正文首个 URL 的链接卡片；有媒体时不显示（X 行为），抓取失败为 null */
   linkCard: LinkCardView | null;

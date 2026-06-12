@@ -24,8 +24,8 @@ const VIDEO_MIMES: Record<string, string> = {
 };
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
-/** 一条帖子最多挂的媒体数（X 规则） */
-const MAX_PER_POST = 4;
+/** 一条帖子最多挂的媒体数（防呆硬顶，图/视频共享配额且可混排；帖子卡只显示前 4 个） */
+const MAX_PER_POST = 20;
 
 export function isImageMime(mime: string): boolean {
   return mime in IMAGE_MIMES;
@@ -233,7 +233,7 @@ export class MediaService {
   }
 
   /**
-   * 校验一组媒体可挂到新帖：≤4 张图或恰 1 个视频（不混排）、全部存在且本人所有、
+   * 校验一组媒体可挂到新帖：≤20 个媒体（图/视频可混排）、全部存在且本人所有、
    * 未被其他帖占用。规则：一条媒体只能挂一个帖子；头像/Banner 不占用名额。
    */
   validateAttachable(ownerId: number, mediaIds: number[]): void {
@@ -246,9 +246,6 @@ export class MediaService {
     if (rows.length !== mediaIds.length) throw new ValidationError('包含不存在的媒体');
     for (const row of rows) {
       if (row.owner_id !== ownerId) throw new ValidationError('只能使用自己上传的媒体');
-    }
-    if (rows.some((r) => r.type === 'video') && rows.length > 1) {
-      throw new ValidationError('视频只能单独发布，不能与其他媒体混排');
     }
     const attached = mediaRepo.attachedSet(db, mediaIds);
     if (attached.size > 0) throw new ValidationError('媒体已被其他帖子使用');

@@ -41,7 +41,7 @@ npm workspaces monorepo：
 - **主题系统**：`client/src/index.css` 中 `[data-theme]` 变量块 + `@theme inline` 映射；组件只用 `bg-x-*` 等令牌类，禁止写死颜色。新主题 = 加一个变量块 + `client/src/theme/themes.ts` 注册。
 - **多账号**：客户端 localStorage 存账号数组（token+快照），401 自动剔除失效账号。
 - **i18n**：所有界面文案经 `useI18n().t(key)`，中英文案都在 `client/src/i18n/messages.ts`，新增文案必须双语。
-- **媒体系统**：外部图片一律下载入库不热链；媒体文件 URL 带 `?w=<worldId>` 防跨世界缓存撞号；一条媒体只挂一个帖子（≤4 图或 1 视频不混排）；外链抓取走 `core/safe-fetch.ts`（SSRF 防护）。Fastify 流式响应必须 `return reply.send(stream)`（async handler 竞争会吞空 body）。详见 docs/design.md。
+- **媒体系统**：外部图片一律下载入库不热链；媒体文件 URL 带 `?w=<worldId>` 防跨世界缓存撞号；一条媒体只挂一个帖子（一帖 ≤20 个媒体，图视频可混排，帖子卡只显示前 4 个）；外链抓取走 `core/safe-fetch.ts`（SSRF 防护）。Fastify 流式响应必须 `return reply.send(stream)`（async handler 竞争会吞空 body）。详见 docs/design.md。
 - 服务端读 JSON 文件须容忍 UTF-8 BOM（已有 readJsonFile 工具）。
 
 ## 环境注意（Windows + PowerShell 5.1）

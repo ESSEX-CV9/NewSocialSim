@@ -7,7 +7,8 @@ import { Avatar } from './Avatar';
 import { MediaSearchPanel } from './MediaSearchPanel';
 
 const MAX_LENGTH = 280;
-const MAX_MEDIA = 4;
+/** 与服务端 MAX_PER_POST 一致：图/视频共享配额且可混排 */
+const MAX_MEDIA = 20;
 const MEDIA_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm';
 
 interface ComposerProps {
@@ -49,14 +50,8 @@ export function Composer({
   const pickFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const picked = Array.from(files);
-    const hasVideo = picked.some((f) => f.type.startsWith('video/'));
-    // 视频只能单独发布：不与图片混选，也不追加到已有媒体
-    if ((hasVideo && (picked.length > 1 || media.length > 0)) || media.some((m) => m.type === 'video')) {
-      setError(t('composer.videoLimit'));
-      return;
-    }
     if (picked.length > MAX_MEDIA - media.length) {
-      setError(t('composer.imageLimit'));
+      setError(t('composer.mediaLimit', { n: MAX_MEDIA }));
       return;
     }
     setUploading(true);
@@ -79,8 +74,8 @@ export function Composer({
   const addFromUrl = async () => {
     const url = urlValue.trim();
     if (!url || uploading) return;
-    if (media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')) {
-      setError(media.some((m) => m.type === 'video') ? t('composer.videoLimit') : t('composer.imageLimit'));
+    if (media.length >= MAX_MEDIA) {
+      setError(t('composer.mediaLimit', { n: MAX_MEDIA }));
       return;
     }
     setUploading(true);
@@ -133,21 +128,44 @@ export function Composer({
             if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
           }}
         />
-        {media.length > 0 && (
-          <div className={`mb-2 grid gap-2 ${media.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+        {/* 预览：单媒体大图；多媒体横向滚动缩略条（20 个上限下网格会撑爆发帖框） */}
+        {media.length === 1 && (
+          <div className="relative mb-2 overflow-hidden rounded-2xl border border-x-border">
+            {media[0]!.type === 'video' ? (
+              <video src={media[0]!.url} controls preload="metadata" className="max-h-72 w-full" />
+            ) : (
+              <img src={media[0]!.url} alt="" className="max-h-72 w-full object-cover" draggable={false} />
+            )}
+            <button
+              aria-label={t('composer.removeImage')}
+              onClick={() => setMedia([])}
+              className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white transition-colors duration-200 hover:bg-black/90"
+            >
+              <i className="ri-close-line text-[16px]" />
+            </button>
+          </div>
+        )}
+        {media.length > 1 && (
+          <div className="no-scrollbar mb-2 flex gap-2 overflow-x-auto">
             {media.map((m) => (
-              <div key={m.id} className="relative overflow-hidden rounded-2xl border border-x-border">
+              <div
+                key={m.id}
+                className="relative size-24 shrink-0 overflow-hidden rounded-xl border border-x-border bg-x-input"
+              >
                 {m.type === 'video' ? (
-                  <video src={m.url} controls preload="metadata" className="max-h-72 w-full" />
+                  <>
+                    <video src={m.url} preload="metadata" muted className="h-full w-full object-cover" />
+                    <i className="ri-play-circle-fill pointer-events-none absolute right-1 bottom-1 text-[18px] text-white drop-shadow" />
+                  </>
                 ) : (
-                  <img src={m.url} alt="" className="max-h-72 w-full object-cover" draggable={false} />
+                  <img src={m.url} alt="" className="h-full w-full object-cover" draggable={false} />
                 )}
                 <button
                   aria-label={t('composer.removeImage')}
                   onClick={() => setMedia((prev) => prev.filter((x) => x.id !== m.id))}
-                  className="absolute top-2 right-2 flex size-8 items-center justify-center rounded-full bg-black/70 text-white transition-colors duration-200 hover:bg-black/90"
+                  className="absolute top-1 right-1 flex size-6 items-center justify-center rounded-full bg-black/70 text-white transition-colors duration-200 hover:bg-black/90"
                 >
-                  <i className="ri-close-line text-[16px]" />
+                  <i className="ri-close-line text-[14px]" />
                 </button>
               </div>
             ))}
@@ -158,9 +176,9 @@ export function Composer({
         )}
         {searchOpen && (
           <MediaSearchPanel
-            disabled={media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
+            disabled={media.length >= MAX_MEDIA}
             onPicked={(m) => {
-              if (media.length >= MAX_MEDIA || media.some((x) => x.type === 'video')) return;
+              if (media.length >= MAX_MEDIA) return;
               setMedia((prev) => [...prev, m]);
             }}
           />
@@ -199,7 +217,7 @@ export function Composer({
           <button
             aria-label={t('composer.addMedia')}
             title={t('composer.addMedia')}
-            disabled={uploading || media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
+            disabled={uploading || media.length >= MAX_MEDIA}
             onClick={() => fileInputRef.current?.click()}
             className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -208,7 +226,7 @@ export function Composer({
           <button
             aria-label={t('composer.addFromUrl')}
             title={t('composer.addFromUrl')}
-            disabled={uploading || media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
+            disabled={uploading || media.length >= MAX_MEDIA}
             onClick={() => setUrlInputOpen((v) => !v)}
             className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -217,7 +235,7 @@ export function Composer({
           <button
             aria-label={t('mediaSearch.title')}
             title={t('mediaSearch.title')}
-            disabled={uploading || media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
+            disabled={uploading || media.length >= MAX_MEDIA}
             onClick={() => setSearchOpen((v) => !v)}
             className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
