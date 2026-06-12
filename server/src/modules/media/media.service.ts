@@ -49,11 +49,17 @@ const SNIFF_TYPE_TO_MIME: Record<string, string> = {
   gif: 'image/gif',
 };
 
-/** 需要特定 Referer 才放行图片的站点（防盗链；D 期搜图复用） */
-const REFERER_BY_HOST: Record<string, string> = {
-  'i.pximg.net': 'https://www.pixiv.net/',
-  's.pximg.net': 'https://www.pixiv.net/',
-};
+/** 需要特定 Referer 才放行图片的站点（防盗链；D 期搜图、视频海报复用）。host 精确或后缀匹配 */
+const REFERER_RULES: { suffix: string; referer: string }[] = [
+  { suffix: 'pximg.net', referer: 'https://www.pixiv.net/' },
+  { suffix: 'phncdn.com', referer: 'https://www.pornhub.com/' }, // PH 视频缩略图 CDN
+];
+
+/** 防盗链站点的 Referer（无则返回 undefined）；视频海报与搜图缩略图入库共用 */
+export function refererForHost(host: string): string | undefined {
+  const h = host.toLowerCase();
+  return REFERER_RULES.find((r) => h === r.suffix || h.endsWith(`.${r.suffix}`))?.referer;
+}
 
 /** 经代理拉外站图可能较慢，放宽到 30 秒 */
 const URL_FETCH_TIMEOUT_MS = 30_000;
@@ -148,7 +154,7 @@ export class MediaService {
   /** 外链图片下载入库（URL 引入 / 搜图选图 / 链接卡片缩略图共用此入口） */
   async ingestImageFromUrl(ownerId: number, url: string, source: string): Promise<MediaView> {
     const host = new URL(url).hostname.toLowerCase();
-    const referer = REFERER_BY_HOST[host];
+    const referer = refererForHost(host);
     const { buf, contentType } = await fetchWithLimit(url, {
       timeoutMs: URL_FETCH_TIMEOUT_MS,
       maxBytes: MAX_IMAGE_BYTES,

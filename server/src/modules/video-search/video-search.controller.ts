@@ -84,14 +84,19 @@ export class VideoSearchController {
     const id = Number(req.params.id);
     const range = req.headers.range;
 
-    let target = await this.service.streamTarget(id, req.query.w);
-    let upstream = await fetchUpstream(target, range);
-    if (RETRYABLE_UPSTREAM.includes(upstream.statusCode)) {
-      await upstream.body.dump();
-      this.service.invalidateStream(id);
-      target = await this.service.streamTarget(id, req.query.w);
-      upstream = await fetchUpstream(target, range);
-    }
+    // 串行化获取上游响应（含解直链+重试）：签名直链不支持同签名并发，浏览器播放却天然
+    // 多连接并发。仅"拿到响应头"这段互斥，body 流回不互斥（不让慢客户端阻塞他人）。
+    const upstream = await this.service.streamExclusive(id, async () => {
+      let target = await this.service.streamTarget(id, req.query.w);
+      let up = await fetchUpstream(target, range);
+      if (RETRYABLE_UPSTREAM.includes(up.statusCode)) {
+        await up.body.dump();
+        this.service.invalidateStream(id);
+        target = await this.service.streamTarget(id, req.query.w);
+        up = await fetchUpstream(target, range);
+      }
+      return up;
+    });
     if (upstream.statusCode !== 200 && upstream.statusCode !== 206) {
       await upstream.body.dump();
       throw new AppError(410, 'STREAM_GONE', `源站返回 ${upstream.statusCode}`);

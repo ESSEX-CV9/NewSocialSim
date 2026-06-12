@@ -8,6 +8,22 @@ type Rating = 'safe' | 'all' | 'r18';
 type Dimension = 'image' | 'video';
 type IngestMode = 'auto' | 'download' | 'stream';
 
+/** 视频结果缩略图：直链优先，加载失败（防盗链 403）回退到服务端 preview 代理 */
+function VideoThumb({ src, title }: { src: string; title: string }) {
+  const [proxied, setProxied] = useState(false);
+  return (
+    <img
+      src={proxied ? `/api/media-search/preview?url=${encodeURIComponent(src)}` : src}
+      alt={title}
+      loading="lazy"
+      onError={() => {
+        if (!proxied) setProxied(true);
+      }}
+      className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
+    />
+  );
+}
+
 /** 毫秒 → mm:ss / h:mm:ss */
 function fmtDuration(ms: number | null): string {
   if (ms === null) return '';
@@ -264,12 +280,7 @@ export function MediaSearchPanel({
               className="group relative aspect-video overflow-hidden rounded-lg bg-x-input disabled:opacity-60"
             >
               {item.thumbnail ? (
-                <img
-                  src={item.thumbnail}
-                  alt={item.title}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-105"
-                />
+                <VideoThumb src={item.thumbnail} title={item.title} />
               ) : (
                 <span className="flex h-full w-full items-center justify-center text-x-dim">
                   <i className="ri-video-line text-[24px]" />

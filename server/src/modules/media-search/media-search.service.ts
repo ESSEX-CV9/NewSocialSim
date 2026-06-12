@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from '../../core/errors/app-error.js';
 import { fetchWithLimit } from '../../core/safe-fetch.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { refererForHost } from '../media/media.service.js';
 import { BiliLoginFlow } from './bili-login.js';
 import { DanbooruAdapter } from './adapters/danbooru.js';
 import { GelbooruAdapter } from './adapters/gelbooru.js';
@@ -14,11 +15,6 @@ import { PixivLoginFlow, type LoginStatus } from './pixiv-login.js';
 import { patchSearchConfig, readSearchConfig, type MediaSearchConfig } from './search-config.js';
 
 const PER_SOURCE_LIMIT = 20;
-/** 预览代理只放行需要 Referer 的防盗链站点 */
-const PREVIEW_PROXY_HOSTS: Record<string, string> = {
-  'i.pximg.net': 'https://www.pixiv.net/',
-  's.pximg.net': 'https://www.pixiv.net/',
-};
 
 export interface SourceStatus {
   id: string;
@@ -112,7 +108,8 @@ export class MediaSearchService {
     } catch {
       throw new ValidationError('链接格式不正确');
     }
-    const referer = PREVIEW_PROXY_HOSTS[host];
+    // 防盗链 Referer 规则与媒体入库共用一套（含 pixiv、PH 视频缩略图 CDN）
+    const referer = refererForHost(host);
     if (!referer) throw new NotFoundError('该站点不在预览代理白名单内');
     const { buf, contentType } = await fetchWithLimit(url, {
       timeoutMs: 10_000,

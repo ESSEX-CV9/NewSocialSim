@@ -85,6 +85,11 @@ export class VideoSearchService {
     }
   }
 
+  /** 把同一流式视频的上游访问串行化（签名直链不支持同签名并发） */
+  streamExclusive<T>(mediaId: number, fn: () => Promise<T>): Promise<T> {
+    return this.resolver.runExclusive(mediaId, fn);
+  }
+
   invalidateStream(mediaId: number): void {
     this.resolver.invalidate(mediaId);
   }

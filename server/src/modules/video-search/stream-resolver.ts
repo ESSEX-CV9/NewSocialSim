@@ -36,11 +36,28 @@ function expiryOf(directUrl: string): number {
 export class StreamResolver {
   private readonly cache = new Map<number, ResolvedStream>();
   private readonly inflight = new Map<number, Promise<ResolvedStream>>();
+  /** per-mediaId 串行锁尾：签名直链不支持同签名并发，同源播放请求需排队打源站 */
+  private readonly chains = new Map<number, Promise<unknown>>();
 
   constructor(
     private readonly ytdlp: YtDlp,
     private readonly optsFor: (url: string) => YtDlpRequestOpts,
   ) {}
+
+  /**
+   * 把同一 mediaId 的上游访问串行化（rule34video/pornhub 的签名直链对同签名并发返回
+   * 403/410，而浏览器播放天然多连接并发）。每个请求接在该 id 的链尾，前一个结束才开始。
+   */
+  runExclusive<T>(mediaId: number, fn: () => Promise<T>): Promise<T> {
+    const prev = this.chains.get(mediaId) ?? Promise.resolve();
+    const next = prev.then(fn, fn);
+    // 链尾推进；当且仅当自己仍是链尾时清理，避免 Map 无限增长
+    this.chains.set(mediaId, next);
+    void next.finally(() => {
+      if (this.chains.get(mediaId) === next) this.chains.delete(mediaId);
+    });
+    return next;
+  }
 
   /** 引入任务 probe 时顺手预热，首次播放免一次解析 */
   prime(mediaId: number, prog: ProgressiveFormat): void {
