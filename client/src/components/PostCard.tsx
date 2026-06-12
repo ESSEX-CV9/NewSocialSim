@@ -153,10 +153,22 @@ interface PostCardProps {
   large?: boolean;
   /** 个人主页置顶帖标记 */
   pinned?: boolean;
+  /** 对话串上半卡（回复 Tab 的被回复帖）：头像下延伸连接线、去底边框 */
+  threadTop?: boolean;
+  /** 被回复帖对观察者不可见时的降级显示：正文上方"回复 @handle"行 */
+  replyToFallbackHandle?: string | undefined;
   onDeleted?: (id: number) => void;
 }
 
-export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCardProps) {
+export function PostCard({
+  post,
+  repostedBy,
+  large,
+  pinned,
+  threadTop,
+  replyToFallbackHandle,
+  onDeleted,
+}: PostCardProps) {
   const { user, setUser } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -289,7 +301,7 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
     <article
       ref={viewRef}
       onClick={() => !large && navigate(`/post/${post.id}`)}
-      className={`border-b border-x-border px-4 py-3 ${
+      className={`px-4 py-3 ${threadTop ? '' : 'border-b border-x-border'} ${
         large ? '' : 'cursor-pointer transition-colors duration-200 hover:bg-x-hover'
       }`}
     >
@@ -306,9 +318,13 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
         </div>
       )}
       <div className="flex gap-3">
-        <Link to={`/u/${post.author.handle}`} onClick={stop} className="self-start">
-          <Avatar handle={post.author.handle} avatarUrl={post.author.avatarUrl} />
-        </Link>
+        <div className="flex flex-col items-center">
+          <Link to={`/u/${post.author.handle}`} onClick={stop}>
+            <Avatar handle={post.author.handle} avatarUrl={post.author.avatarUrl} />
+          </Link>
+          {/* 对话串连接线：从头像下缘延伸到卡片底部，与下方回复卡的头像相接 */}
+          {threadTop && <div className="mt-1 -mb-3 w-0.5 flex-1 bg-x-border" />}
+        </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-x-1 text-[15px]">
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1">
@@ -381,6 +397,19 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
               </span>
             )}
           </div>
+          {/* 被回复帖不可见（已删/被屏蔽/被隐藏）时的降级行（与 X 一致） */}
+          {replyToFallbackHandle && (
+            <div className="text-[15px] text-x-dim">
+              {t('post.replyTo')}{' '}
+              <Link
+                to={`/u/${replyToFallbackHandle}`}
+                onClick={stop}
+                className="text-x-blue hover:underline"
+              >
+                @{replyToFallbackHandle}
+              </Link>
+            </div>
+          )}
           <div className={large ? 'mt-2 text-xl' : 'mt-0.5'}>
             <PostContent content={post.content} />
           </div>

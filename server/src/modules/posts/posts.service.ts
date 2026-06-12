@@ -136,7 +136,28 @@ export class PostsService {
       decodeTsIdCursor(cursor),
       pageSize + 1,
     );
-    return this.toPage(rows, pageSize, viewerId);
+    const page = this.toPage(rows, pageSize, viewerId);
+    if (type === 'replies') this.attachParents(page.items, viewerId);
+    return page;
+  }
+
+  /** 回复 Tab：给每条回复嵌入一层被回复帖（观察者不可见时只留作者 handle 供降级显示） */
+  private attachParents(items: PostView[], viewerId: number | null): void {
+    const parentIds = [
+      ...new Set(items.map((v) => v.replyToId).filter((id): id is number => id !== null)),
+    ];
+    if (parentIds.length === 0) return;
+    const { db } = this.worldManager.current();
+    const handleById = new Map(
+      postsRepo.findByIds(db, parentIds).map((r) => [r.id, r.author_handle]),
+    );
+    const visibleRows = postsRepo.findVisibleByIds(db, parentIds, viewerId);
+    const visibleViews = new Map(this.buildViews(visibleRows, viewerId).map((v) => [v.id, v]));
+    for (const item of items) {
+      if (item.replyToId === null) continue;
+      item.inReplyTo = visibleViews.get(item.replyToId) ?? null;
+      item.replyToHandle = handleById.get(item.replyToId) ?? null;
+    }
   }
 
   /** 某用户带媒体的帖子（个人主页媒体 Tab） */

@@ -35,6 +35,10 @@ export interface PostView extends Post {
   media: MediaView[];
   /** 正文首个 URL 的链接卡片；有媒体时不显示（X 行为），抓取失败为 null */
   linkCard: LinkCardView | null;
+  /** 被回复帖的一层嵌入（仅个人主页"回复"Tab 填充）；观察者不可见（已删/被屏蔽/被隐藏）时为 null */
+  inReplyTo?: PostView | null;
+  /** 被回复帖作者 handle（仅"回复"Tab 填充）；嵌入不可见时前端降级显示"回复 @handle" */
+  replyToHandle?: string | null;
 }
 
 export interface TimelineItem {

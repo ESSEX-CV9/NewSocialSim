@@ -22,12 +22,16 @@ const POST_QUERY_HEADS = new Set([
 
 type PostPatch = (p: PostView) => Partial<PostView>;
 
-/** 命中则返回新对象，未命中返回原引用；.quoted 嵌套独立判定 */
+/** 命中则返回新对象，未命中返回原引用；.quoted / .inReplyTo 嵌套独立判定 */
 function patchOnePost(p: PostView, match: (p: PostView) => boolean, patch: PostPatch): PostView {
   let next = match(p) ? { ...p, ...patch(p) } : p;
   if (p.quoted) {
     const quoted = patchOnePost(p.quoted, match, patch);
     if (quoted !== p.quoted) next = next === p ? { ...p, quoted } : { ...next, quoted };
+  }
+  if (p.inReplyTo) {
+    const inReplyTo = patchOnePost(p.inReplyTo, match, patch);
+    if (inReplyTo !== p.inReplyTo) next = next === p ? { ...p, inReplyTo } : { ...next, inReplyTo };
   }
   return next;
 }

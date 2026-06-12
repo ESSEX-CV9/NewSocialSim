@@ -466,9 +466,25 @@ export function ProfilePage() {
         <>
           {activeList.isLoading && <Spinner />}
           {activeList.isError && <ErrorBox error={activeList.error} />}
-          {activeList.items.map((post) => (
-            <PostCard key={post.id} post={post} onDeleted={refreshLists} />
-          ))}
+          {activeList.items.map((post) =>
+            // 回复 Tab：被回复帖可见时渲染为对话串（上半卡 + 连接线 + 回复卡），
+            // 不可见时回复卡内降级显示"回复 @handle"
+            tab === 'replies' && post.inReplyTo ? (
+              <div key={post.id}>
+                <PostCard post={post.inReplyTo} threadTop onDeleted={refreshLists} />
+                <PostCard post={post} onDeleted={refreshLists} />
+              </div>
+            ) : (
+              <PostCard
+                key={post.id}
+                post={post}
+                replyToFallbackHandle={
+                  tab === 'replies' ? (post.replyToHandle ?? undefined) : undefined
+                }
+                onDeleted={refreshLists}
+              />
+            ),
+          )}
           {activeList.isSuccess && activeList.items.length === 0 && (
             <EmptyBox icon={TAB_EMPTY[tab].icon} text={t(TAB_EMPTY[tab].key)} />
           )}

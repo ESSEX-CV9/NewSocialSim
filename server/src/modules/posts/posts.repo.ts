@@ -74,6 +74,21 @@ export const postsRepo = {
     return db.prepare(`${SELECT_POST} WHERE p.id IN (${placeholders})`).all(...ids) as PostRow[];
   },
 
+  /** 批量查询中对观察者可见的帖子：排除已删除、被屏蔽作者与被隐藏帖 */
+  findVisibleByIds(db: WorldDb, ids: number[], viewerId: number | null): PostRow[] {
+    if (ids.length === 0) return [];
+    const placeholders = ids.map((_, i) => `@id${i}`).join(',');
+    const viewerClause = viewerId !== null ? `${NOT_BLOCKED_AUTHOR} ${NOT_HIDDEN}` : '';
+    const params: Record<string, number> = {};
+    ids.forEach((id, i) => (params[`id${i}`] = id));
+    if (viewerId !== null) params['viewerId'] = viewerId;
+    return db
+      .prepare(
+        `${SELECT_POST} WHERE p.id IN (${placeholders}) AND p.deleted = 0 ${viewerClause}`,
+      )
+      .all(params) as PostRow[];
+  },
+
   listReplies(
     db: WorldDb,
     postId: number,
