@@ -21,7 +21,7 @@ npm workspaces monorepo：
 - `shared/` — 前后端共用纯类型（贫血实体 + 视图类型 + API DTO），改接口先改这里。
 - `server/` — Fastify + better-sqlite3。
   - `src/core/` 基础设施：`clock/`（SimClock 模拟时钟）、`db/`（连接 + 版本化 migration，当前 v8）、`world/`（WorldManager 多世界热切换）、`auth/`（JWT 密钥与 requireAuth/optionalAuth 守卫）、`pagination.ts`（游标工具）。
-  - `src/modules/` 按功能域分层，每模块四件套 `*.routes.ts / *.controller.ts / *.service.ts / *.repo.ts`：worlds、auth、users、posts、media（图片上传与文件流，文件存各世界 media/ 目录）、interactions（赞/转发/书签/隐藏帖）、follows、blocks、timeline、notifications、search。
+  - `src/modules/` 按功能域分层，每模块四件套 `*.routes.ts / *.controller.ts / *.service.ts / *.repo.ts`：worlds、auth、users、posts、media（上传/外链入库/文件流，文件存各世界 media/ 目录）、media-search（七源关键字搜图 + Pixiv CDP 引导登录，凭证在 data/media-search.json）、link-cards（OG 链接卡片，无路由）、interactions（赞/转发/书签/隐藏帖）、follows、blocks、timeline、notifications、search。
 - `client/` — React 19 + Vite + Tailwind 4 + react-query + Remix Icon（均 npm 本地，离线可用）。
   - `src/api/` fetch 封装与全部接口；`src/auth|world|i18n|theme/` 四个全局 Context；`src/components/` 通用组件（Layout、PostCard、Composer、usePagedQuery 等）；`src/features/<页面>/` 按页面组织。
 - `simulator/` — 空，第二阶段使用。
@@ -61,5 +61,5 @@ npm workspaces monorepo：
 
 - 短期：继续响应用户的 UI/交互打磨需求。
 - 中期：M5 模拟器（ECS 架构虚拟用户、ContentGenerator 接口先模板后 LLM、上帝控制台、数据导出）；其前置后端能力（世界时钟控制 API、虚拟用户管理 API）与无排期待办清单见 docs/design.md 的"后续路线"。
-- 媒体系统四期推进中（A 图片地基、B 视频、C URL 引入+OG 链接卡片已完成；D 关键字搜图未做，分期计划见 docs/design.md）。
+- 媒体系统四期（A 图片地基 / B 视频 / C URL 引入+OG 链接卡片 / D 关键字搜图）已全部完成，设计细节见 docs/design.md。
 - 未实现的大块：自定义历法换算、生产构建流程。
