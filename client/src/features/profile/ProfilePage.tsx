@@ -1,6 +1,6 @@
 import type { MediaView, UserProfile } from '@socialsim/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { patchAuthorFollow } from '../../api/postCache';
@@ -13,148 +13,9 @@ import { PostCard } from '../../components/PostCard';
 import { usePagedQuery } from '../../components/usePagedQuery';
 import { useFormatCount } from '../../i18n/formatCount';
 import { useI18n } from '../../i18n/I18nContext';
-import { inputClass } from '../auth/LoginPage';
+import { EditProfileModal } from './EditProfileModal';
 
 type ProfileTab = 'posts' | 'replies' | 'media' | 'likes';
-
-/** 头像/横幅编辑项的取值：undefined=未改动；{id:null}=恢复默认 */
-type MediaPatch = { id: number | null; url: string | null } | undefined;
-
-function MediaPicker({
-  label,
-  resetLabel,
-  current,
-  patch,
-  onChange,
-  round,
-}: {
-  label: string;
-  resetLabel: string;
-  current: string | null;
-  patch: MediaPatch;
-  onChange: (next: MediaPatch) => void;
-  round?: boolean;
-}) {
-  const [uploading, setUploading] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const previewUrl = patch !== undefined ? patch.url : current;
-  const pick = async (files: FileList | null) => {
-    const file = files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const res = await api.uploadMedia(file);
-      onChange({ id: res.media.id, url: res.media.url });
-    } finally {
-      setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
-    }
-  };
-
-  return (
-    <div className="flex items-center gap-3">
-      {previewUrl ? (
-        <img
-          src={previewUrl}
-          alt=""
-          className={`h-12 w-20 border border-x-border object-cover ${round ? 'w-12 rounded-full' : 'rounded-lg'}`}
-        />
-      ) : (
-        <div className={`h-12 w-20 border border-x-border bg-x-input ${round ? 'w-12 rounded-full' : 'rounded-lg'}`} />
-      )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
-        className="hidden"
-        onChange={(e) => void pick(e.target.files)}
-      />
-      <button
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        className="rounded-full border border-x-dim px-3 py-1 text-[13px] font-bold transition-colors duration-200 hover:bg-x-input disabled:opacity-50"
-      >
-        {uploading ? <i className="ri-loader-4-line animate-spin" /> : label}
-      </button>
-      {(previewUrl !== null || patch !== undefined) && (
-        <button
-          onClick={() => onChange({ id: null, url: null })}
-          className="rounded-full px-3 py-1 text-[13px] text-x-dim transition-colors duration-200 hover:bg-x-input"
-        >
-          {resetLabel}
-        </button>
-      )}
-    </div>
-  );
-}
-
-function EditProfileForm({ onDone }: { onDone: () => void }) {
-  const { user, setUser } = useAuth();
-  const { t } = useI18n();
-  const [displayName, setDisplayName] = useState(user?.displayName ?? '');
-  const [bio, setBio] = useState(user?.bio ?? '');
-  const [avatar, setAvatar] = useState<MediaPatch>(undefined);
-  const [banner, setBanner] = useState<MediaPatch>(undefined);
-  const [busy, setBusy] = useState(false);
-
-  const save = async () => {
-    setBusy(true);
-    try {
-      const res = await api.updateMe({
-        displayName,
-        bio,
-        ...(avatar !== undefined ? { avatarMediaId: avatar.id } : {}),
-        ...(banner !== undefined ? { bannerMediaId: banner.id } : {}),
-      });
-      setUser(res.user);
-      onDone();
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-3 border-b border-x-border p-4">
-      <label className="text-[13px] text-x-dim">{t('profile.displayName')}</label>
-      <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className={inputClass} />
-      <label className="text-[13px] text-x-dim">{t('profile.bio')}</label>
-      <textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className={inputClass} />
-      <label className="text-[13px] text-x-dim">{t('profile.changeAvatar')}</label>
-      <MediaPicker
-        label={t('profile.changeAvatar')}
-        resetLabel={t('profile.resetAvatar')}
-        current={user?.avatarUrl ?? null}
-        patch={avatar}
-        onChange={setAvatar}
-        round
-      />
-      <label className="text-[13px] text-x-dim">{t('profile.changeBanner')}</label>
-      <MediaPicker
-        label={t('profile.changeBanner')}
-        resetLabel={t('profile.resetBanner')}
-        current={user?.bannerUrl ?? null}
-        patch={banner}
-        onChange={setBanner}
-      />
-      <div className="flex justify-end gap-2">
-        <button
-          onClick={onDone}
-          className="rounded-full px-4 py-1.5 text-[15px] text-x-dim transition-colors duration-200 hover:bg-x-input"
-        >
-          {t('common.cancel')}
-        </button>
-        <button
-          onClick={() => void save()}
-          disabled={busy || displayName.trim().length === 0}
-          className="rounded-full bg-x-blue px-4 py-1.5 text-[15px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
-        >
-          {t('common.save')}
-        </button>
-      </div>
-    </div>
-  );
-}
 
 const TAB_EMPTY: Record<ProfileTab, { icon: string; key: 'profile.emptyPosts' | 'profile.emptyReplies' | 'profile.emptyMedia' | 'profile.emptyLikes' }> = {
   posts: { icon: 'ri-chat-3-line', key: 'profile.emptyPosts' },
@@ -172,11 +33,11 @@ export function ProfilePage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [tab, setTab] = useState<ProfileTab>('posts');
-  // 媒体 Tab 的查看器：点击缩略图直接放大（同帖多媒体可左右切换），不跳详情
+  // 媒体查看器：媒体 Tab 缩略图（带"查看帖子"入口）与头像/横幅大图共用
   const [mediaViewer, setMediaViewer] = useState<{
     media: MediaView[];
     index: number;
-    postId: number;
+    postId?: number;
   } | null>(null);
 
   const profile = useQuery({
@@ -292,9 +153,22 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {/* Banner：有上传图用图片，否则纯色占位 */}
+      {/* Banner：有上传图用图片（可点击放大），否则纯色占位 */}
       {u.bannerUrl ? (
-        <img src={u.bannerUrl} alt="" className="h-50 w-full object-cover" draggable={false} />
+        <img
+          src={u.bannerUrl}
+          alt=""
+          onClick={() =>
+            setMediaViewer({
+              media: [
+                { id: u.bannerMediaId ?? 0, type: 'image', url: u.bannerUrl!, width: null, height: null },
+              ],
+              index: 0,
+            })
+          }
+          className="h-50 w-full cursor-pointer object-cover"
+          draggable={false}
+        />
       ) : (
         <div className="h-50 w-full bg-x-input" />
       )}
@@ -302,7 +176,19 @@ export function ProfilePage() {
       {/* 资料区 */}
       <div className="border-b border-x-border px-4 py-3">
         <div className="-mt-13 flex items-start justify-between">
-          <div className="rounded-full border-4 border-x-bg">
+          <div
+            onClick={() => {
+              if (u.avatarUrl) {
+                setMediaViewer({
+                  media: [
+                    { id: u.avatarMediaId ?? 0, type: 'image', url: u.avatarUrl, width: null, height: null },
+                  ],
+                  index: 0,
+                });
+              }
+            }}
+            className={`rounded-full border-4 border-x-bg ${u.avatarUrl ? 'cursor-pointer' : ''}`}
+          >
             <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={80} />
           </div>
           <div className="mt-13 pt-1">
@@ -375,7 +261,7 @@ export function ProfilePage() {
         </div>
       </div>
 
-      {editing && isMe && <EditProfileForm onDone={() => setEditing(false)} />}
+      {editing && isMe && <EditProfileModal onClose={() => setEditing(false)} />}
 
       {/* 四 Tab：帖子 / 回复 / 媒体 / 喜欢 */}
       <div className="flex border-b border-x-border">
@@ -427,14 +313,6 @@ export function ProfilePage() {
             isFetching={mediaPosts.isFetchingNextPage}
             onClick={() => void mediaPosts.fetchNextPage()}
           />
-          {mediaViewer && (
-            <MediaLightbox
-              media={mediaViewer.media}
-              initialIndex={mediaViewer.index}
-              postId={mediaViewer.postId}
-              onClose={() => setMediaViewer(null)}
-            />
-          )}
         </>
       )}
       {tab === 'posts' && (
@@ -494,6 +372,16 @@ export function ProfilePage() {
             onClick={() => void activeList.fetchNextPage()}
           />
         </>
+      )}
+
+      {/* 媒体查看器：媒体 Tab 缩略图与头像/横幅大图共用（后者无"查看帖子"入口） */}
+      {mediaViewer && (
+        <MediaLightbox
+          media={mediaViewer.media}
+          initialIndex={mediaViewer.index}
+          {...(mediaViewer.postId !== undefined ? { postId: mediaViewer.postId } : {})}
+          onClose={() => setMediaViewer(null)}
+        />
       )}
     </div>
   );

@@ -52,6 +52,8 @@ export const messages = {
     'media.prev': '上一张',
     'media.next': '下一张',
     'media.viewPost': '查看帖子',
+    'crop.title': '编辑图片',
+    'crop.apply': '应用',
 
     'post.deleted': '此帖子已被删除',
     'post.delete': '删除',
@@ -267,6 +269,8 @@ export const messages = {
     'media.prev': 'Previous',
     'media.next': 'Next',
     'media.viewPost': 'View post',
+    'crop.title': 'Edit image',
+    'crop.apply': 'Apply',
 
     'post.deleted': 'This post has been deleted',
     'post.delete': 'Delete',
