@@ -23,6 +23,7 @@ interface Pin {
  */
 export class PinterestAdapter implements SearchAdapter {
   readonly name = 'pinterest';
+  readonly supportsRating = false;
 
   available(): { ok: boolean } {
     return { ok: true }; // 匿名可搜

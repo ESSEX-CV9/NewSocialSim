@@ -43,6 +43,12 @@ export function MediaSearchPanel({
     staleTime: 5 * 60 * 1000,
   });
 
+  // 分级下拉只在所选源支持分级时显示（"全部源"时只要有任一可用源支持即显示）
+  const sourceList = sources.data?.sources ?? [];
+  const ratingVisible = source
+    ? (sourceList.find((s) => s.id === source)?.supportsRating ?? false)
+    : sourceList.some((s) => s.ok && s.supportsRating);
+
   const submit = () => {
     const q = query.trim();
     if (q) setSubmitted({ q, source, rating });
@@ -83,23 +89,25 @@ export function MediaSearchPanel({
           className="rounded-full border border-x-border bg-x-bg px-3 py-1.5 text-[13px] outline-none"
         >
           <option value="">{t('mediaSearch.sourceAll')}</option>
-          {(sources.data?.sources ?? []).map((s) => (
+          {sourceList.map((s) => (
             <option key={s.id} value={s.id} disabled={!s.ok}>
               {s.id}
               {s.ok ? '' : ` (${t('mediaSearch.sourceNeedsConfig')})`}
             </option>
           ))}
         </select>
-        <select
-          value={rating}
-          onChange={(e) => setRating(e.target.value as Rating)}
-          title={t('mediaSearch.rating')}
-          className="rounded-full border border-x-border bg-x-bg px-3 py-1.5 text-[13px] outline-none"
-        >
-          <option value="safe">{t('mediaSearch.ratingSafe')}</option>
-          <option value="all">{t('mediaSearch.ratingAll')}</option>
-          <option value="r18">{t('mediaSearch.ratingR18')}</option>
-        </select>
+        {ratingVisible && (
+          <select
+            value={rating}
+            onChange={(e) => setRating(e.target.value as Rating)}
+            title={t('mediaSearch.rating')}
+            className="rounded-full border border-x-border bg-x-bg px-3 py-1.5 text-[13px] outline-none"
+          >
+            <option value="safe">{t('mediaSearch.ratingSafe')}</option>
+            <option value="all">{t('mediaSearch.ratingAll')}</option>
+            <option value="r18">{t('mediaSearch.ratingR18')}</option>
+          </select>
+        )}
         <button
           onClick={submit}
           disabled={query.trim().length === 0 || results.isFetching}

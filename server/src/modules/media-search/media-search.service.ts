@@ -22,6 +22,8 @@ const PREVIEW_PROXY_HOSTS: Record<string, string> = {
 export interface SourceStatus {
   id: string;
   ok: boolean;
+  /** 该源是否支持内容分级筛选 */
+  supportsRating: boolean;
   reason?: string;
 }
 
@@ -56,7 +58,12 @@ export class MediaSearchService {
     const cfg = readSearchConfig();
     return this.adapters.map((a) => {
       const avail = a.available(cfg);
-      return { id: a.name, ok: avail.ok, ...(avail.reason ? { reason: avail.reason } : {}) };
+      return {
+        id: a.name,
+        ok: avail.ok,
+        supportsRating: a.supportsRating,
+        ...(avail.reason ? { reason: avail.reason } : {}),
+      };
     });
   }
 

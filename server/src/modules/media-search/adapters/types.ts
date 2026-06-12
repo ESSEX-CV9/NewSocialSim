@@ -30,6 +30,8 @@ export interface SourceAvailability {
 
 export interface SearchAdapter {
   readonly name: string;
+  /** 该源是否支持内容分级筛选（前端据此决定是否显示分级下拉） */
+  readonly supportsRating: boolean;
   available(cfg: MediaSearchConfig): SourceAvailability;
   search(query: string, cfg: MediaSearchConfig, opts: SearchOptions): Promise<SearchResult[]>;
 }

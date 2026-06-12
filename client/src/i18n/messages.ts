@@ -176,6 +176,7 @@ export const messages = {
     'mediaSearch.pexelsKey': 'Pexels API Key（免费申请：pexels.com/api）',
     'mediaSearch.configured': '已配置',
     'mediaSearch.saved': '已保存',
+    'mediaSearch.allowR18G': '允许 R-18G 内容（仅在分级为"不限/仅 R-18"时生效）',
 
     'footer.tos': '服务条款',
     'footer.privacy': '隐私政策',
@@ -389,6 +390,7 @@ export const messages = {
     'mediaSearch.pexelsKey': 'Pexels API key (free at pexels.com/api)',
     'mediaSearch.configured': 'Configured',
     'mediaSearch.saved': 'Saved',
+    'mediaSearch.allowR18G': 'Allow R-18G content (only applies when rating is Any / R-18 only)',
 
     'footer.tos': 'Terms of Service',
     'footer.privacy': 'Privacy Policy',

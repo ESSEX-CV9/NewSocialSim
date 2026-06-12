@@ -15,6 +15,7 @@ interface YanderePost {
 
 export class YandereAdapter implements SearchAdapter {
   readonly name = 'yandere';
+  readonly supportsRating = true;
 
   private readonly resolver = new TagResolver(async (term) => {
     const params = new URLSearchParams({ name: term, order: 'count', limit: '5' });

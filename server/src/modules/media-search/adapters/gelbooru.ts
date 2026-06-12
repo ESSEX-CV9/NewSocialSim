@@ -15,6 +15,7 @@ interface GelbooruPost {
 
 export class GelbooruAdapter implements SearchAdapter {
   readonly name = 'gelbooru';
+  readonly supportsRating = true;
 
   private readonly resolver = new TagResolver(async (term) => {
     const params = new URLSearchParams({

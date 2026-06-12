@@ -170,6 +170,19 @@ export function MediaSearchSettings() {
             {t('mediaSearch.openLoginUrl')}
           </a>
         )}
+        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-x-dim">
+          <input
+            type="checkbox"
+            checked={config.data?.config.pixivAllowR18G ?? false}
+            onChange={(e) => {
+              void api
+                .patchMediaSearchConfig({ pixiv: { allowR18G: e.target.checked } })
+                .then(refreshAll);
+            }}
+            className="accent-x-blue"
+          />
+          {t('mediaSearch.allowR18G')}
+        </label>
       </div>
 
       {/* 代理与凭证 */}

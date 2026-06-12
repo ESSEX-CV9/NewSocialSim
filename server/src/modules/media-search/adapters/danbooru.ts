@@ -17,6 +17,7 @@ interface DanbooruPost {
 
 export class DanbooruAdapter implements SearchAdapter {
   readonly name = 'danbooru';
+  readonly supportsRating = true;
 
   private readonly resolver = new TagResolver(async (term) => {
     const params = new URLSearchParams({

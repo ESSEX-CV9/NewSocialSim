@@ -35,6 +35,7 @@ interface PixivIllust {
  */
 export class PixivAdapter implements SearchAdapter {
   readonly name = 'pixiv';
+  readonly supportsRating = true;
 
   private client: Pixiv | null = null;
   private lastAuthAt = 0;

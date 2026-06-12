@@ -11,6 +11,7 @@ interface PexelsPhoto {
 
 export class PexelsAdapter implements SearchAdapter {
   readonly name = 'pexels';
+  readonly supportsRating = false;
 
   available(cfg: MediaSearchConfig): { ok: boolean; reason?: string } {
     return cfg.pexels?.apiKey ? { ok: true } : { ok: false, reason: 'missing-api-key' };

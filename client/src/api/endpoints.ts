@@ -142,7 +142,7 @@ export const api = {
       `/api/media-search?q=${encodeURIComponent(q)}${source ? `&source=${encodeURIComponent(source)}` : ''}${rating ? `&rating=${rating}` : ''}`,
     ),
   mediaSearchSources: () =>
-    http<{ sources: { id: string; ok: boolean; reason?: string }[] }>(
+    http<{ sources: { id: string; ok: boolean; supportsRating: boolean; reason?: string }[] }>(
       'GET',
       '/api/media-search/sources',
     ),

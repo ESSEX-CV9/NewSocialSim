@@ -15,6 +15,7 @@ interface WikiPage {
 
 export class WikimediaAdapter implements SearchAdapter {
   readonly name = 'wikimedia';
+  readonly supportsRating = false;
 
   available(): { ok: boolean } {
     return { ok: true };
