@@ -2,6 +2,7 @@ import type { LinkCardView } from '@socialsim/shared';
 import { fetchWithLimit } from '../../core/safe-fetch.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import { mediaFileUrl, type MediaService } from '../media/media.service.js';
+import { deriveEmbed } from './embed.js';
 import { linkCardsRepo } from './link-cards.repo.js';
 
 /** YouTube 等重型页面 og 标签出现在 ~650KB 处，限额须放宽到 2MB（经代理下载也需更长超时） */
@@ -177,6 +178,8 @@ export class LinkCardsService {
         description: row.description,
         imageUrl: mediaFileUrl(row.image_media_id, worldId),
         siteName: row.site_name,
+        // 现算不落库：embedUrl 是 url 的纯函数，推导规则升级后旧帖自动受益
+        embedUrl: deriveEmbed(row.url)?.embedUrl ?? null,
       });
     }
     return map;

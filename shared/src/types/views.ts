@@ -79,6 +79,8 @@ export interface LinkCardView {
   /** 缩略图已下载入库的本地地址 */
   imageUrl: string | null;
   siteName: string | null;
+  /** 可嵌入播放器地址（YouTube/B 站等已知站点由 url 现算）；不支持的站点为 null */
+  embedUrl: string | null;
 }
 
 /** 趋势条目：近期被讨论的 #话题（右边栏"有什么新鲜事"） */

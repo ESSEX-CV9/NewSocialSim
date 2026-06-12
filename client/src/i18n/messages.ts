@@ -224,6 +224,9 @@ export const messages = {
     'trends.postCount': '{n} 帖子',
     'trends.empty': '暂无趋势',
 
+    'linkCard.play': '播放',
+    'linkCard.openOriginal': '打开原链接',
+
     'mediaSearch.title': '搜索图片',
     'mediaSearch.queryPrompt': '输入关键字搜图',
     'mediaSearch.search': '搜索',
@@ -516,6 +519,9 @@ export const messages = {
     'trends.trending': 'Trending',
     'trends.postCount': '{n} posts',
     'trends.empty': 'No trends yet',
+
+    'linkCard.play': 'Play',
+    'linkCard.openOriginal': 'Open original link',
 
     'mediaSearch.title': 'Search images',
     'mediaSearch.queryPrompt': 'Search images by keyword',
