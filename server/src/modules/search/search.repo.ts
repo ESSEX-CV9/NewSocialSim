@@ -7,6 +7,7 @@ export interface SearchUserRow {
   display_name: string;
   is_bot: number;
   avatar_media_id: number | null;
+  verified: string;
 }
 
 /** LIKE 通配符转义：让用户输入的 % _ 按字面匹配 */
@@ -31,7 +32,8 @@ export const searchRepo = {
                 u.handle          AS author_handle,
                 u.display_name    AS author_display_name,
                 u.is_bot          AS author_is_bot,
-                u.avatar_media_id AS author_avatar_media_id
+                u.avatar_media_id AS author_avatar_media_id,
+                u.verified        AS author_verified
          FROM posts p
          JOIN users u ON u.id = p.author_id
          WHERE p.deleted = 0
@@ -61,7 +63,7 @@ export const searchRepo = {
     const cursorClause = beforeId !== null ? 'AND id < @beforeId' : '';
     return db
       .prepare(
-        `SELECT id, handle, display_name, is_bot, avatar_media_id
+        `SELECT id, handle, display_name, is_bot, avatar_media_id, verified
          FROM users
          WHERE (handle LIKE @pattern ESCAPE '\\' OR display_name LIKE @pattern ESCAPE '\\')
            ${cursorClause}

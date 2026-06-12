@@ -183,6 +183,14 @@ const migrations: Migration[] = [
       );
     `,
   },
+  {
+    version: 9,
+    name: 'user-verified-website',
+    sql: `
+      ALTER TABLE users ADD COLUMN verified TEXT NOT NULL DEFAULT 'none';
+      ALTER TABLE users ADD COLUMN website TEXT;
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

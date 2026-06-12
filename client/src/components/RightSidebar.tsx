@@ -9,6 +9,7 @@ import { useI18n } from '../i18n/I18nContext';
 import { useWorld } from '../world/WorldContext';
 import { Avatar } from './Avatar';
 import { SimClockDisplay } from './SimClockDisplay';
+import { VerifiedBadge } from './VerifiedBadge';
 
 /** 右边栏"有什么新鲜事"：近期 #话题 排行 */
 function TrendsCard() {
@@ -71,7 +72,10 @@ function WhoToFollowCard() {
             <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={40} />
           </Link>
           <Link to={`/u/${u.handle}`} className="min-w-0 flex-1">
-            <div className="truncate text-[15px] font-bold hover:underline">{u.displayName}</div>
+            <div className="flex items-center gap-1 text-[15px] font-bold">
+              <span className="truncate hover:underline">{u.displayName}</span>
+              <VerifiedBadge verified={u.verified} size={14} />
+            </div>
             <div className="truncate text-[14px] text-x-dim">@{u.handle}</div>
           </Link>
           <button

@@ -1,4 +1,4 @@
-import type { NotificationType, NotificationView, Page } from '@socialsim/shared';
+import type { NotificationType, NotificationView, Page, VerifiedType } from '@socialsim/shared';
 import { decodeCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import { mediaFileUrl } from '../media/media.service.js';
@@ -70,6 +70,7 @@ function toView(row: NotificationRow, worldId: string): NotificationView {
       displayName: row.actor_display_name,
       isBot: row.actor_is_bot === 1,
       avatarUrl: mediaFileUrl(row.actor_avatar_media_id, worldId),
+      verified: row.actor_verified as VerifiedType,
     },
     actorFollowerCount: row.actor_follower_count,
     actorFollowedByViewer: row.actor_followed === 1,

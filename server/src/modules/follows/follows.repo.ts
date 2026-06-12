@@ -6,6 +6,7 @@ export interface FollowUserRow {
   display_name: string;
   is_bot: number;
   avatar_media_id: number | null;
+  verified: string;
   follow_created_at: number;
 }
 
@@ -49,7 +50,7 @@ export const followsRepo = {
       : '';
     return db
       .prepare(
-        `SELECT u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id,
+        `SELECT u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id, u.verified,
                 f.created_at AS follow_created_at
          FROM follows f
          JOIN users u ON u.id = f.${selectCol}

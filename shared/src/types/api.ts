@@ -1,4 +1,4 @@
-import type { UserProfile } from './user.js';
+import type { UserProfile, VerifiedType } from './user.js';
 
 export interface RegisterRequest {
   handle: string;
@@ -22,6 +22,10 @@ export interface UpdateProfileRequest {
   /** 须为本人所有的图片媒体；null = 恢复默认（哈希色块/纯色） */
   avatarMediaId?: number | null;
   bannerMediaId?: number | null;
+  /** 认证标识（模拟器内自助设定） */
+  verified?: VerifiedType;
+  /** 个人链接；空串或 null = 清除。无协议前缀时服务端补 https:// */
+  website?: string | null;
 }
 
 export interface CreatePostRequest {

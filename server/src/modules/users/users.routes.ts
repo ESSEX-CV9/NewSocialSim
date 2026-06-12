@@ -11,6 +11,8 @@ const updateProfileBodySchema = {
     bio: { type: 'string', maxLength: 500 },
     avatarMediaId: { type: ['integer', 'null'] },
     bannerMediaId: { type: ['integer', 'null'] },
+    verified: { type: 'string', enum: ['none', 'personal', 'org'] },
+    website: { type: ['string', 'null'], maxLength: 200 },
   },
 } as const;
 

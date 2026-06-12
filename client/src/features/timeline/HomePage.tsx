@@ -12,6 +12,7 @@ import { LoadMore } from '../../components/LoadMore';
 import { PostCard } from '../../components/PostCard';
 import { usePagedQuery } from '../../components/usePagedQuery';
 import { useFormatCount } from '../../i18n/formatCount';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useI18n } from '../../i18n/I18nContext';
 
 type MainTab = 'foryou' | 'following';
@@ -101,7 +102,10 @@ function FollowSuggestions() {
             <Avatar handle={u.handle} avatarUrl={u.avatarUrl} />
           </Link>
           <Link to={`/u/${u.handle}`} className="min-w-0 flex-1">
-            <div className="text-[15px] font-bold hover:underline">{u.displayName}</div>
+            <div className="flex items-center gap-1 text-[15px] font-bold">
+              <span className="hover:underline">{u.displayName}</span>
+              <VerifiedBadge verified={u.verified} size={14} />
+            </div>
             <div className="text-[14px] text-x-dim">
               @{u.handle} · {t('timeline.followerCount', { n: fmt(u.followerCount) })}
             </div>

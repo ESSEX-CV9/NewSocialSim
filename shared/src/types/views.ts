@@ -1,4 +1,5 @@
 import type { Post } from './post.js';
+import type { VerifiedType } from './user.js';
 
 /** 嵌入在帖子/通知里的轻量用户信息 */
 export interface UserSummary {
@@ -8,6 +9,8 @@ export interface UserSummary {
   isBot: boolean;
   /** 头像图片地址；null = 用 handle 哈希色块兜底 */
   avatarUrl: string | null;
+  /** 认证标识（蓝标/金标），随用户名各显示点展示 */
+  verified: VerifiedType;
 }
 
 /** 媒体资源视图（文件本体经 url 流式获取） */

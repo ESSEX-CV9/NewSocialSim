@@ -13,6 +13,7 @@ export interface NotificationRow {
   actor_display_name: string;
   actor_is_bot: number;
   actor_avatar_media_id: number | null;
+  actor_verified: string;
   actor_follower_count: number;
   actor_followed: number;
   post_content: string | null;
@@ -57,6 +58,7 @@ export const notificationsRepo = {
                 u.display_name    AS actor_display_name,
                 u.is_bot          AS actor_is_bot,
                 u.avatar_media_id AS actor_avatar_media_id,
+                u.verified        AS actor_verified,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = n.actor_id) AS actor_follower_count,
                 EXISTS(
                   SELECT 1 FROM follows WHERE follower_id = @userId AND followee_id = n.actor_id

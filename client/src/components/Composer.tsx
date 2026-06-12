@@ -5,6 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
 import { MediaSearchPanel } from './MediaSearchPanel';
+import { VerifiedBadge } from './VerifiedBadge';
 
 const MAX_LENGTH = 280;
 /** 与服务端 MAX_PER_POST 一致：图/视频共享配额且可混排 */
@@ -266,7 +267,10 @@ export function Composer({
                 >
                   <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={36} />
                   <div className="min-w-0">
-                    <div className="truncate text-[15px] font-bold">{u.displayName}</div>
+                    <div className="flex items-center gap-1 text-[15px] font-bold">
+                      <span className="truncate">{u.displayName}</span>
+                      <VerifiedBadge verified={u.verified} size={14} />
+                    </div>
                     <div className="truncate text-[13px] text-x-dim">@{u.handle}</div>
                   </div>
                 </button>

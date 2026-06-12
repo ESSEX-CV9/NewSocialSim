@@ -18,6 +18,7 @@ export interface PostRow {
   author_display_name: string;
   author_is_bot: number;
   author_avatar_media_id: number | null;
+  author_verified: string;
 }
 
 const SELECT_POST = `
@@ -25,7 +26,8 @@ const SELECT_POST = `
          u.handle          AS author_handle,
          u.display_name    AS author_display_name,
          u.is_bot          AS author_is_bot,
-         u.avatar_media_id AS author_avatar_media_id
+         u.avatar_media_id AS author_avatar_media_id,
+         u.verified        AS author_verified
   FROM posts p
   JOIN users u ON u.id = p.author_id
 `;
@@ -175,6 +177,7 @@ export const postsRepo = {
                 u.display_name    AS author_display_name,
                 u.is_bot          AS author_is_bot,
                 u.avatar_media_id AS author_avatar_media_id,
+                u.verified        AS author_verified,
                 l.created_at      AS liked_at
          FROM likes l
          JOIN posts p ON p.id = l.post_id

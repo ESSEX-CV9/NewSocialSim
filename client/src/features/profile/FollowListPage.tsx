@@ -4,6 +4,7 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { usePagedQuery } from '../../components/usePagedQuery';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useI18n } from '../../i18n/I18nContext';
 
 export function FollowListPage({ direction }: { direction: 'followers' | 'following' }) {
@@ -44,7 +45,10 @@ export function FollowListPage({ direction }: { direction: 'followers' | 'follow
         >
           <Avatar handle={u.handle} avatarUrl={u.avatarUrl} />
           <div>
-            <div className="text-[15px] font-bold">{u.displayName}</div>
+            <div className="flex items-center gap-1 text-[15px] font-bold">
+              {u.displayName}
+              <VerifiedBadge verified={u.verified} size={14} />
+            </div>
             <div className="text-[14px] text-x-dim">@{u.handle}</div>
           </div>
           {u.isBot && (

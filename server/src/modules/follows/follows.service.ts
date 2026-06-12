@@ -1,4 +1,4 @@
-import type { Page, UserSummary } from '@socialsim/shared';
+import type { Page, UserSummary, VerifiedType } from '@socialsim/shared';
 import { ValidationError } from '../../core/errors/app-error.js';
 import { decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
@@ -70,6 +70,7 @@ export class FollowsService {
       displayName: r.display_name,
       isBot: r.is_bot === 1,
       avatarUrl: mediaFileUrl(r.avatar_media_id, worldId),
+      verified: r.verified as VerifiedType,
     }));
     return {
       items,

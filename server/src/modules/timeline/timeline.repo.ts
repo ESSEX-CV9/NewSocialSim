@@ -15,6 +15,7 @@ export interface TimelineEntryRow {
   actor_display_name: string | null;
   actor_is_bot: number | null;
   actor_avatar_media_id: number | null;
+  actor_verified: string | null;
 }
 
 const CURSOR_CLAUSE = 'WHERE (activity_at < @ts OR (activity_at = @ts AND post_id < @cid))';
@@ -38,7 +39,8 @@ const ENTRY_COLUMNS = `
   NULL          AS actor_handle,
   NULL          AS actor_display_name,
   NULL          AS actor_is_bot,
-  NULL          AS actor_avatar_media_id
+  NULL          AS actor_avatar_media_id,
+  NULL          AS actor_verified
 `;
 
 export const timelineRepo = {
@@ -64,7 +66,7 @@ export const timelineRepo = {
            SELECT r.post_id,
                   r.created_at,
                   'repost',
-                  u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id
+                  u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id, u.verified
            FROM reposts r
            JOIN users u ON u.id = r.user_id
            JOIN posts p ON p.id = r.post_id
@@ -190,7 +192,7 @@ export const timelineRepo = {
            SELECT r.post_id,
                   r.created_at,
                   'repost',
-                  u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id
+                  u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id, u.verified
            FROM reposts r
            JOIN users u ON u.id = r.user_id
            JOIN posts p ON p.id = r.post_id

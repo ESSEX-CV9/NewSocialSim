@@ -1,4 +1,4 @@
-import type { CreatePostRequest, Page, PostView, UserSummary } from '@socialsim/shared';
+import type { CreatePostRequest, Page, PostView, UserSummary, VerifiedType } from '@socialsim/shared';
 import {
   ForbiddenError,
   NotFoundError,
@@ -354,6 +354,7 @@ export function toUserSummary(row: PostRow, avatarUrl: string | null): UserSumma
     displayName: row.author_display_name,
     isBot: row.author_is_bot === 1,
     avatarUrl,
+    verified: row.author_verified as VerifiedType,
   };
 }
 

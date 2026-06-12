@@ -1,4 +1,4 @@
-import type { Page, TimelineItem } from '@socialsim/shared';
+import type { Page, TimelineItem, VerifiedType } from '@socialsim/shared';
 import { decodeCursor, decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import { mediaFileUrl } from '../media/media.service.js';
@@ -84,6 +84,7 @@ export class TimelineService {
                 displayName: row.actor_display_name ?? '',
                 isBot: row.actor_is_bot === 1,
                 avatarUrl: mediaFileUrl(row.actor_avatar_media_id, worldId),
+                verified: (row.actor_verified ?? 'none') as VerifiedType,
               }
             : null,
         activityAt: row.activity_at,

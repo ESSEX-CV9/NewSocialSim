@@ -13,6 +13,8 @@ export interface UserRow {
   pinned_post_id: number | null;
   avatar_media_id: number | null;
   banner_media_id: number | null;
+  verified: string;
+  website: string | null;
 }
 
 export interface UserCounts {
@@ -64,6 +66,7 @@ export const usersRepo = {
     display_name: string;
     is_bot: number;
     avatar_media_id: number | null;
+    verified: string;
     follower_count: number;
   }[] {
     const excludeClause =
@@ -74,7 +77,7 @@ export const usersRepo = {
         : '';
     return db
       .prepare(
-        `SELECT u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id,
+        `SELECT u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id, u.verified,
                 (SELECT COUNT(*) FROM follows WHERE followee_id = u.id) AS follower_count
          FROM users u
          ${excludeClause}
@@ -87,8 +90,41 @@ export const usersRepo = {
       display_name: string;
       is_bot: number;
       avatar_media_id: number | null;
+      verified: string;
       follower_count: number;
     }[];
+  },
+
+  /** 观察者关注的人里也关注了 targetId 的（X"你认识的关注者"），按粉丝数倒序取前 limit 个 */
+  knownFollowers(
+    db: WorldDb,
+    targetId: number,
+    viewerId: number,
+    limit: number,
+  ): { rows: { id: number; handle: string; display_name: string; is_bot: number; avatar_media_id: number | null; verified: string }[]; total: number } {
+    const condition = `FROM follows f
+         JOIN users u ON u.id = f.follower_id
+         WHERE f.followee_id = @targetId
+           AND f.follower_id IN (SELECT followee_id FROM follows WHERE follower_id = @viewerId)`;
+    const rows = db
+      .prepare(
+        `SELECT u.id, u.handle, u.display_name, u.is_bot, u.avatar_media_id, u.verified
+         ${condition}
+         ORDER BY (SELECT COUNT(*) FROM follows WHERE followee_id = u.id) DESC, u.id ASC
+         LIMIT @limit`,
+      )
+      .all({ targetId, viewerId, limit }) as {
+      id: number;
+      handle: string;
+      display_name: string;
+      is_bot: number;
+      avatar_media_id: number | null;
+      verified: string;
+    }[];
+    const total = (
+      db.prepare(`SELECT COUNT(*) AS n ${condition}`).get({ targetId, viewerId }) as { n: number }
+    ).n;
+    return { rows, total };
   },
 
   isFollowedBy(db: WorldDb, targetId: number, viewerId: number): boolean {
@@ -127,6 +163,8 @@ export const usersRepo = {
       bio?: string;
       avatarMediaId?: number | null;
       bannerMediaId?: number | null;
+      verified?: string;
+      website?: string | null;
     },
   ): void {
     if (patch.displayName !== undefined) {
@@ -140,6 +178,12 @@ export const usersRepo = {
     }
     if (patch.bannerMediaId !== undefined) {
       db.prepare('UPDATE users SET banner_media_id = ? WHERE id = ?').run(patch.bannerMediaId, userId);
+    }
+    if (patch.verified !== undefined) {
+      db.prepare('UPDATE users SET verified = ? WHERE id = ?').run(patch.verified, userId);
+    }
+    if (patch.website !== undefined) {
+      db.prepare('UPDATE users SET website = ? WHERE id = ?').run(patch.website, userId);
     }
   },
 };

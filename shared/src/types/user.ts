@@ -1,3 +1,8 @@
+import type { UserSummary } from './views.js';
+
+/** 认证类型：none=无 / personal=个人（蓝标）/ org=组织（金标） */
+export type VerifiedType = 'none' | 'personal' | 'org';
+
 /** 用户实体（贫血模型：纯数据，无行为） */
 export interface User {
   id: number;
@@ -28,4 +33,11 @@ export interface UserProfile extends User {
   bannerUrl: string | null;
   avatarMediaId: number | null;
   bannerMediaId: number | null;
+  /** 认证标识（模拟器内自助设定） */
+  verified: VerifiedType;
+  /** 简介下方展示的个人链接；null = 未设置 */
+  website: string | null;
+  /** 观察者关注的人里也关注此人的（最多 3 个，匿名或本人页为空数组） */
+  knownFollowers: UserSummary[];
+  knownFollowerCount: number;
 }

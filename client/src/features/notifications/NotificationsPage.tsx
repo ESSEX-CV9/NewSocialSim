@@ -9,6 +9,7 @@ import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { TimeAgo } from '../../components/TimeAgo';
 import { usePagedQuery } from '../../components/usePagedQuery';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useFormatCount } from '../../i18n/formatCount';
 import { useI18n } from '../../i18n/I18nContext';
 import type { MessageKey } from '../../i18n/messages';
@@ -242,7 +243,8 @@ export function NotificationsPage() {
                   className="font-bold hover:underline"
                 >
                   {lead.user.displayName}
-                </Link>{' '}
+                </Link>
+                <VerifiedBadge verified={lead.user.verified} size={14} />{' '}
                 <span>{groupText(group, t, fmt)}</span>
                 <span className="text-x-dim">
                   {' '}

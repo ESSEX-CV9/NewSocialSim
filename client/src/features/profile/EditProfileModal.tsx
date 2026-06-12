@@ -22,6 +22,7 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const queryClient = useQueryClient();
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
+  const [website, setWebsite] = useState(user?.website ?? '');
   const [avatar, setAvatar] = useState<MediaPatch>(undefined);
   const [banner, setBanner] = useState<MediaPatch>(undefined);
   const [cropping, setCropping] = useState<CropTask | null>(null);
@@ -73,6 +74,7 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
       const res = await api.updateMe({
         displayName,
         bio,
+        website: website.trim().length > 0 ? website.trim() : null,
         ...(avatar !== undefined ? { avatarMediaId: avatar.id } : {}),
         ...(banner !== undefined ? { bannerMediaId: banner.id } : {}),
       });
@@ -203,6 +205,15 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   rows={3}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[13px] text-x-dim">
+                {t('profile.website')}
+                <input
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  placeholder="https://example.com"
                   className={inputClass}
                 />
               </label>

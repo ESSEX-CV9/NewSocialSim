@@ -10,12 +10,13 @@ import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
 import { LinkCard } from './LinkCard';
+import { VerifiedBadge } from './VerifiedBadge';
 import { MediaGrid } from './MediaGrid';
 import { TimeAgo } from './TimeAgo';
 import { useViewTracking } from './useViewTracking';
 
-/** 帖子正文：URL 转外链，#话题 转搜索链接，@用户名 转主页链接 */
-function PostContent({ content }: { content: string }) {
+/** 帖子正文：URL 转外链，#话题 转搜索链接，@用户名 转主页链接（个人简介等处复用） */
+export function PostContent({ content }: { content: string }) {
   const parts = content.split(/(https?:\/\/[^\s]+|#[^\s#@]+|@[a-zA-Z0-9_]{2,20})/g);
   return (
     <p className="text-[15px] leading-normal wrap-break-word whitespace-pre-wrap">
@@ -90,6 +91,7 @@ function QuotedCard({ quoted }: { quoted: PostView }) {
       <div className="mb-1 flex items-center gap-1.5 text-[15px]">
         <Avatar handle={quoted.author.handle} avatarUrl={quoted.author.avatarUrl} size={20} />
         <span className="font-bold">{quoted.author.displayName}</span>
+        <VerifiedBadge verified={quoted.author.verified} />
         <span className="text-x-dim">@{quoted.author.handle}</span>
         <span className="text-x-dim">·</span>
         <TimeAgo at={quoted.createdAt} />
@@ -335,6 +337,7 @@ export function PostCard({
               >
                 {post.author.displayName}
               </Link>
+              <VerifiedBadge verified={post.author.verified} />
               {post.author.isBot && (
                 <span className="ml-0.5 rounded bg-x-input px-1 text-xs text-x-dim">
                   {t('profile.bot')}

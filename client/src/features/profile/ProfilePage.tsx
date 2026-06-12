@@ -1,6 +1,6 @@
-import type { MediaView, UserProfile } from '@socialsim/shared';
+import type { MediaView, UserProfile, VerifiedType } from '@socialsim/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { patchAuthorFollow } from '../../api/postCache';
@@ -9,13 +9,108 @@ import { Avatar } from '../../components/Avatar';
 import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
 import { LoadMore } from '../../components/LoadMore';
 import { MediaLightbox } from '../../components/MediaLightbox';
-import { PostCard } from '../../components/PostCard';
+import { PostCard, PostContent } from '../../components/PostCard';
 import { usePagedQuery } from '../../components/usePagedQuery';
+import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useFormatCount } from '../../i18n/formatCount';
 import { useI18n } from '../../i18n/I18nContext';
 import { EditProfileModal } from './EditProfileModal';
 
 type ProfileTab = 'posts' | 'replies' | 'media' | 'likes';
+
+/** 共同关注文案：1 人 / 2 人 / 更多三种形态 */
+function knownFollowersText(
+  u: UserProfile,
+  t: (key: Parameters<ReturnType<typeof useI18n>['t']>[0], vars?: Record<string, string | number>) => string,
+): string {
+  const names = u.knownFollowers.map((f) => f.displayName);
+  if (u.knownFollowerCount === 1) return t('profile.knownFollowers1', { a: names[0] ?? '' });
+  if (u.knownFollowerCount === 2)
+    return t('profile.knownFollowers2', { a: names[0] ?? '', b: names[1] ?? '' });
+  return t('profile.knownFollowersMore', {
+    a: names[0] ?? '',
+    b: names[1] ?? '',
+    n: u.knownFollowerCount - 2,
+  });
+}
+
+/** 认证自助弹窗：模拟器内直接指定当前账号的认证类型 */
+function VerifyModal({ profile, onClose }: { profile: UserProfile; onClose: () => void }) {
+  const { setUser } = useAuth();
+  const { t } = useI18n();
+  const queryClient = useQueryClient();
+  const [choice, setChoice] = useState<VerifiedType>(profile.verified);
+  const [busy, setBusy] = useState(false);
+
+  const save = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const res = await api.updateMe({ verified: choice });
+      setUser(res.user);
+      void queryClient.invalidateQueries({ queryKey: ['user', profile.handle] });
+      onClose();
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const options: { value: VerifiedType; label: string; icon: ReactNode }[] = [
+    {
+      value: 'none',
+      label: t('profile.verifyNone'),
+      icon: <i className="ri-close-circle-line text-[20px] text-x-dim" />,
+    },
+    {
+      value: 'personal',
+      label: t('profile.verifyPersonal'),
+      icon: <VerifiedBadge verified="personal" size={20} />,
+    },
+    {
+      value: 'org',
+      label: t('profile.verifyOrg'),
+      icon: <VerifiedBadge verified="org" size={20} />,
+    },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20">
+      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-x-border bg-x-bg">
+        <div className="flex items-center gap-4 p-2 pr-4">
+          <button
+            onClick={onClose}
+            className="flex size-9 items-center justify-center rounded-full transition-colors duration-200 hover:bg-x-input"
+          >
+            <i className="ri-close-line text-[18px]" />
+          </button>
+          <span className="flex-1 text-[17px] font-bold">{t('profile.verifyTitle')}</span>
+          <button
+            onClick={() => void save()}
+            disabled={busy}
+            className="rounded-full bg-x-text px-4 py-1 text-[14px] font-bold text-x-bg transition-opacity duration-200 hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? <i className="ri-loader-4-line animate-spin" /> : t('common.save')}
+          </button>
+        </div>
+        <div className="flex flex-col gap-1 p-4 pt-2">
+          {options.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => setChoice(o.value)}
+              className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left text-[15px] font-bold transition-colors duration-200 ${
+                choice === o.value ? 'border-x-blue bg-x-blue/10' : 'border-x-border hover:bg-x-hover'
+              }`}
+            >
+              {o.icon}
+              <span className="flex-1">{o.label}</span>
+              {choice === o.value && <i className="ri-check-line text-[18px] text-x-blue" />}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const TAB_EMPTY: Record<ProfileTab, { icon: string; key: 'profile.emptyPosts' | 'profile.emptyReplies' | 'profile.emptyMedia' | 'profile.emptyLikes' }> = {
   posts: { icon: 'ri-chat-3-line', key: 'profile.emptyPosts' },
@@ -32,6 +127,7 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const [tab, setTab] = useState<ProfileTab>('posts');
   // 媒体查看器：媒体 Tab 缩略图（带"查看帖子"入口）与头像/横幅大图共用
   const [mediaViewer, setMediaViewer] = useState<{
@@ -191,14 +287,22 @@ export function ProfilePage() {
           >
             <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={80} />
           </div>
-          <div className="mt-13 pt-1">
+          <div className="mt-13 flex gap-2 pt-1">
             {isMe ? (
-              <button
-                onClick={() => setEditing((v) => !v)}
-                className="rounded-full border border-x-dim px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 hover:bg-x-input"
-              >
-                {t('profile.editProfile')}
-              </button>
+              <>
+                <button
+                  onClick={() => setVerifying(true)}
+                  className="rounded-full border border-x-dim px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 hover:bg-x-input"
+                >
+                  {u.verified !== 'none' ? t('profile.verifyManage') : t('profile.verifyApply')}
+                </button>
+                <button
+                  onClick={() => setEditing((v) => !v)}
+                  className="rounded-full border border-x-dim px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 hover:bg-x-input"
+                >
+                  {t('profile.editProfile')}
+                </button>
+              </>
             ) : (
               viewer &&
               (u.blockedByViewer ? (
@@ -227,6 +331,7 @@ export function ProfilePage() {
         <div className="mt-3">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-extrabold">{u.displayName}</h1>
+            <VerifiedBadge verified={u.verified} size={20} />
             {u.isBot && (
               <span className="rounded bg-x-input px-1.5 py-0.5 text-xs text-x-dim">
                 <i className="ri-robot-2-line mr-1" />
@@ -237,11 +342,31 @@ export function ProfilePage() {
           <div className="text-[15px] text-x-dim">@{u.handle}</div>
         </div>
 
-        {u.bio && <p className="mt-3 text-[15px] whitespace-pre-wrap">{u.bio}</p>}
+        {u.bio && (
+          <div className="mt-3">
+            <PostContent content={u.bio} />
+          </div>
+        )}
 
-        <div className="mt-3 flex items-center gap-1 text-[14px] text-x-dim">
-          <i className="ri-calendar-line" />
-          <span>{t('profile.joined', { date: joinedDate })}</span>
+        {/* 元信息行：个人链接（用户设置时）+ 加入时间（X 同款一行排布） */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-x-dim">
+          {u.website && (
+            <span className="flex items-center gap-1">
+              <i className="ri-links-line" />
+              <a
+                href={u.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-x-blue hover:underline"
+              >
+                {u.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
+              </a>
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <i className="ri-calendar-line" />
+            <span>{t('profile.joined', { date: joinedDate })}</span>
+          </span>
         </div>
 
         {u.blockedByViewer && (
@@ -259,9 +384,31 @@ export function ProfilePage() {
             <b className="text-x-text">{fmt(u.followerCount)}</b> {t('profile.followers')}
           </Link>
         </div>
+
+        {/* 共同关注者："你关注的人里也关注了 TA"（X 社交证明行） */}
+        {!isMe && u.knownFollowerCount > 0 && u.knownFollowers.length > 0 && (
+          <Link
+            to={`/u/${handle}/followers`}
+            className="mt-3 flex items-center gap-2 text-[13px] text-x-dim hover:underline"
+          >
+            <span className="flex shrink-0">
+              {u.knownFollowers.slice(0, 3).map((f, i) => (
+                <span
+                  key={f.id}
+                  className={`rounded-full border border-x-bg ${i > 0 ? '-ml-2' : ''}`}
+                  style={{ zIndex: 3 - i }}
+                >
+                  <Avatar handle={f.handle} avatarUrl={f.avatarUrl} size={18} />
+                </span>
+              ))}
+            </span>
+            <span className="min-w-0">{knownFollowersText(u, t)}</span>
+          </Link>
+        )}
       </div>
 
       {editing && isMe && <EditProfileModal onClose={() => setEditing(false)} />}
+      {verifying && isMe && <VerifyModal profile={u} onClose={() => setVerifying(false)} />}
 
       {/* 四 Tab：帖子 / 回复 / 媒体 / 喜欢 */}
       <div className="flex border-b border-x-border">

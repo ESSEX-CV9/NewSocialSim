@@ -1,4 +1,4 @@
-import type { UpdateProfileRequest, UserProfile, UserSummary } from '@socialsim/shared';
+import type { UpdateProfileRequest, UserProfile, UserSummary, VerifiedType } from '@socialsim/shared';
 import { NotFoundError, ValidationError } from '../../core/errors/app-error.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import type { MediaService } from '../media/media.service.js';
@@ -24,6 +24,7 @@ export class UsersService {
       displayName: r.display_name,
       isBot: r.is_bot === 1,
       avatarUrl: this.avatarUrlOf(r.avatar_media_id),
+      verified: r.verified as VerifiedType,
       followerCount: r.follower_count,
     }));
   }
@@ -58,12 +59,25 @@ export class UsersService {
     if (patch.bannerMediaId !== undefined && patch.bannerMediaId !== null) {
       this.mediaService.validateOwnedImage(userId, patch.bannerMediaId);
     }
+    // 个人链接：空串/null 清除；无协议前缀自动补 https://
+    let website: string | null | undefined;
+    if (patch.website !== undefined) {
+      const raw = patch.website?.trim() ?? '';
+      if (raw.length === 0) website = null;
+      else if (/^https?:\/\//i.test(raw)) website = raw;
+      else website = `https://${raw}`;
+      if (website !== null && website.length > 200) {
+        throw new ValidationError('链接过长（最多 200 字符）');
+      }
+    }
     const { db } = this.worldManager.current();
     usersRepo.updateProfile(db, userId, {
       ...(patch.displayName !== undefined ? { displayName: patch.displayName.trim() } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
       ...(patch.avatarMediaId !== undefined ? { avatarMediaId: patch.avatarMediaId } : {}),
       ...(patch.bannerMediaId !== undefined ? { bannerMediaId: patch.bannerMediaId } : {}),
+      ...(patch.verified !== undefined ? { verified: patch.verified } : {}),
+      ...(website !== undefined ? { website } : {}),
     });
     return this.getProfileById(userId);
   }
@@ -82,6 +96,11 @@ export class UsersService {
 
   private buildProfile(row: UserRow, viewerId: number | null = null): UserProfile {
     const { db } = this.worldManager.current();
+    // 共同关注者：仅登录观察者看他人主页时计算
+    const known =
+      viewerId !== null && viewerId !== row.id
+        ? usersRepo.knownFollowers(db, row.id, viewerId, 3)
+        : { rows: [], total: 0 };
     return {
       ...toUser(row),
       ...usersRepo.counts(db, row.id),
@@ -94,6 +113,17 @@ export class UsersService {
       bannerUrl: this.avatarUrlOf(row.banner_media_id),
       avatarMediaId: row.avatar_media_id,
       bannerMediaId: row.banner_media_id,
+      verified: row.verified as VerifiedType,
+      website: row.website,
+      knownFollowers: known.rows.map((r) => ({
+        id: r.id,
+        handle: r.handle,
+        displayName: r.display_name,
+        isBot: r.is_bot === 1,
+        avatarUrl: this.avatarUrlOf(r.avatar_media_id),
+        verified: r.verified as VerifiedType,
+      })),
+      knownFollowerCount: known.total,
     };
   }
 }

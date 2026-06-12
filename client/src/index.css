@@ -20,6 +20,7 @@
   --th-green: #00ba7c;
   --th-pink: #f91880;
   --th-red: #f4212e;
+  --th-gold: #d9a521;
 }
 
 [data-theme='light'] {
@@ -36,6 +37,7 @@
   --th-green: #00ba7c;
   --th-pink: #f91880;
   --th-red: #f4212e;
+  --th-gold: #d9a521;
 }
 
 @theme inline {
@@ -51,6 +53,7 @@
   --color-x-green: var(--th-green);
   --color-x-pink: var(--th-pink);
   --color-x-red: var(--th-red);
+  --color-x-gold: var(--th-gold);
 }
 
 @theme {
