@@ -135,4 +135,6 @@ export function registerMediaSearchRoutes(app: FastifyInstance, deps: MediaSearc
     { ...auth, schema: { body: codeBodySchema } },
     controller.pixivCode,
   );
+  app.post('/api/media-search/bilibili/login', auth, controller.biliLogin);
+  app.get('/api/media-search/bilibili/login/status', auth, controller.biliLoginStatus);
 }

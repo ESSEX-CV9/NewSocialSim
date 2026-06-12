@@ -200,6 +200,8 @@ export const api = {
   pixivLoginStatus: () => http<PixivLoginStatus>('GET', '/api/media-search/pixiv/login/status'),
   pixivSubmitCode: (code: string) =>
     http<PixivLoginStatus>('POST', '/api/media-search/pixiv/code', { code }),
+  biliLogin: () => http<PixivLoginStatus>('POST', '/api/media-search/bilibili/login', {}),
+  biliLoginStatus: () => http<PixivLoginStatus>('GET', '/api/media-search/bilibili/login/status'),
 
   // video ingest（外站视频引入：auto 按形态路由，可能直接返回 embed 不建任务）
   videoIngest: (url: string, mode: 'auto' | 'download' | 'stream' = 'auto') =>

@@ -53,4 +53,12 @@ export class MediaSearchController {
   pixivCode = async (req: FastifyRequest<{ Body: { code: string } }>, reply: FastifyReply) => {
     reply.send(await this.service.pixivSubmitCode(req.body.code));
   };
+
+  biliLogin = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send(await this.service.biliLoginStart());
+  };
+
+  biliLoginStatus = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send(this.service.biliLoginStatus());
+  };
 }

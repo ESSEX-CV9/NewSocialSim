@@ -1,6 +1,7 @@
 import { NotFoundError, ValidationError } from '../../core/errors/app-error.js';
 import { fetchWithLimit } from '../../core/safe-fetch.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { BiliLoginFlow } from './bili-login.js';
 import { DanbooruAdapter } from './adapters/danbooru.js';
 import { GelbooruAdapter } from './adapters/gelbooru.js';
 import { PexelsAdapter } from './adapters/pexels.js';
@@ -53,6 +54,7 @@ export class MediaSearchService {
     new WikimediaAdapter(),
   ];
   private readonly loginFlow = new PixivLoginFlow();
+  private readonly biliLoginFlow = new BiliLoginFlow();
 
   constructor(private readonly worldManager: WorldManager) {
     readSearchConfig(); // 启动即加载（应用代理配置）
@@ -151,5 +153,13 @@ export class MediaSearchService {
 
   pixivSubmitCode(input: string): Promise<LoginStatus> {
     return this.loginFlow.submitCode(input);
+  }
+
+  biliLoginStart(): Promise<LoginStatus> {
+    return this.biliLoginFlow.start();
+  }
+
+  biliLoginStatus(): LoginStatus {
+    return this.biliLoginFlow.status();
   }
 }

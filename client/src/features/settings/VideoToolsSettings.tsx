@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { api, type ToolId, type ToolStatus } from '../../api/endpoints';
+import { useEffect, useRef, useState } from 'react';
+import { api, type PixivLoginStatus, type ToolId, type ToolStatus } from '../../api/endpoints';
 import { useI18n } from '../../i18n/I18nContext';
 import { inputClass } from '../auth/LoginPage';
 
@@ -116,6 +116,34 @@ export function VideoToolsSettings() {
   const [mirrorMsg, setMirrorMsg] = useState<string | null>(null);
   const [biliCookies, setBiliCookies] = useState('');
   const [biliMsg, setBiliMsg] = useState<string | null>(null);
+  const [biliManualOpen, setBiliManualOpen] = useState(false);
+  const [biliLogin, setBiliLoginState] = useState<PixivLoginStatus | null>(null);
+  const biliPollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopBiliPolling = () => {
+    if (biliPollTimer.current) {
+      clearInterval(biliPollTimer.current);
+      biliPollTimer.current = null;
+    }
+  };
+  useEffect(() => stopBiliPolling, []);
+
+  const startBiliLogin = async () => {
+    const status = await api.biliLogin();
+    setBiliLoginState(status);
+    stopBiliPolling();
+    biliPollTimer.current = setInterval(() => {
+      void api.biliLoginStatus().then((s) => {
+        setBiliLoginState(s);
+        if (s.state === 'success' || s.state === 'error') {
+          stopBiliPolling();
+          if (s.state === 'success') {
+            void queryClient.invalidateQueries({ queryKey: ['media-search-config'] });
+          }
+        }
+      });
+    }, 2000);
+  };
 
   const status = useQuery({
     queryKey: ['tools-status'],
@@ -226,33 +254,66 @@ export function VideoToolsSettings() {
         </div>
       </div>
 
-      {/* B站 Cookie：api.bilibili.com 对无 Cookie 请求 412 风控，引入 B站视频必填 */}
+      {/* B站登录：api.bilibili.com 对无 Cookie 请求 412 风控；引导登录自动捕获（Pixiv 同范式） */}
       <h3 className="mt-6 mb-2 text-[15px] font-bold text-x-dim">{t('videoTools.biliTitle')}</h3>
       <p className="mb-2 text-[13px] text-x-dim">{t('videoTools.biliHint')}</p>
       <div className="flex flex-col gap-2">
-        {config.data?.config.bilibiliHasCookies && (
-          <span className="text-[13px] text-x-green">
-            <i className="ri-checkbox-circle-fill mr-1" />
-            {t('mediaSearch.configured')}
-          </span>
-        )}
-        <textarea
-          value={biliCookies}
-          onChange={(e) => setBiliCookies(e.target.value)}
-          placeholder="buvid3=...; SESSDATA=...; bili_jct=..."
-          rows={2}
-          className={inputClass}
-        />
-        <div className="flex items-center gap-3 self-end">
-          {biliMsg && <span className="text-[13px] text-x-dim">{biliMsg}</span>}
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => void saveBiliCookies()}
-            disabled={!biliCookies.trim()}
+            onClick={() => void startBiliLogin()}
+            disabled={biliLogin?.state === 'waiting' || biliLogin?.state === 'exchanging'}
             className="rounded-full bg-x-blue px-4 py-1.5 text-[14px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
           >
-            {t('common.save')}
+            {config.data?.config.bilibiliHasCookies
+              ? t('videoTools.biliRelogin')
+              : t('videoTools.biliLogin')}
           </button>
+          {config.data?.config.bilibiliHasCookies && (
+            <span className="text-[13px] text-x-green">
+              <i className="ri-checkbox-circle-fill mr-1" />
+              {t('mediaSearch.configured')}
+            </span>
+          )}
         </div>
+        {biliLogin && biliLogin.state !== 'idle' && (
+          <div className="text-[13px] text-x-dim">
+            {biliLogin.state === 'waiting' || biliLogin.state === 'launching'
+              ? t('videoTools.biliLoginWaiting')
+              : biliLogin.state === 'exchanging'
+                ? t('videoTools.biliLoginSaving')
+                : biliLogin.state === 'success'
+                  ? t('videoTools.biliLoginSuccess')
+                  : `${t('videoTools.biliLoginFailed')}：${biliLogin.message ?? ''}`}
+          </div>
+        )}
+        {/* 手动粘贴兜底（引导失败/无浏览器时） */}
+        <button
+          onClick={() => setBiliManualOpen((v) => !v)}
+          className="self-start text-[13px] text-x-dim hover:text-x-blue hover:underline"
+        >
+          {t('videoTools.biliManualToggle')}
+        </button>
+        {biliManualOpen && (
+          <>
+            <textarea
+              value={biliCookies}
+              onChange={(e) => setBiliCookies(e.target.value)}
+              placeholder="buvid3=...; SESSDATA=...; bili_jct=..."
+              rows={2}
+              className={inputClass}
+            />
+            <div className="flex items-center gap-3 self-end">
+              {biliMsg && <span className="text-[13px] text-x-dim">{biliMsg}</span>}
+              <button
+                onClick={() => void saveBiliCookies()}
+                disabled={!biliCookies.trim()}
+                className="rounded-full bg-x-blue px-4 py-1.5 text-[14px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
+              >
+                {t('common.save')}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </section>
   );
