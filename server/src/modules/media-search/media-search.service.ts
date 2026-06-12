@@ -36,6 +36,9 @@ export interface MaskedConfig {
   pexelsHasKey: boolean;
   danbooruHasKey: boolean;
   gelbooruHasKey: boolean;
+  /** 视频工具下载源覆盖（非敏感，原样返回；空串 = 用官方源） */
+  toolsYtdlpUrl: string;
+  toolsFfmpegUrl: string;
 }
 
 export class MediaSearchService {
@@ -126,6 +129,8 @@ export class MediaSearchService {
       pexelsHasKey: !!cfg.pexels?.apiKey?.trim(),
       danbooruHasKey: !!(cfg.danbooru?.username && cfg.danbooru.apiKey),
       gelbooruHasKey: !!(cfg.gelbooru?.userId && cfg.gelbooru.apiKey),
+      toolsYtdlpUrl: cfg.tools?.ytdlpUrl ?? '',
+      toolsFfmpegUrl: cfg.tools?.ffmpegUrl ?? '',
     };
   }
 

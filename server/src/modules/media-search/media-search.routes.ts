@@ -60,6 +60,14 @@ const configBodySchema = {
         apiKey: { type: 'string', maxLength: 200 },
       },
     },
+    tools: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        ytdlpUrl: { type: 'string', maxLength: 500 },
+        ffmpegUrl: { type: 'string', maxLength: 500 },
+      },
+    },
   },
 } as const;
 

@@ -2,8 +2,24 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api, type ToolId, type ToolStatus } from '../../api/endpoints';
 import { useI18n } from '../../i18n/I18nContext';
+import { inputClass } from '../auth/LoginPage';
 
-/** 工具行：状态灯 + 版本信息 + 安装/更新按钮 + 安装进度条 */
+function fmtBytes(n: number): string {
+  if (n >= 1024 * 1024 * 1024) return `${(n / 1024 / 1024 / 1024).toFixed(2)} GB`;
+  if (n >= 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1)} MB`;
+  return `${(n / 1024).toFixed(0)} KB`;
+}
+
+function hostOf(url: string | undefined): string {
+  if (!url) return '';
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return url;
+  }
+}
+
+/** 工具行：状态灯 + 版本信息 + 安装/更新按钮 + 下载详情（文件/来源/速度/进度） */
 function ToolRow({
   tool,
   latest,
@@ -20,6 +36,7 @@ function ToolRow({
   const running = job !== null && (job.state === 'downloading' || job.state === 'extracting');
   const updateAvailable =
     tool.installed && latest !== null && tool.version !== null && tool.version !== latest;
+  const knownTotal = (job?.totalBytes ?? null) !== null && (job?.totalBytes ?? 0) > 0;
 
   return (
     <div className="flex flex-col gap-1.5 rounded-2xl border border-x-border p-3">
@@ -45,17 +62,39 @@ function ToolRow({
           {tool.installed ? t('videoTools.update') : t('videoTools.install')}
         </button>
       </div>
-      {running && (
-        <div className="flex items-center gap-2">
-          <div className="h-1 flex-1 overflow-hidden rounded-full bg-x-input">
-            <div
-              className="h-full bg-x-blue transition-all duration-300"
-              style={{ width: `${job.progress}%` }}
-            />
+      {running && job && (
+        <div className="flex flex-col gap-1">
+          {/* 在下载什么、从哪下：始终带旋转动画，避免看起来卡死 */}
+          <div className="flex items-center gap-2 text-[12px] text-x-dim">
+            <i className="ri-loader-4-line shrink-0 animate-spin text-[14px] text-x-blue" />
+            <span className="truncate">
+              {job.state === 'extracting'
+                ? t('videoTools.extracting')
+                : `${t('videoTools.downloading')} ${job.file ?? ''} — ${hostOf(job.url)}`}
+            </span>
           </div>
-          <span className="w-24 text-right text-[12px] text-x-dim">
-            {job.state === 'extracting' ? t('videoTools.extracting') : `${job.progress}%`}
-          </span>
+          {job.state === 'downloading' && (
+            <>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-x-input">
+                {knownTotal ? (
+                  <div
+                    className="h-full bg-x-blue transition-all duration-300"
+                    style={{ width: `${job.progress}%` }}
+                  />
+                ) : (
+                  <div className="h-full w-1/3 animate-pulse bg-x-blue" />
+                )}
+              </div>
+              <div className="flex justify-between text-[12px] text-x-dim">
+                <span>
+                  {fmtBytes(job.downloadedBytes ?? 0)}
+                  {knownTotal && ` / ${fmtBytes(job.totalBytes!)}`}
+                  {knownTotal && `（${job.progress}%）`}
+                </span>
+                <span>{job.speedBps !== undefined ? `${fmtBytes(job.speedBps)}/s` : t('videoTools.connecting')}</span>
+              </div>
+            </>
+          )}
         </div>
       )}
       {job?.state === 'error' && (
@@ -72,6 +111,9 @@ export function VideoToolsSettings() {
   const { t } = useI18n();
   const queryClient = useQueryClient();
   const [installing, setInstalling] = useState(false);
+  const [ytdlpUrl, setYtdlpUrl] = useState<string | null>(null);
+  const [ffmpegUrl, setFfmpegUrl] = useState<string | null>(null);
+  const [mirrorMsg, setMirrorMsg] = useState<string | null>(null);
 
   const status = useQuery({
     queryKey: ['tools-status'],
@@ -85,6 +127,10 @@ export function VideoToolsSettings() {
         : false,
   });
   const latest = useQuery({ queryKey: ['tools-latest'], queryFn: api.toolsLatest });
+  const config = useQuery({ queryKey: ['media-search-config'], queryFn: api.mediaSearchConfig });
+
+  const tools = status.data?.tools ?? [];
+  const byId = (id: ToolId) => tools.find((tl) => tl.id === id);
 
   const install = async (id: ToolId) => {
     setInstalling(true);
@@ -98,12 +144,29 @@ export function VideoToolsSettings() {
     }
   };
 
+  const saveMirrors = async () => {
+    setMirrorMsg(null);
+    try {
+      await api.patchMediaSearchConfig({
+        tools: {
+          ...(ytdlpUrl !== null ? { ytdlpUrl: ytdlpUrl.trim() } : {}),
+          ...(ffmpegUrl !== null ? { ffmpegUrl: ffmpegUrl.trim() } : {}),
+        },
+      });
+      setMirrorMsg(t('mediaSearch.saved'));
+      void queryClient.invalidateQueries({ queryKey: ['media-search-config'] });
+      void queryClient.invalidateQueries({ queryKey: ['tools-status'] });
+    } catch (e) {
+      setMirrorMsg(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   return (
     <section className="border-b border-x-border p-4">
       <h2 className="mb-1 text-xl font-extrabold">{t('videoTools.settingsTitle')}</h2>
       <p className="mb-3 text-[13px] text-x-dim">{t('videoTools.intro')}</p>
       <div className="flex flex-col gap-2">
-        {(status.data?.tools ?? []).map((tool) => (
+        {tools.map((tool) => (
           <ToolRow
             key={tool.id}
             tool={tool}
@@ -112,6 +175,40 @@ export function VideoToolsSettings() {
             onInstall={() => void install(tool.id)}
           />
         ))}
+      </div>
+
+      {/* 镜像源：GitHub 直连/代理慢时可替换下载地址 */}
+      <h3 className="mt-6 mb-2 text-[15px] font-bold text-x-dim">{t('videoTools.mirrorTitle')}</h3>
+      <p className="mb-2 text-[13px] text-x-dim">{t('videoTools.mirrorHint')}</p>
+      <div className="flex flex-col gap-3">
+        <label className="flex flex-col gap-1 text-[13px] text-x-dim">
+          {t('videoTools.mirrorYtdlp')}
+          <input
+            value={ytdlpUrl ?? config.data?.config.toolsYtdlpUrl ?? ''}
+            onChange={(e) => setYtdlpUrl(e.target.value)}
+            placeholder={byId('yt-dlp')?.defaultUrl ?? ''}
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-[13px] text-x-dim">
+          {t('videoTools.mirrorFfmpeg')}
+          <input
+            value={ffmpegUrl ?? config.data?.config.toolsFfmpegUrl ?? ''}
+            onChange={(e) => setFfmpegUrl(e.target.value)}
+            placeholder={byId('ffmpeg')?.defaultUrl ?? ''}
+            className={inputClass}
+          />
+        </label>
+        <div className="flex items-center gap-3 self-end">
+          {mirrorMsg && <span className="text-[13px] text-x-dim">{mirrorMsg}</span>}
+          <button
+            onClick={() => void saveMirrors()}
+            disabled={ytdlpUrl === null && ffmpegUrl === null}
+            className="rounded-full bg-x-blue px-4 py-1.5 text-[14px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:opacity-50"
+          >
+            {t('common.save')}
+          </button>
+        </div>
       </div>
     </section>
   );

@@ -216,6 +216,11 @@ export interface ToolInstallJob {
   state: 'downloading' | 'extracting' | 'done' | 'error';
   progress: number;
   message?: string;
+  file?: string;
+  url?: string;
+  downloadedBytes?: number;
+  totalBytes?: number | null;
+  speedBps?: number;
 }
 
 export interface ToolStatus {
@@ -223,6 +228,8 @@ export interface ToolStatus {
   installed: boolean;
   version: string | null;
   path: string | null;
+  downloadUrl: string;
+  defaultUrl: string;
   job: ToolInstallJob | null;
 }
 
@@ -246,6 +253,8 @@ export interface MediaSearchMaskedConfig {
   pexelsHasKey: boolean;
   danbooruHasKey: boolean;
   gelbooruHasKey: boolean;
+  toolsYtdlpUrl: string;
+  toolsFfmpegUrl: string;
 }
 
 export interface PixivLoginStatus {

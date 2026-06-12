@@ -18,6 +18,7 @@ import { registerMediaRoutes } from './modules/media/media.routes.js';
 import { MediaService } from './modules/media/media.service.js';
 import { registerMediaSearchRoutes } from './modules/media-search/media-search.routes.js';
 import { MediaSearchService } from './modules/media-search/media-search.service.js';
+import { readSearchConfig } from './modules/media-search/search-config.js';
 import { registerMessagesRoutes } from './modules/messages/messages.routes.js';
 import { MessagesService } from './modules/messages/messages.service.js';
 import { registerNotificationsRoutes } from './modules/notifications/notifications.routes.js';
@@ -72,7 +73,8 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   const mediaService = new MediaService(worldManager);
   const mediaSearchService = new MediaSearchService(worldManager);
-  const toolsService = new ToolsService();
+  // 组装层穿针：镜像源配置存于 media-search.json 的 tools 段，避免 tools 模块依赖 media-search
+  const toolsService = new ToolsService(() => readSearchConfig().tools ?? {});
   const linkCardsService = new LinkCardsService(worldManager, mediaService);
   const usersService = new UsersService(worldManager, mediaService);
   const authService = new AuthService(worldManager, usersService);

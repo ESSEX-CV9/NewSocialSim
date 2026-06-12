@@ -19,6 +19,8 @@ export interface MediaSearchConfig {
   pexels?: { apiKey?: string };
   danbooru?: { username?: string; apiKey?: string };
   gelbooru?: { userId?: string; apiKey?: string };
+  /** 视频工具下载源覆盖（镜像加速）；留空用 GitHub 官方 release */
+  tools?: { ytdlpUrl?: string; ffmpegUrl?: string };
 }
 
 const FILE = path.join(config.dataDir, 'media-search.json');
@@ -68,6 +70,7 @@ export function patchSearchConfig(patch: Partial<MediaSearchConfig>): MediaSearc
     ...(patch.pexels !== undefined ? { pexels: { ...current.pexels, ...patch.pexels } } : {}),
     ...(patch.danbooru !== undefined ? { danbooru: { ...current.danbooru, ...patch.danbooru } } : {}),
     ...(patch.gelbooru !== undefined ? { gelbooru: { ...current.gelbooru, ...patch.gelbooru } } : {}),
+    ...(patch.tools !== undefined ? { tools: { ...current.tools, ...patch.tools } } : {}),
   };
   fs.mkdirSync(path.dirname(FILE), { recursive: true });
   fs.writeFileSync(FILE, JSON.stringify(next, null, 2), 'utf8');

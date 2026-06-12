@@ -15,9 +15,17 @@ export const TOOL_IDS: readonly ToolId[] = ['yt-dlp', 'ffmpeg'];
 
 export interface InstallJobView {
   state: 'downloading' | 'extracting' | 'done' | 'error';
-  /** 0-100 */
+  /** 0-100；总大小未知时保持 0，前端按未知进度展示 */
   progress: number;
   message?: string;
+  /** 正在下载的文件名 */
+  file?: string;
+  /** 实际下载地址（官方或镜像） */
+  url?: string;
+  downloadedBytes?: number;
+  totalBytes?: number | null;
+  /** 近 1 秒窗口的下载速度（字节/秒） */
+  speedBps?: number;
 }
 
 export interface ToolStatus {
@@ -25,7 +33,17 @@ export interface ToolStatus {
   installed: boolean;
   version: string | null;
   path: string | null;
+  /** 当前生效的下载地址（含镜像覆盖） */
+  downloadUrl: string;
+  /** 官方默认下载地址（设置页镜像输入框的占位提示） */
+  defaultUrl: string;
   job: InstallJobView | null;
+}
+
+/** 视频工具下载源覆盖（来自 data/media-search.json 的 tools 段，由组装层注入） */
+export interface ToolUrlOverrides {
+  ytdlpUrl?: string;
+  ffmpegUrl?: string;
 }
 
 /** releases/latest/download 形式免 GitHub API（不受速率限制） */
@@ -58,6 +76,15 @@ export class ToolsService {
   /** 周期 C 起由 video-search 注入：有运行中的视频任务时拒绝覆盖二进制（Windows 文件锁） */
   private busyCheck: () => boolean = () => false;
 
+  constructor(private readonly urlOverrides: () => ToolUrlOverrides = () => ({})) {}
+
+  /** 当前生效的下载地址：镜像覆盖优先，留空回落官方 */
+  private downloadUrl(id: ToolId): string {
+    const o = this.urlOverrides();
+    if (id === 'yt-dlp') return o.ytdlpUrl?.trim() || YTDLP_EXE_URL;
+    return o.ffmpegUrl?.trim() || FFMPEG_ZIP_URL;
+  }
+
   setBusyCheck(fn: () => boolean): void {
     this.busyCheck = fn;
   }
@@ -85,6 +112,8 @@ export class ToolsService {
       installed: toolPath !== null,
       version: toolPath ? await this.version(id, toolPath) : null,
       path: toolPath,
+      downloadUrl: this.downloadUrl(id),
+      defaultUrl: id === 'yt-dlp' ? YTDLP_EXE_URL : FFMPEG_ZIP_URL,
       job: this.jobs.get(id) ?? null,
     };
   }
@@ -147,23 +176,39 @@ export class ToolsService {
     return this.jobs.get(id) ?? null;
   }
 
+  /** 给 job 装上字节/速度采样的进度回调（速度按 ≥1 秒窗口计算） */
+  private makeProgress(job: InstallJobView, scaleTo: number): (done: number, total: number | null) => void {
+    let lastAt = Date.now();
+    let lastBytes = 0;
+    return (done, total) => {
+      job.downloadedBytes = done;
+      job.totalBytes = total;
+      job.progress = total ? Math.min(scaleTo, Math.round((done / total) * scaleTo)) : 0;
+      const now = Date.now();
+      if (now - lastAt >= 1000) {
+        job.speedBps = Math.round(((done - lastBytes) * 1000) / (now - lastAt));
+        lastAt = now;
+        lastBytes = done;
+      }
+    };
+  }
+
   private async runInstall(id: ToolId, job: InstallJobView): Promise<void> {
     const tmpDir = path.join(config.binDir, 'tmp');
+    const url = this.downloadUrl(id);
+    job.url = url;
+    job.file = id === 'yt-dlp' ? 'yt-dlp.exe' : 'ffmpeg-master-latest-win64-gpl.zip';
     try {
       await rmWithRetry(tmpDir);
       fs.mkdirSync(tmpDir, { recursive: true });
       if (id === 'yt-dlp') {
         const tmpFile = path.join(tmpDir, 'yt-dlp.exe.new');
-        await downloadToFile(YTDLP_EXE_URL, tmpFile, (done, total) => {
-          job.progress = total ? Math.min(99, Math.round((done / total) * 100)) : 0;
-        });
+        await downloadToFile(url, tmpFile, this.makeProgress(job, 99));
         // renameSync 在 Windows 上可覆盖既有文件（MOVEFILE_REPLACE_EXISTING）
         fs.renameSync(tmpFile, path.join(config.binDir, 'yt-dlp.exe'));
       } else {
         const zipFile = path.join(tmpDir, 'ffmpeg.zip');
-        await downloadToFile(FFMPEG_ZIP_URL, zipFile, (done, total) => {
-          job.progress = total ? Math.min(80, Math.round((done / total) * 80)) : 0;
-        });
+        await downloadToFile(url, zipFile, this.makeProgress(job, 80));
         job.state = 'extracting';
         job.progress = 80;
         const extractDir = path.join(tmpDir, 'extract');
