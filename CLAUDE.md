@@ -12,7 +12,7 @@ npm run typecheck    # 三个工作区 tsc --noEmit
 ```
 
 - 演示账号（"现代地球"世界）：alice / bob / carol / dave，密码均 `secret123`。
-- 后端 API 回归脚本：`scripts/verify-m3.ps1`、`scripts/verify-dm.ps1`（私信，51 项断言）；均需后端已启动。
+- 后端 API 回归脚本：`scripts/verify-m3.ps1`、`scripts/verify-dm.ps1`（私信，72 项断言）；均需后端已启动。
 
 ## 结构速览
 
@@ -65,7 +65,7 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 短期：UX 体验修改 11 项清单（第九周期）与个人资料页增强批次（第十周期：认证体系、位置/生日/专业类别/个人链接、用户悬浮卡、通知缩略图、链接卡片修复）均已实施并验收；私信系统（第十一周期：1v1 会话/消息请求/已读回执/表情回应/SSE 实时推送，migration v11）已实施、后端 51 项断言通过，**待用户人工端到端验收**。详见 devlog 2026-06-12。用户可能继续逐批提出 UI/UX 改进。
+- 短期：第九至十二周期（UX 体验修改 11 项、资料页增强、私信系统 v11/v12、私信打磨与媒体查看器 X 化重构）均已实施并经用户人工验收，私信与查看器经多轮反馈打磨。详见 devlog 2026-06-12。用户可能继续逐批提出 UI/UX 改进；用户偶尔会亲自微调样式并直接提交（如弹窗定位 pt-10），动相关代码前先看 git log 以其提交为准。
 - 中期：M5 模拟器（ECS 架构虚拟用户、ContentGenerator 接口先模板后 LLM、上帝控制台、数据导出）；其前置后端能力（世界时钟控制 API、虚拟用户管理 API）与无排期待办清单见 docs/design.md 的"后续路线"。虚拟用户发图帖的链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 媒体系统四期（A 图片地基 / B 视频 / C URL 引入+OG 链接卡片 / D 关键字搜图）已全部完成，设计细节见 docs/design.md。
 - 未实现的大块：自定义历法换算、生产构建流程。
