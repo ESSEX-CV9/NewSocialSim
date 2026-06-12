@@ -142,8 +142,11 @@ export function NotificationsPage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
-  const query = usePagedQuery(['notifications', filter], (cursor) =>
-    api.notifications(cursor, filter),
+  // 进页必拉最新（未读徽标先于列表更新），停留期间与未读数轮询同节拍刷新
+  const query = usePagedQuery(
+    ['notifications', filter],
+    (cursor) => api.notifications(cursor, filter),
+    { refetchOnMount: 'always', refetchInterval: 30_000 },
   );
 
   const markAll = async () => {

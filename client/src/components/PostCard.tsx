@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState, type MouseEvent, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api/endpoints';
+import { patchAuthorFollow, patchPostById } from '../api/postCache';
 import { useAuth } from '../auth/AuthContext';
 import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
@@ -161,13 +162,6 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [liked, setLiked] = useState(post.likedByViewer);
-  const [likeCount, setLikeCount] = useState(post.likeCount);
-  const [reposted, setReposted] = useState(post.repostedByViewer);
-  const [repostCount, setRepostCount] = useState(post.repostCount);
-  const [quoteCount, setQuoteCount] = useState(post.quoteCount);
-  const [bookmarked, setBookmarked] = useState(post.bookmarkedByViewer);
-  const [authorFollowed, setAuthorFollowed] = useState(post.authorFollowedByViewer);
   const [quoteOpen, setQuoteOpen] = useState(false);
   const [repostMenuOpen, setRepostMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
@@ -188,27 +182,38 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
   const toggleLike = async (e: MouseEvent) => {
     stop(e);
     if (!user) return navigate('/login');
-    const res = liked ? await api.unlike(post.id) : await api.like(post.id);
-    setLiked(res.active);
-    setLikeCount(res.count);
+    const res = post.likedByViewer ? await api.unlike(post.id) : await api.like(post.id);
+    patchPostById(queryClient, post.id, () => ({ likedByViewer: res.active, likeCount: res.count }));
+    void queryClient.invalidateQueries({ queryKey: ['user-likes', user.handle], refetchType: 'none' });
   };
 
   const toggleRepost = async () => {
-    const res = reposted ? await api.unrepost(post.id) : await api.repost(post.id);
-    setReposted(res.active);
-    setRepostCount(res.count);
+    const res = post.repostedByViewer ? await api.unrepost(post.id) : await api.repost(post.id);
+    patchPostById(queryClient, post.id, () => ({
+      repostedByViewer: res.active,
+      repostCount: res.count,
+    }));
+    if (user) {
+      void queryClient.invalidateQueries({ queryKey: ['timeline'], refetchType: 'none' });
+      void queryClient.invalidateQueries({
+        queryKey: ['user-timeline', user.handle],
+        refetchType: 'none',
+      });
+    }
   };
 
   const toggleBookmark = async (e: MouseEvent) => {
     stop(e);
     if (!user) return navigate('/login');
-    const res = bookmarked ? await api.unbookmark(post.id) : await api.bookmark(post.id);
-    setBookmarked(res.active);
+    const res = post.bookmarkedByViewer ? await api.unbookmark(post.id) : await api.bookmark(post.id);
+    patchPostById(queryClient, post.id, () => ({ bookmarkedByViewer: res.active }));
+    void queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
   };
 
   const remove = async () => {
     if (!window.confirm(t('post.deleteConfirm'))) return;
     await api.deletePost(post.id);
+    patchPostById(queryClient, post.id, () => ({ deleted: true }));
     setGone(true);
     onDeleted?.(post.id);
   };
@@ -224,11 +229,12 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
   };
 
   const toggleAuthorFollow = async () => {
-    const res = authorFollowed
+    const res = post.authorFollowedByViewer
       ? await api.unfollow(post.author.handle)
       : await api.follow(post.author.handle);
-    setAuthorFollowed(res.following);
+    patchAuthorFollow(queryClient, post.authorId, res.following);
     void queryClient.invalidateQueries({ queryKey: ['user', post.author.handle] });
+    if (user) void queryClient.invalidateQueries({ queryKey: ['user', user.handle] });
     void queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
   };
 
@@ -352,8 +358,10 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
                       ) : (
                         <>
                           {menuItem(
-                            authorFollowed ? 'ri-user-unfollow-line' : 'ri-user-follow-line',
-                            authorFollowed
+                            post.authorFollowedByViewer
+                              ? 'ri-user-unfollow-line'
+                              : 'ri-user-follow-line',
+                            post.authorFollowedByViewer
                               ? t('post.unfollowAuthor', { handle: post.author.handle })
                               : t('post.followAuthor', { handle: post.author.handle }),
                             () => void toggleAuthorFollow(),
@@ -389,9 +397,9 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
             <span className="relative">
               <ActionButton
                 icon="ri-repeat-2-line"
-                count={repostCount + quoteCount}
+                count={post.repostCount + post.quoteCount}
                 color="green"
-                active={reposted}
+                active={post.repostedByViewer}
                 onClick={(e) => {
                   stop(e);
                   if (!user) return navigate('/login');
@@ -417,7 +425,7 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
                       className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold text-x-text transition-colors duration-200 hover:bg-x-input"
                     >
                       <i className="ri-repeat-2-line" />
-                      {reposted ? t('post.unrepost') : t('post.repost')}
+                      {post.repostedByViewer ? t('post.unrepost') : t('post.repost')}
                     </button>
                     <button
                       onClick={(e) => {
@@ -437,10 +445,10 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
             </div>
             <div className="flex-1">
               <ActionButton
-                icon={liked ? 'ri-heart-3-fill' : 'ri-heart-3-line'}
-                count={likeCount}
+                icon={post.likedByViewer ? 'ri-heart-3-fill' : 'ri-heart-3-line'}
+                count={post.likeCount}
                 color="pink"
-                active={liked}
+                active={post.likedByViewer}
                 onClick={(e) => void toggleLike(e)}
               />
             </div>
@@ -449,9 +457,9 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
               <ActionButton icon="ri-bar-chart-2-line" count={post.viewCount} color="blue" onClick={stop} />
             </div>
             <ActionButton
-              icon={bookmarked ? 'ri-bookmark-fill' : 'ri-bookmark-line'}
+              icon={post.bookmarkedByViewer ? 'ri-bookmark-fill' : 'ri-bookmark-line'}
               color="blue"
-              active={bookmarked}
+              active={post.bookmarkedByViewer}
               onClick={(e) => void toggleBookmark(e)}
             />
           </div>
@@ -489,7 +497,7 @@ export function PostCard({ post, repostedBy, large, pinned, onDeleted }: PostCar
               bordered={false}
               onPosted={(p) => {
                 setQuoteOpen(false);
-                setQuoteCount((c) => c + 1);
+                patchPostById(queryClient, post.id, (old) => ({ quoteCount: old.quoteCount + 1 }));
                 navigate(`/post/${p.id}`);
               }}
             />

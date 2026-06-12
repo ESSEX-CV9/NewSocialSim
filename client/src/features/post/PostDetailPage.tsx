@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/endpoints';
+import { patchPostById } from '../../api/postCache';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { Composer } from '../../components/Composer';
@@ -73,6 +74,7 @@ export function PostDetailPage() {
               bordered={false}
               onPosted={() => {
                 setComposerOpen(false);
+                patchPostById(queryClient, id, (p) => ({ replyCount: p.replyCount + 1 }));
                 void queryClient.invalidateQueries({ queryKey: ['replies', id] });
                 void queryClient.invalidateQueries({ queryKey: ['post', id] });
               }}

@@ -1,7 +1,9 @@
+import type { UserProfile } from '@socialsim/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/endpoints';
+import { patchAuthorFollow } from '../../api/postCache';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { EmptyBox, ErrorBox, Spinner } from '../../components/Feedback';
@@ -168,7 +170,6 @@ export function ProfilePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
-  const [following, setFollowing] = useState<boolean | null>(null);
   const [tab, setTab] = useState<ProfileTab>('posts');
 
   const profile = useQuery({
@@ -213,12 +214,26 @@ export function ProfilePage() {
   if (!profile.data) return null;
   const u = profile.data.user;
   const isMe = viewer?.id === u.id;
-  const isFollowing = following ?? u.followedByViewer;
+  const isFollowing = u.followedByViewer;
 
   const toggleFollow = async () => {
     const res = isFollowing ? await api.unfollow(handle) : await api.follow(handle);
-    setFollowing(res.following);
+    // 写穿 profile 缓存保证按钮即时翻转；invalidate 兜底校准真实计数
+    queryClient.setQueryData<{ user: UserProfile }>(['user', handle], (old) =>
+      old
+        ? {
+            user: {
+              ...old.user,
+              followedByViewer: res.following,
+              followerCount: old.user.followerCount + (res.following ? 1 : -1),
+            },
+          }
+        : old,
+    );
+    patchAuthorFollow(queryClient, u.id, res.following);
     void queryClient.invalidateQueries({ queryKey: ['user', handle] });
+    if (viewer) void queryClient.invalidateQueries({ queryKey: ['user', viewer.handle] });
+    void queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
   };
 
   const unblock = async () => {

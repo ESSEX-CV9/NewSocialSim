@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import type { UserSummary } from '@socialsim/shared';
 import { api } from '../api/endpoints';
+import { patchAuthorFollow } from '../api/postCache';
 import { useFormatCount } from '../i18n/formatCount';
 import { useI18n } from '../i18n/I18nContext';
 import { useWorld } from '../world/WorldContext';
@@ -53,6 +54,7 @@ function WhoToFollowCard() {
   const follow = async (u: UserSummary) => {
     await api.follow(u.handle);
     setFollowed((prev) => new Set(prev).add(u.id));
+    patchAuthorFollow(queryClient, u.id, true);
     void queryClient.invalidateQueries({ queryKey: ['timeline'] });
   };
 

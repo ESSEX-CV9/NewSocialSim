@@ -5,7 +5,12 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 export function usePagedQuery<T>(
   key: readonly unknown[],
   fetcher: (cursor?: string) => Promise<Page<T>>,
-  options?: { enabled?: boolean },
+  options?: {
+    enabled?: boolean;
+    refetchOnMount?: boolean | 'always';
+    refetchInterval?: number | false;
+    staleTime?: number;
+  },
 ) {
   const query = useInfiniteQuery({
     queryKey: key,
@@ -13,6 +18,9 @@ export function usePagedQuery<T>(
     initialPageParam: '',
     getNextPageParam: (last: Page<T>) => last.nextCursor ?? undefined,
     enabled: options?.enabled ?? true,
+    ...(options?.refetchOnMount !== undefined ? { refetchOnMount: options.refetchOnMount } : {}),
+    ...(options?.refetchInterval !== undefined ? { refetchInterval: options.refetchInterval } : {}),
+    ...(options?.staleTime !== undefined ? { staleTime: options.staleTime } : {}),
   });
 
   return {

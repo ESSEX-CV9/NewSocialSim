@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '../../api/endpoints';
+import { patchAuthorFollow } from '../../api/postCache';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { Composer } from '../../components/Composer';
@@ -86,6 +87,7 @@ function FollowSuggestions() {
   const follow = async (u: UserSummary) => {
     await api.follow(u.handle);
     setFollowed((prev) => new Set(prev).add(u.id));
+    patchAuthorFollow(queryClient, u.id, true);
     void queryClient.invalidateQueries({ queryKey: ['timeline'] });
   };
 
