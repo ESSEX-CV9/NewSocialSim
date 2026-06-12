@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- 站点图标：蓝底信号基站，对应侧栏 logo（ri-base-station）的意象 -->
+  <rect width="32" height="32" rx="7" fill="#1d9bf0"/>
+  <g stroke="#fff" stroke-width="2.4" stroke-linecap="round" fill="none">
+    <path d="M9.8 8.6a8.8 8.8 0 0 1 12.4 0"/>
+    <path d="M12.6 11.4a4.8 4.8 0 0 1 6.8 0"/>
+    <path d="M16 17v8"/>
+    <path d="M16 19.5 11.8 25.5"/>
+    <path d="M16 19.5 20.2 25.5"/>
+  </g>
+  <circle cx="16" cy="15" r="2.6" fill="#fff"/>
+</svg>

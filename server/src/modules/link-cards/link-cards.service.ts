@@ -4,10 +4,31 @@ import type { WorldManager } from '../../core/world/world-manager.js';
 import { mediaFileUrl, type MediaService } from '../media/media.service.js';
 import { linkCardsRepo } from './link-cards.repo.js';
 
-const FETCH_TIMEOUT_MS = 5_000;
-const MAX_HTML_BYTES = 512 * 1024;
+/** YouTube 等重型页面 og 标签出现在 ~650KB 处，限额须放宽到 2MB（经代理下载也需更长超时） */
+const FETCH_TIMEOUT_MS = 10_000;
+const MAX_HTML_BYTES = 2 * 1024 * 1024;
 const MAX_TITLE = 200;
 const MAX_DESCRIPTION = 300;
+/** 浏览器化请求头：YouTube/Pinterest 等对非浏览器 UA 会返回无 OG 标签的机器人页 */
+const BROWSER_HEADERS = {
+  'User-Agent':
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  Accept: 'text/html,application/xhtml+xml',
+  'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+};
+
+/** 站点特定的 og:image 提清：B 站缩略图带 @WxH 低清后缀，去掉取原图 */
+function upgradeOgImage(absoluteUrl: string): string {
+  try {
+    const host = new URL(absoluteUrl).hostname;
+    if (host === 'hdslb.com' || host.endsWith('.hdslb.com')) {
+      return absoluteUrl.split('@')[0] ?? absoluteUrl;
+    }
+  } catch {
+    // URL 异常时原样返回
+  }
+  return absoluteUrl;
+}
 
 /** 提取正文中的首个 http(s) URL（去掉常见的尾随标点）；无则 null */
 export function extractFirstUrl(content: string): string | null {
@@ -76,13 +97,15 @@ export class LinkCardsService {
    */
   async resolve(url: string, ownerId: number): Promise<void> {
     const { db } = this.worldManager.current();
-    if (linkCardsRepo.find(db, url)) return;
+    // 成功条目永久缓存；失败条目在下一次有帖子引用同 URL 时重试
+    // （否则一次网络抖动会让该 URL 永远出不了卡片）
+    if (linkCardsRepo.find(db, url)?.status === 'ok') return;
 
     try {
       const { buf, contentType, finalUrl } = await fetchWithLimit(url, {
         timeoutMs: FETCH_TIMEOUT_MS,
         maxBytes: MAX_HTML_BYTES,
-        headers: { Accept: 'text/html,application/xhtml+xml' },
+        headers: BROWSER_HEADERS,
       });
       if (contentType !== 'text/html' && contentType !== 'application/xhtml+xml') {
         throw new Error(`不是 HTML：${contentType}`);
@@ -104,7 +127,7 @@ export class LinkCardsService {
       let imageMediaId: number | null = null;
       if (ogImage) {
         try {
-          const absolute = new URL(ogImage, finalUrl).href;
+          const absolute = upgradeOgImage(new URL(ogImage, finalUrl).href);
           const media = await this.mediaService.ingestImageFromUrl(ownerId, absolute, 'linkcard');
           imageMediaId = media.id;
         } catch {
