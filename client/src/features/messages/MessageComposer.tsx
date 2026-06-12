@@ -1,7 +1,11 @@
-import type { MediaView } from '@socialsim/shared';
+import type { MediaView, UserSummary } from '@socialsim/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
 import { api } from '../../api/endpoints';
+import {
+  MentionCandidateList,
+  useMentionCandidates,
+} from '../../components/useMentionCandidates';
 import { useI18n } from '../../i18n/I18nContext';
 import { prependDmMessage } from './dmCache';
 
@@ -27,8 +31,24 @@ export function MessageComposer({
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const mentionCtl = useMentionCandidates();
 
   const empty = content.trim().length === 0 && media.length === 0;
+
+  /** 选中 @ 候选：替换光标前的 @prefix 并恢复焦点 */
+  const pickMention = (u: UserSummary) => {
+    const picked = mentionCtl.applyPick(content, u);
+    if (!picked) return;
+    setContent(picked.next);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(picked.caret, picked.caret);
+        autoResize(el);
+      }
+    });
+  };
 
   const autoResize = (el: HTMLTextAreaElement) => {
     el.style.height = 'auto';
@@ -112,7 +132,14 @@ export function MessageComposer({
         </div>
       )}
       {error && <div className="mb-2 text-sm text-x-red">{error}</div>}
-      <div className="flex items-end gap-1 rounded-2xl bg-x-input px-2 py-1.5">
+      <div className="relative flex items-end gap-1 rounded-2xl bg-x-input px-2 py-1.5">
+        <MentionCandidateList
+          candidates={mentionCtl.mention ? mentionCtl.candidates : []}
+          candidateIdx={mentionCtl.candidateIdx}
+          onHoverIdx={mentionCtl.setCandidateIdx}
+          onPick={pickMention}
+          className="bottom-full left-2 mb-2"
+        />
         <input
           ref={fileInputRef}
           type="file"
@@ -139,8 +166,15 @@ export function MessageComposer({
           onChange={(e) => {
             setContent(e.target.value);
             autoResize(e.target);
+            mentionCtl.updateFromCaret(e.target);
+          }}
+          onSelect={(e) => mentionCtl.updateFromCaret(e.currentTarget)}
+          onBlur={() => {
+            // 延迟关闭，给候选条目的 onMouseDown 留出执行窗口
+            setTimeout(() => mentionCtl.setMention(null), 150);
           }}
           onKeyDown={(e) => {
+            if (mentionCtl.handleKeyDown(e, pickMention)) return;
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               void send();

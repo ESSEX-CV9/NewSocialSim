@@ -1,11 +1,12 @@
 import type { MessageView } from '@socialsim/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { usePagedQuery } from '../../components/usePagedQuery';
+import { UserHoverCard } from '../../components/UserHoverCard';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
 import { useI18n } from '../../i18n/I18nContext';
 import { ConversationInfoModal } from './ConversationInfoModal';
@@ -159,21 +160,23 @@ export function ConversationView({ conversationId }: { conversationId: number })
 
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col">
-      {/* 头部：对方信息（点击进主页）+ 删除会话 */}
+      {/* 头部：对方信息（悬停出用户卡，点击进主页）+ 会话信息弹窗 */}
       <div className="flex items-center gap-3 border-b border-x-border px-4 py-2">
-        <button
-          onClick={() => navigate(`/u/${other.handle}`)}
-          className="flex min-w-0 items-center gap-3 rounded-full py-1 pr-3 text-left transition-colors duration-200 hover:bg-x-hover"
-        >
-          <Avatar handle={other.handle} avatarUrl={other.avatarUrl} size={36} />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1 text-[16px] font-bold">
-              <span className="truncate">{other.displayName}</span>
-              <VerifiedBadge verified={other.verified} size={15} />
+        <UserHoverCard handle={other.handle}>
+          <Link
+            to={`/u/${other.handle}`}
+            className="flex min-w-0 items-center gap-3 rounded-full py-1 pr-3 text-left transition-colors duration-200 hover:bg-x-hover-strong"
+          >
+            <Avatar handle={other.handle} avatarUrl={other.avatarUrl} size={36} />
+            <div className="min-w-0">
+              <div className="flex items-center gap-1 text-[16px] font-bold">
+                <span className="truncate">{other.displayName}</span>
+                <VerifiedBadge verified={other.verified} size={15} />
+              </div>
+              <div className="truncate text-[13px] text-x-dim">@{other.handle}</div>
             </div>
-            <div className="truncate text-[13px] text-x-dim">@{other.handle}</div>
-          </div>
-        </button>
+          </Link>
+        </UserHoverCard>
         <button
           aria-label={t('dm.conversationInfo')}
           title={t('dm.conversationInfo')}

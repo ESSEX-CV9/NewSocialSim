@@ -1,11 +1,11 @@
 import type { MediaView, PostView, UserSummary } from '@socialsim/shared';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
 import { MediaSearchPanel } from './MediaSearchPanel';
-import { VerifiedBadge } from './VerifiedBadge';
+import { MentionCandidateList, useMentionCandidates } from './useMentionCandidates';
 
 const MAX_LENGTH = 280;
 /** 与服务端 MAX_PER_POST 一致：图/视频共享配额且可混排 */
@@ -13,8 +13,6 @@ const MAX_MEDIA = 20;
 const MEDIA_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm';
 /** 输入框内实时高亮的片段：与发布后 PostContent 的解析口径一致（URL / #话题 / @用户名） */
 const HIGHLIGHT_RE = /https?:\/\/[^\s]+|#[^\s#@]+|@[a-zA-Z0-9_]{2,20}/g;
-/** 光标前进行中的 @mention（@ 前必须是行首或非 handle 字符，避免 email 误触发） */
-const ACTIVE_MENTION_RE = /(^|[^a-zA-Z0-9_])@([a-zA-Z0-9_]{0,20})$/;
 
 interface ComposerProps {
   replyToId?: number;
@@ -48,33 +46,7 @@ export function Composer({
   const [searchOpen, setSearchOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  // @ 候选：mention.start 为 @ 字符的下标，prefix 为已输入的 handle 前缀
-  const [mention, setMention] = useState<{ start: number; prefix: string } | null>(null);
-  const [candidates, setCandidates] = useState<UserSummary[]>([]);
-  const [candidateIdx, setCandidateIdx] = useState(0);
-
-  // 候选拉取：有前缀走用户搜索（300ms 防抖），裸 @ 立即给推荐关注作默认候选
-  useEffect(() => {
-    if (!mention) {
-      setCandidates([]);
-      return;
-    }
-    const timer = setTimeout(
-      () => {
-        const load = mention.prefix
-          ? api.searchUsers(mention.prefix, undefined, 5).then((r) => r.items)
-          : api.suggestedUsers().then((r) => r.users);
-        load
-          .then((items) => {
-            setCandidates(items.slice(0, 5));
-            setCandidateIdx(0);
-          })
-          .catch(() => setCandidates([]));
-      },
-      mention.prefix ? 300 : 0,
-    );
-    return () => clearTimeout(timer);
-  }, [mention]);
+  const mentionCtl = useMentionCandidates();
 
   // 高亮镜像层内容：命中片段变蓝，其余原样（含尾随零宽字符保持与 textarea 等高）
   const highlightNodes = useMemo(() => {
@@ -97,38 +69,16 @@ export function Composer({
   const remaining = MAX_LENGTH - content.length;
   const empty = content.trim().length === 0 && media.length === 0;
 
-  /** 根据光标位置更新进行中的 @mention 状态（onChange/onSelect 共用） */
-  const updateMention = (el: HTMLTextAreaElement) => {
-    if (el.selectionStart !== el.selectionEnd) {
-      setMention(null);
-      return;
-    }
-    const before = el.value.slice(0, el.selectionStart);
-    const m = ACTIVE_MENTION_RE.exec(before);
-    if (!m) {
-      setMention(null);
-      return;
-    }
-    const prefix = m[2]!;
-    setMention((prev) => {
-      const start = before.length - prefix.length - 1;
-      return prev && prev.start === start && prev.prefix === prefix ? prev : { start, prefix };
-    });
-  };
-
   /** 选中候选：把光标前的 @prefix 替换为 @handle + 空格 */
   const pickMention = (u: UserSummary) => {
-    if (!mention) return;
-    const end = mention.start + 1 + mention.prefix.length;
-    setContent(`${content.slice(0, mention.start)}@${u.handle} ${content.slice(end)}`);
-    const pos = mention.start + u.handle.length + 2;
-    setMention(null);
-    setCandidates([]);
+    const picked = mentionCtl.applyPick(content, u);
+    if (!picked) return;
+    setContent(picked.next);
     requestAnimationFrame(() => {
       const el = textareaRef.current;
       if (el) {
         el.focus();
-        el.setSelectionRange(pos, pos);
+        el.setSelectionRange(picked.caret, picked.caret);
       }
     });
   };
@@ -214,69 +164,29 @@ export function Composer({
             value={content}
             onChange={(e) => {
               setContent(e.target.value);
-              updateMention(e.target);
+              mentionCtl.updateFromCaret(e.target);
             }}
-            onSelect={(e) => updateMention(e.currentTarget)}
+            onSelect={(e) => mentionCtl.updateFromCaret(e.currentTarget)}
             onBlur={() => {
               // 延迟关闭，给候选条目的 onMouseDown 留出执行窗口
-              setTimeout(() => setMention(null), 150);
+              setTimeout(() => mentionCtl.setMention(null), 150);
             }}
             placeholder={placeholder}
             autoFocus={autoFocus}
             className="absolute inset-0 h-full w-full resize-none overflow-hidden bg-transparent text-xl text-transparent outline-none placeholder:text-x-dim"
             style={{ caretColor: 'var(--th-text)' }}
             onKeyDown={(e) => {
-              if (mention && candidates.length > 0) {
-                if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  setCandidateIdx((i) => (i + 1) % candidates.length);
-                  return;
-                }
-                if (e.key === 'ArrowUp') {
-                  e.preventDefault();
-                  setCandidateIdx((i) => (i - 1 + candidates.length) % candidates.length);
-                  return;
-                }
-                if ((e.key === 'Enter' && !e.ctrlKey && !e.metaKey) || e.key === 'Tab') {
-                  e.preventDefault();
-                  pickMention(candidates[candidateIdx]!);
-                  return;
-                }
-                if (e.key === 'Escape') {
-                  e.preventDefault();
-                  setMention(null);
-                  return;
-                }
-              }
+              if (mentionCtl.handleKeyDown(e, pickMention)) return;
               if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
             }}
           />
-          {mention && candidates.length > 0 && (
-            <div className="absolute top-full left-0 z-30 w-72 overflow-hidden rounded-xl border border-x-border bg-x-card shadow-lg">
-              {candidates.map((u, i) => (
-                <button
-                  key={u.id}
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    pickMention(u);
-                  }}
-                  onMouseEnter={() => setCandidateIdx(i)}
-                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 ${
-                    i === candidateIdx ? 'bg-x-input' : ''
-                  }`}
-                >
-                  <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={36} />
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1 text-[15px] font-bold">
-                      <span className="truncate">{u.displayName}</span>
-                      <VerifiedBadge verified={u.verified} size={14} />
-                    </div>
-                    <div className="truncate text-[13px] text-x-dim">@{u.handle}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
+          <MentionCandidateList
+            candidates={mentionCtl.mention ? mentionCtl.candidates : []}
+            candidateIdx={mentionCtl.candidateIdx}
+            onHoverIdx={mentionCtl.setCandidateIdx}
+            onPick={pickMention}
+            className="top-full left-0"
+          />
         </div>
         {/* 预览：单媒体大图；多媒体横向滚动缩略条（20 个上限下网格会撑爆发帖框） */}
         {media.length === 1 && (

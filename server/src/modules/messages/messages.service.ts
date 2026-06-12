@@ -20,6 +20,7 @@ import {
 } from '../../core/errors/app-error.js';
 import { decodeCursor, decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { extractFirstUrl, type LinkCardsService } from '../link-cards/link-cards.service.js';
 import { mediaFileUrl, type MediaService } from '../media/media.service.js';
 import {
   messagesRepo,
@@ -47,6 +48,7 @@ export class MessagesService {
   constructor(
     private readonly worldManager: WorldManager,
     private readonly mediaService: MediaService,
+    private readonly linkCardsService: LinkCardsService,
     private readonly publisher: DmEventPublisher = NOOP_PUBLISHER,
   ) {}
 
@@ -140,7 +142,11 @@ export class MessagesService {
     };
   }
 
-  sendMessage(viewerId: number, conversationId: number, input: SendMessageRequest): MessageView {
+  async sendMessage(
+    viewerId: number,
+    conversationId: number,
+    input: SendMessageRequest,
+  ): Promise<MessageView> {
     const { db, clock, worldId } = this.worldManager.current();
     const conv = messagesRepo.findConversation(db, conversationId);
     const me = conv && messagesRepo.getParticipant(db, conversationId, viewerId);
@@ -160,6 +166,12 @@ export class MessagesService {
       throw new ValidationError(`消息最长 ${MAX_CONTENT_LENGTH} 字`);
     }
     this.mediaService.validateAttachableToMessage(viewerId, mediaIds);
+
+    // 正文首个 URL 预抓 OG 卡片（内部吞错，失败不阻断发送；同发帖规则）
+    const firstUrl = extractFirstUrl(content);
+    if (firstUrl !== null && mediaIds.length === 0) {
+      await this.linkCardsService.resolve(firstUrl, viewerId);
+    }
 
     const now = clock.now();
     const isFirstMessage = conv.last_message_id === null;
@@ -365,7 +377,7 @@ export class MessagesService {
       .map((r) => ({ userId: r.user_id, emoji: r.emoji }));
   }
 
-  /** 批量拼装消息视图（媒体 + 回应一次查全） */
+  /** 批量拼装消息视图（媒体 + 回应 + 链接卡片一次查全） */
   private buildMessageViews(rows: MessageRow[], worldId: string): MessageView[] {
     if (rows.length === 0) return [];
     const ids = rows.map((r) => r.id);
@@ -377,12 +389,22 @@ export class MessagesService {
       list.push({ userId: r.user_id, emoji: r.emoji });
       reactionMap.set(r.message_id, list);
     }
+    // 链接卡片：有媒体的消息不显示（同帖子规则）
+    const firstUrls = new Map<number, string>();
+    for (const row of rows) {
+      if (row.deleted === 1) continue;
+      if ((mediaMap.get(row.id)?.length ?? 0) > 0) continue;
+      const url = extractFirstUrl(row.content);
+      if (url !== null) firstUrls.set(row.id, url);
+    }
+    const cardMap = this.linkCardsService.viewsForUrls([...firstUrls.values()]);
     return rows.map((row) => ({
       id: row.id,
       conversationId: row.conversation_id,
       sender: senderSummary(row, worldId),
       content: row.deleted === 1 ? '' : row.content,
       media: row.deleted === 1 ? [] : (mediaMap.get(row.id) ?? []),
+      linkCard: cardMap.get(firstUrls.get(row.id) ?? '') ?? null,
       reactions: reactionMap.get(row.id) ?? [],
       deleted: row.deleted === 1,
       createdAt: row.created_at,

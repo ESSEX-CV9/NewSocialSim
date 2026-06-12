@@ -1,4 +1,4 @@
-import type { MediaView, UserSummary } from './views.js';
+import type { LinkCardView, MediaView, UserSummary } from './views.js';
 
 /** 会话在观察者收件箱中的位置：主收件箱 / 消息请求（对方未关注你时的来信） */
 export type ConversationState = 'inbox' | 'request';
@@ -21,6 +21,8 @@ export interface MessageView {
   content: string;
   /** 按 position 排序，最多 4 个；墓碑时为空数组 */
   media: MediaView[];
+  /** 正文首个 URL 的链接卡片；有媒体/墓碑/抓取失败时为 null（同帖子规则） */
+  linkCard: LinkCardView | null;
   reactions: MessageReactionView[];
   deleted: boolean;
   createdAt: number;

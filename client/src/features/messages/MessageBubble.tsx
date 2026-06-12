@@ -3,7 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
+import { LinkCard } from '../../components/LinkCard';
 import { MediaGrid } from '../../components/MediaGrid';
+import { PostContent } from '../../components/PostContent';
 import { useI18n } from '../../i18n/I18nContext';
 import { ReactionPicker } from './ReactionPicker';
 
@@ -75,13 +77,21 @@ export function MessageBubble({
           )}
           {message.content.length > 0 && (
             <div
-              className={`mt-1 px-4 py-2 text-[15px] wrap-break-word whitespace-pre-wrap ${
+              className={`mt-1 px-4 py-2 ${
                 isOwn
                   ? 'rounded-2xl rounded-br-sm bg-x-blue text-white'
                   : 'rounded-2xl rounded-bl-sm bg-x-input'
               }`}
             >
-              {message.content}
+              <PostContent
+                content={message.content}
+                linkClass={isOwn ? 'text-white underline hover:opacity-80' : undefined}
+              />
+            </div>
+          )}
+          {message.linkCard && (
+            <div className="w-72 max-w-full">
+              <LinkCard card={message.linkCard} />
             </div>
           )}
         </div>

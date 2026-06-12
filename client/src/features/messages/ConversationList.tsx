@@ -126,7 +126,7 @@ function ConversationListItem({
                 setMenu(null);
                 window.open(`/messages/${conversation.id}`, '_blank');
               }}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] transition-colors duration-200 hover:bg-x-hover-strong"
             >
               <i className="ri-external-link-line text-[17px]" />
               {t('dm.openInNewTab')}
@@ -137,7 +137,7 @@ function ConversationListItem({
                   unread ? api.dmMarkRead(conversation.id) : api.dmMarkUnread(conversation.id),
                 )
               }
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] transition-colors duration-200 hover:bg-x-hover-strong"
             >
               <i
                 className={`${unread ? 'ri-chat-check-line' : 'ri-chat-unread-line'} text-[17px]`}
@@ -150,7 +150,7 @@ function ConversationListItem({
                   conversation.muted ? api.dmUnmute(conversation.id) : api.dmMute(conversation.id),
                 )
               }
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] transition-colors duration-200 hover:bg-x-hover-strong"
             >
               <i
                 className={`${conversation.muted ? 'ri-volume-up-line' : 'ri-volume-mute-line'} text-[17px]`}
@@ -163,7 +163,7 @@ function ConversationListItem({
                   conversation.pinned ? api.dmUnpin(conversation.id) : api.dmPin(conversation.id),
                 )
               }
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] transition-colors duration-200 hover:bg-x-hover-strong"
             >
               <i
                 className={`${conversation.pinned ? 'ri-unpin-line' : 'ri-pushpin-line'} text-[17px]`}
@@ -172,7 +172,7 @@ function ConversationListItem({
             </button>
             <button
               onClick={() => void deleteConversation()}
-              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold text-x-red transition-colors duration-200 hover:bg-x-hover-strong"
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] text-x-red transition-colors duration-200 hover:bg-x-hover-strong"
             >
               <i className="ri-delete-bin-line text-[17px]" />
               {t('dm.deleteConversation')}
@@ -418,7 +418,7 @@ export function ConversationList({
                         setFilter(item.key);
                         setFilterMenuOpen(false);
                       }}
-                      className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] transition-colors duration-200 hover:bg-x-hover-strong"
                     >
                       <i className={`${item.icon} text-[17px]`} />
                       <span className="flex-1 text-left">{item.label}</span>
@@ -428,7 +428,7 @@ export function ConversationList({
                   <div className="my-1 border-t border-x-border" />
                   <button
                     onClick={() => void markAllRead()}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] font-bold transition-colors duration-200 hover:bg-x-hover-strong"
+                    className="flex w-full items-center gap-3 px-4 py-2.5 text-[15px] transition-colors duration-200 hover:bg-x-hover-strong"
                   >
                     <i className="ri-check-double-line text-[17px]" />
                     {t('dm.markAllRead')}

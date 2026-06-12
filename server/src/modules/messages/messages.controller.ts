@@ -54,7 +54,7 @@ export class MessagesController {
     }>,
     reply: FastifyReply,
   ) => {
-    reply.send({ message: this.service.sendMessage(req.user.sub, req.params.id, req.body) });
+    reply.send({ message: await this.service.sendMessage(req.user.sub, req.params.id, req.body) });
   };
 
   markRead = async (
