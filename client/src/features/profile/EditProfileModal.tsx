@@ -35,17 +35,7 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const avatarPreview = avatar !== undefined ? avatar.url : user.avatarUrl;
   const bannerPreview = banner !== undefined ? banner.url : user.bannerUrl;
 
-  const pickFile = (kind: CropTask['kind']) => (files: FileList | null) => {
-    const file = files?.[0];
-    if (file) setCropping({ file, kind });
-    if (avatarInputRef.current) avatarInputRef.current.value = '';
-    if (bannerInputRef.current) bannerInputRef.current.value = '';
-  };
-
-  const onCropped = async (file: File) => {
-    if (!cropping) return;
-    const kind = cropping.kind;
-    setCropping(null);
+  const uploadAndSet = async (kind: CropTask['kind'], file: File) => {
     setError(null);
     try {
       const res = await api.uploadMedia(file);
@@ -55,6 +45,24 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
+  };
+
+  const pickFile = (kind: CropTask['kind']) => (files: FileList | null) => {
+    const file = files?.[0];
+    if (file) {
+      // GIF 选作头像直传原图保留动画（canvas 裁剪会变静帧）；其余格式进裁剪
+      if (kind === 'avatar' && file.type === 'image/gif') void uploadAndSet('avatar', file);
+      else setCropping({ file, kind });
+    }
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
+    if (bannerInputRef.current) bannerInputRef.current.value = '';
+  };
+
+  const onCropped = async (file: File) => {
+    if (!cropping) return;
+    const kind = cropping.kind;
+    setCropping(null);
+    await uploadAndSet(kind, file);
   };
 
   const save = async () => {
