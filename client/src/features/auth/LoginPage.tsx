@@ -19,7 +19,7 @@ export function AuthFormShell({ title, children }: { title: string; children: Re
 }
 
 export const inputClass =
-  'w-full rounded-lg border border-transparent bg-x-input px-3 py-2.5 text-[15px] outline-none placeholder:text-x-dim focus:border-x-blue';
+  'w-full rounded-lg border border-transparent bg-x-input px-3 py-2.5 text-[15px] text-x-text outline-none placeholder:text-x-dim focus:border-x-blue';
 export const buttonClass =
   'w-full rounded-full bg-x-blue py-2.5 text-[15px] font-bold text-white transition-colors duration-200 hover:bg-x-blue-dark disabled:cursor-not-allowed disabled:opacity-50';
 

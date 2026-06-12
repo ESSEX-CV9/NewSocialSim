@@ -193,7 +193,7 @@ export function MediaSearchSettings() {
           <input
             value={proxy ?? config.data?.config.proxy ?? ''}
             onChange={(e) => setProxy(e.target.value)}
-            placeholder="http://127.0.0.1:7890"
+            placeholder={t('mediaSearch.proxyPlaceholder')}
             className={inputClass}
           />
         </label>
