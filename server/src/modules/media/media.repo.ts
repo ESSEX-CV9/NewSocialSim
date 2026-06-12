@@ -69,19 +69,48 @@ export const mediaRepo = {
     return db.prepare(`SELECT * FROM media WHERE id IN (${placeholders})`).all(...ids) as MediaRow[];
   },
 
-  /** 已被任何帖子占用的媒体 id 集合 */
+  /** 已被任何帖子或私信消息占用的媒体 id 集合（一条媒体只能挂一处） */
   attachedSet(db: WorldDb, mediaIds: number[]): Set<number> {
     if (mediaIds.length === 0) return new Set();
     const placeholders = mediaIds.map(() => '?').join(',');
     const rows = db
-      .prepare(`SELECT DISTINCT media_id FROM post_media WHERE media_id IN (${placeholders})`)
-      .all(...mediaIds) as { media_id: number }[];
+      .prepare(
+        `SELECT DISTINCT media_id FROM post_media WHERE media_id IN (${placeholders})
+         UNION
+         SELECT DISTINCT media_id FROM message_media WHERE media_id IN (${placeholders})`,
+      )
+      .all(...mediaIds, ...mediaIds) as { media_id: number }[];
     return new Set(rows.map((r) => r.media_id));
   },
 
   attachToPost(db: WorldDb, postId: number, mediaIds: number[]): void {
     const stmt = db.prepare('INSERT INTO post_media (post_id, media_id, position) VALUES (?, ?, ?)');
     mediaIds.forEach((mediaId, i) => stmt.run(postId, mediaId, i));
+  },
+
+  attachToMessage(db: WorldDb, messageId: number, mediaIds: number[]): void {
+    const stmt = db.prepare(
+      'INSERT INTO message_media (message_id, media_id, position) VALUES (?, ?, ?)',
+    );
+    mediaIds.forEach((mediaId, i) => stmt.run(messageId, mediaId, i));
+  },
+
+  /** 批量取多条私信消息的媒体（按 position 排序） */
+  listForMessages(
+    db: WorldDb,
+    messageIds: number[],
+  ): (MediaRow & { message_id: number; position: number })[] {
+    if (messageIds.length === 0) return [];
+    const placeholders = messageIds.map(() => '?').join(',');
+    return db
+      .prepare(
+        `SELECT m.*, mm.message_id, mm.position
+         FROM message_media mm
+         JOIN media m ON m.id = mm.media_id
+         WHERE mm.message_id IN (${placeholders})
+         ORDER BY mm.message_id, mm.position`,
+      )
+      .all(...messageIds) as (MediaRow & { message_id: number; position: number })[];
   },
 
   /** 批量取多个帖子的媒体（按 position 排序），供 buildViews 用 */

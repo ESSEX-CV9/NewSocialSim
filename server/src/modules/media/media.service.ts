@@ -26,6 +26,8 @@ const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 100 * 1024 * 1024;
 /** 一条帖子最多挂的媒体数（防呆硬顶，图/视频共享配额且可混排；帖子卡只显示前 4 个） */
 const MAX_PER_POST = 20;
+/** 一条私信消息最多挂的媒体数（对照 X） */
+const MAX_PER_MESSAGE = 4;
 
 export function isImageMime(mime: string): boolean {
   return mime in IMAGE_MIMES;
@@ -234,13 +236,30 @@ export class MediaService {
 
   /**
    * 校验一组媒体可挂到新帖：≤20 个媒体（图/视频可混排）、全部存在且本人所有、
-   * 未被其他帖占用。规则：一条媒体只能挂一个帖子；头像/Banner 不占用名额。
+   * 未被占用。规则：一条媒体只能挂一处（帖子或私信消息）；头像/Banner 不占用名额。
    */
   validateAttachable(ownerId: number, mediaIds: number[]): void {
+    this.validateUsable(ownerId, mediaIds, MAX_PER_POST, `一条帖子最多 ${MAX_PER_POST} 个媒体`);
+  }
+
+  /** 校验一组媒体可挂到新私信消息（≤4 个，规则同上） */
+  validateAttachableToMessage(ownerId: number, mediaIds: number[]): void {
+    this.validateUsable(
+      ownerId,
+      mediaIds,
+      MAX_PER_MESSAGE,
+      `一条消息最多 ${MAX_PER_MESSAGE} 个媒体`,
+    );
+  }
+
+  private validateUsable(
+    ownerId: number,
+    mediaIds: number[],
+    maxCount: number,
+    overflowMessage: string,
+  ): void {
     if (mediaIds.length === 0) return;
-    if (mediaIds.length > MAX_PER_POST) {
-      throw new ValidationError(`一条帖子最多 ${MAX_PER_POST} 个媒体`);
-    }
+    if (mediaIds.length > maxCount) throw new ValidationError(overflowMessage);
     const { db } = this.worldManager.current();
     const rows = mediaRepo.findByIds(db, mediaIds);
     if (rows.length !== mediaIds.length) throw new ValidationError('包含不存在的媒体');
@@ -248,7 +267,7 @@ export class MediaService {
       if (row.owner_id !== ownerId) throw new ValidationError('只能使用自己上传的媒体');
     }
     const attached = mediaRepo.attachedSet(db, mediaIds);
-    if (attached.size > 0) throw new ValidationError('媒体已被其他帖子使用');
+    if (attached.size > 0) throw new ValidationError('媒体已被使用');
   }
 
   /** 校验头像/Banner 用图：存在、本人所有、是图片 */
@@ -264,6 +283,25 @@ export class MediaService {
   attachToPost(postId: number, mediaIds: number[]): void {
     const { db } = this.worldManager.current();
     mediaRepo.attachToPost(db, postId, mediaIds);
+  }
+
+  /** 事务内挂接到私信消息（messages.service.sendMessage 调用，校验须已通过） */
+  attachToMessage(messageId: number, mediaIds: number[]): void {
+    const { db } = this.worldManager.current();
+    mediaRepo.attachToMessage(db, messageId, mediaIds);
+  }
+
+  /** 批量取多条私信消息的媒体视图 */
+  viewsForMessages(messageIds: number[]): Map<number, MediaView[]> {
+    const { db } = this.worldManager.current();
+    const rows = mediaRepo.listForMessages(db, messageIds);
+    const map = new Map<number, MediaView[]>();
+    for (const row of rows) {
+      const list = map.get(row.message_id) ?? [];
+      list.push(this.toView(row));
+      map.set(row.message_id, list);
+    }
+    return map;
   }
 
   private toView(row: MediaRow): MediaView {

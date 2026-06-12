@@ -17,6 +17,8 @@ import { registerMediaRoutes } from './modules/media/media.routes.js';
 import { MediaService } from './modules/media/media.service.js';
 import { registerMediaSearchRoutes } from './modules/media-search/media-search.routes.js';
 import { MediaSearchService } from './modules/media-search/media-search.service.js';
+import { registerMessagesRoutes } from './modules/messages/messages.routes.js';
+import { MessagesService } from './modules/messages/messages.service.js';
 import { registerNotificationsRoutes } from './modules/notifications/notifications.routes.js';
 import { NotificationsService } from './modules/notifications/notifications.service.js';
 import { registerPostsRoutes } from './modules/posts/posts.routes.js';
@@ -82,6 +84,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const blocksService = new BlocksService(worldManager, usersService, followsService);
   const timelineService = new TimelineService(worldManager, postsService, usersService);
   const searchService = new SearchService(worldManager, postsService);
+  const messagesService = new MessagesService(worldManager, mediaService);
 
   app.get('/api/health', async () => ({ ok: true }));
 
@@ -95,6 +98,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerFollowsRoutes(app, { followsService, requireAuth });
   registerBlocksRoutes(app, { blocksService, requireAuth });
   registerNotificationsRoutes(app, { notificationsService, requireAuth });
+  registerMessagesRoutes(app, { messagesService, requireAuth });
   registerTimelineRoutes(app, { timelineService, requireAuth, optionalAuth });
   registerSearchRoutes(app, { searchService, optionalAuth });
 
