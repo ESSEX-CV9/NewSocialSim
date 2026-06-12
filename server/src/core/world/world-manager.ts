@@ -22,6 +22,7 @@ export interface CreateWorldInput {
   /** 模拟时间起点与流速，默认：从现实当前时刻开始、1 倍速 */
   clock?: Partial<ClockState>;
   calendar?: { label: string };
+  contentRating?: WorldMeta['contentRating'];
 }
 
 interface ServerState {
@@ -122,6 +123,7 @@ export class WorldManager {
         paused: input.clock?.paused ?? false,
       },
       calendar: input.calendar ?? { label: '公历' },
+      contentRating: input.contentRating ?? 'safe',
       createdAtRealMs: Date.now(),
     };
     if (!Number.isFinite(meta.clock.scale) || meta.clock.scale <= 0) {
@@ -184,7 +186,10 @@ export class WorldManager {
 
   private readMeta(worldId: string): WorldMeta {
     const file = path.join(this.worldDir(worldId), 'world.json');
-    return readJsonFile(file) as WorldMeta;
+    const meta = readJsonFile(file) as WorldMeta;
+    // 旧世界的 world.json 没有此字段，缺省按最保守的 safe
+    meta.contentRating ??= 'safe';
+    return meta;
   }
 
   private writeMeta(meta: WorldMeta): void {

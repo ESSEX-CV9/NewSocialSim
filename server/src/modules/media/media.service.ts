@@ -52,7 +52,8 @@ const REFERER_BY_HOST: Record<string, string> = {
   's.pximg.net': 'https://www.pixiv.net/',
 };
 
-const URL_FETCH_TIMEOUT_MS = 10_000;
+/** 经代理拉外站图可能较慢，放宽到 30 秒 */
+const URL_FETCH_TIMEOUT_MS = 30_000;
 
 /** 媒体文件公开 URL 的纯函数版（供各模块组装 UserSummary 等使用） */
 export function mediaFileUrl(mediaId: number | null, worldId: string): string | null {

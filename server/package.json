@@ -9,12 +9,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@book000/pixivts": "^0.48.91",
     "@fastify/jwt": "^10.1.0",
     "@fastify/multipart": "^10.0.0",
     "@socialsim/shared": "*",
     "better-sqlite3": "^12.2.0",
     "fastify": "^5.4.0",
-    "image-size": "^2.0.2"
+    "image-size": "^2.0.2",
+    "undici": "^7.27.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",

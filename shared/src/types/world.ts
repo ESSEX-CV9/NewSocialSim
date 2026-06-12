@@ -13,6 +13,9 @@ export interface CalendarConfig {
   label: string;
 }
 
+/** 媒体搜索的内容分级：safe = 仅全年龄；all = 不过滤（R-18G 由实例配置单独把门） */
+export type ContentRating = 'safe' | 'all';
+
 /** 一个世界的元数据，对应 data/worlds/<id>/world.json */
 export interface WorldMeta {
   id: string;
@@ -22,6 +25,8 @@ export interface WorldMeta {
   locale: 'zh-CN' | 'en';
   clock: ClockState;
   calendar: CalendarConfig;
+  /** 媒体搜索内容分级默认值（旧世界缺省按 safe） */
+  contentRating: ContentRating;
   /** 创建时的真实时间（unix 毫秒），仅作管理信息，与模拟时间无关 */
   createdAtRealMs: number;
 }

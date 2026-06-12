@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../auth/AuthContext';
 import { useI18n } from '../../i18n/I18nContext';
 import type { Locale } from '../../i18n/messages';
 import { THEMES, type ThemeId } from '../../theme/themes';
 import { useTheme } from '../../theme/ThemeContext';
+import { MediaSearchSettings } from './MediaSearchSettings';
 
 const LOCALES: { id: Locale; label: string }[] = [
   { id: 'zh-CN', label: '中文' },
@@ -34,6 +36,7 @@ function OptionCard({
 export function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
   const { theme, setTheme } = useTheme();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -74,6 +77,9 @@ export function SettingsPage() {
           ))}
         </div>
       </section>
+
+      {/* 媒体搜索配置（需登录：接口走 requireAuth） */}
+      {user && <MediaSearchSettings />}
     </div>
   );
 }

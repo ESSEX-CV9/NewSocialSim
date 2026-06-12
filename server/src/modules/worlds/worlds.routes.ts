@@ -12,6 +12,7 @@ const createWorldBodySchema = {
     name: { type: 'string', minLength: 1, maxLength: 100 },
     description: { type: 'string', maxLength: 2000 },
     locale: { type: 'string', enum: ['zh-CN', 'en'] },
+    contentRating: { type: 'string', enum: ['safe', 'all'] },
     clock: {
       type: 'object',
       additionalProperties: false,

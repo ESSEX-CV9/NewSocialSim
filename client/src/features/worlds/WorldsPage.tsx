@@ -18,6 +18,7 @@ function CreateWorldForm({ onCreated }: { onCreated: () => void }) {
     locale: 'zh-CN' as 'zh-CN' | 'en',
     scale: '1',
     calendarLabel: '公历',
+    contentRating: 'safe' as 'safe' | 'all',
   });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,8 +38,17 @@ function CreateWorldForm({ onCreated }: { onCreated: () => void }) {
         locale: form.locale,
         clock: { scale: Number(form.scale) || 1 },
         calendar: { label: form.calendarLabel || '公历' },
+        contentRating: form.contentRating,
       });
-      setForm({ id: '', name: '', description: '', locale: 'zh-CN', scale: '1', calendarLabel: '公历' });
+      setForm({
+        id: '',
+        name: '',
+        description: '',
+        locale: 'zh-CN',
+        scale: '1',
+        calendarLabel: '公历',
+        contentRating: 'safe',
+      });
       onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -77,6 +87,13 @@ function CreateWorldForm({ onCreated }: { onCreated: () => void }) {
         <label className="flex flex-1 flex-col gap-1 text-[13px] text-x-dim">
           {t('worlds.calendarLabel')}
           <input value={form.calendarLabel} onChange={set('calendarLabel')} className={inputClass} />
+        </label>
+        <label className="flex flex-1 flex-col gap-1 text-[13px] text-x-dim">
+          {t('worlds.contentRating')}
+          <select value={form.contentRating} onChange={set('contentRating')} className={inputClass}>
+            <option value="safe">{t('worlds.ratingSafe')}</option>
+            <option value="all">{t('worlds.ratingAll')}</option>
+          </select>
         </label>
       </div>
       {error && <div className="text-sm text-x-red">{error}</div>}

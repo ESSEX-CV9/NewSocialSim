@@ -4,6 +4,7 @@ import { api } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
+import { MediaSearchPanel } from './MediaSearchPanel';
 
 const MAX_LENGTH = 280;
 const MAX_MEDIA = 4;
@@ -38,6 +39,7 @@ export function Composer({
   const [error, setError] = useState<string | null>(null);
   const [urlInputOpen, setUrlInputOpen] = useState(false);
   const [urlValue, setUrlValue] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!user) return null;
@@ -154,6 +156,15 @@ export function Composer({
         {error && (
           <div className="mb-2 text-sm text-x-red">{t('common.error', { message: error })}</div>
         )}
+        {searchOpen && (
+          <MediaSearchPanel
+            disabled={media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
+            onPicked={(m) => {
+              if (media.length >= MAX_MEDIA || media.some((x) => x.type === 'video')) return;
+              setMedia((prev) => [...prev, m]);
+            }}
+          />
+        )}
         {urlInputOpen && (
           <div className="mb-2 flex items-center gap-2">
             <input
@@ -202,6 +213,15 @@ export function Composer({
             className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <i className="ri-link text-[18px]" />
+          </button>
+          <button
+            aria-label={t('mediaSearch.title')}
+            title={t('mediaSearch.title')}
+            disabled={uploading || media.length >= MAX_MEDIA || media.some((m) => m.type === 'video')}
+            onClick={() => setSearchOpen((v) => !v)}
+            className="flex size-8.5 items-center justify-center rounded-full text-x-blue transition-colors duration-200 hover:bg-x-blue/10 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <i className="ri-search-eye-line text-[18px]" />
           </button>
           <div className="ml-auto flex items-center gap-3">
             <span

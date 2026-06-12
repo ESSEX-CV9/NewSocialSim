@@ -129,8 +129,56 @@ export const api = {
     locale?: 'zh-CN' | 'en';
     clock?: { simTimeMs?: number; scale?: number; paused?: boolean };
     calendar?: { label: string };
+    contentRating?: 'safe' | 'all';
   }) => http<{ world: WorldMeta }>('POST', '/api/admin/worlds', input),
   activateWorld: (id: string) =>
     http<ActiveWorldInfo>('POST', `/api/admin/worlds/${id}/activate`, {}),
   activeWorld: () => http<ActiveWorldInfo>('GET', '/api/admin/worlds/active'),
+
+  // media search
+  mediaSearch: (q: string, source?: string) =>
+    http<{ results: MediaSearchResult[] }>(
+      'GET',
+      `/api/media-search?q=${encodeURIComponent(q)}${source ? `&source=${encodeURIComponent(source)}` : ''}`,
+    ),
+  mediaSearchSources: () =>
+    http<{ sources: { id: string; ok: boolean; reason?: string }[] }>(
+      'GET',
+      '/api/media-search/sources',
+    ),
+  mediaSearchConfig: () => http<{ config: MediaSearchMaskedConfig }>('GET', '/api/media-search/config'),
+  patchMediaSearchConfig: (patch: Record<string, unknown>) =>
+    http<{ config: MediaSearchMaskedConfig }>('PATCH', '/api/media-search/config', patch),
+  pixivLogin: () => http<PixivLoginStatus>('POST', '/api/media-search/pixiv/login', {}),
+  pixivLoginStatus: () => http<PixivLoginStatus>('GET', '/api/media-search/pixiv/login/status'),
+  pixivSubmitCode: (code: string) =>
+    http<PixivLoginStatus>('POST', '/api/media-search/pixiv/code', { code }),
 };
+
+/** 搜图候选（与服务端 SearchResult 对应） */
+export interface MediaSearchResult {
+  url: string;
+  preview: string;
+  source: string;
+  title: string;
+  width: number;
+  height: number;
+  score?: number;
+  referer?: string;
+}
+
+export interface MediaSearchMaskedConfig {
+  proxy: string;
+  pixivLoggedIn: boolean;
+  pixivAllowR18G: boolean;
+  pinterestHasCookies: boolean;
+  pexelsHasKey: boolean;
+  danbooruHasKey: boolean;
+  gelbooruHasKey: boolean;
+}
+
+export interface PixivLoginStatus {
+  state: 'idle' | 'launching' | 'waiting' | 'exchanging' | 'success' | 'error';
+  message?: string;
+  loginUrl?: string;
+}

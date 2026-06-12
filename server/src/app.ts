@@ -15,6 +15,8 @@ import { InteractionsService } from './modules/interactions/interactions.service
 import { LinkCardsService } from './modules/link-cards/link-cards.service.js';
 import { registerMediaRoutes } from './modules/media/media.routes.js';
 import { MediaService } from './modules/media/media.service.js';
+import { registerMediaSearchRoutes } from './modules/media-search/media-search.routes.js';
+import { MediaSearchService } from './modules/media-search/media-search.service.js';
 import { registerNotificationsRoutes } from './modules/notifications/notifications.routes.js';
 import { NotificationsService } from './modules/notifications/notifications.service.js';
 import { registerPostsRoutes } from './modules/posts/posts.routes.js';
@@ -63,6 +65,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   const optionalAuth = makeOptionalAuth(worldManager);
 
   const mediaService = new MediaService(worldManager);
+  const mediaSearchService = new MediaSearchService(worldManager);
   const linkCardsService = new LinkCardsService(worldManager, mediaService);
   const usersService = new UsersService(worldManager, mediaService);
   const authService = new AuthService(worldManager, usersService);
@@ -84,6 +87,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
 
   registerWorldsRoutes(app, { worldManager });
   registerMediaRoutes(app, { mediaService, requireAuth });
+  registerMediaSearchRoutes(app, { mediaSearchService, requireAuth });
   registerAuthRoutes(app, { authService, worldManager, requireAuth });
   registerUsersRoutes(app, { usersService, requireAuth, optionalAuth });
   registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });
