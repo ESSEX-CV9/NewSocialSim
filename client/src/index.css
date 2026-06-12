@@ -57,6 +57,11 @@
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
 }
 
+/* 短页面无滚动条时仍预留同宽槽位，避免切页时布局横向抖动 */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   @apply bg-x-bg text-x-text antialiased;
   font-size: 15px;
