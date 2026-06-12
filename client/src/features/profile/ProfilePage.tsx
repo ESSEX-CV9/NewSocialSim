@@ -1,6 +1,6 @@
 import type { MediaView, UserProfile, VerifiedType } from '@socialsim/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { patchAuthorFollow } from '../../api/postCache';
@@ -132,7 +132,7 @@ const TAB_EMPTY: Record<ProfileTab, { icon: string; key: 'profile.emptyPosts' | 
 
 export function ProfilePage() {
   const { handle = '' } = useParams();
-  const { user: viewer } = useAuth();
+  const { user: viewer, setUser } = useAuth();
   const { t, locale } = useI18n();
   const fmt = useFormatCount();
   const navigate = useNavigate();
@@ -140,6 +140,8 @@ export function ProfilePage() {
   const [editing, setEditing] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [verifyInfoOpen, setVerifyInfoOpen] = useState(false);
+  const [verifyMenuOpen, setVerifyMenuOpen] = useState(false);
+  const verifyHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tab, setTab] = useState<ProfileTab>('posts');
   // 媒体查看器：媒体 Tab 缩略图（带"查看帖子"入口）与头像/横幅大图共用
   const [mediaViewer, setMediaViewer] = useState<{
@@ -210,6 +212,14 @@ export function ProfilePage() {
     void queryClient.invalidateQueries({ queryKey: ['user', handle] });
     if (viewer) void queryClient.invalidateQueries({ queryKey: ['user', viewer.handle] });
     void queryClient.invalidateQueries({ queryKey: ['suggested-users'] });
+  };
+
+  /** "获得认证"下拉直接套用认证类型（本人页） */
+  const applyVerified = async (v: VerifiedType) => {
+    setVerifyMenuOpen(false);
+    const res = await api.updateMe({ verified: v });
+    setUser(res.user);
+    void queryClient.invalidateQueries({ queryKey: ['user', handle] });
   };
 
   const unblock = async () => {
@@ -299,22 +309,14 @@ export function ProfilePage() {
           >
             <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={80} />
           </div>
-          <div className="mt-13 flex gap-2 pt-1">
+          <div className="mt-13 pt-1">
             {isMe ? (
-              <>
-                <button
-                  onClick={() => setVerifying(true)}
-                  className="rounded-full border border-x-dim px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 hover:bg-x-input"
-                >
-                  {u.verified !== 'none' ? t('profile.verifyManage') : t('profile.verifyApply')}
-                </button>
-                <button
-                  onClick={() => setEditing((v) => !v)}
-                  className="rounded-full border border-x-dim px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 hover:bg-x-input"
-                >
-                  {t('profile.editProfile')}
-                </button>
-              </>
+              <button
+                onClick={() => setEditing((v) => !v)}
+                className="rounded-full border border-x-dim px-4 py-1.5 text-[14px] font-bold transition-colors duration-200 hover:bg-x-input"
+              >
+                {t('profile.editProfile')}
+              </button>
             ) : (
               viewer &&
               (u.blockedByViewer ? (
@@ -344,7 +346,17 @@ export function ProfilePage() {
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-extrabold">{u.displayName}</h1>
             {u.verified !== 'none' && (
-              <span className="relative flex items-center">
+              <span
+                className="relative flex items-center"
+                onMouseEnter={() => {
+                  if (verifyHoverTimer.current) clearTimeout(verifyHoverTimer.current);
+                  verifyHoverTimer.current = setTimeout(() => setVerifyInfoOpen(true), 400);
+                }}
+                onMouseLeave={() => {
+                  if (verifyHoverTimer.current) clearTimeout(verifyHoverTimer.current);
+                  setVerifyInfoOpen(false);
+                }}
+              >
                 <button
                   aria-label={t('verify.title')}
                   onClick={() => setVerifyInfoOpen((v) => !v)}
@@ -352,10 +364,9 @@ export function ProfilePage() {
                 >
                   <VerifiedBadge verified={u.verified} size={20} />
                 </button>
-                {/* X 式认证说明卡 */}
+                {/* X 式认证说明卡：悬停片刻或点击徽标出现，移开即收起 */}
                 {verifyInfoOpen && (
                   <>
-                    <div className="fixed inset-0 z-20" onClick={() => setVerifyInfoOpen(false)} />
                     <div className="absolute top-8 left-0 z-30 w-80 rounded-2xl border border-x-border bg-x-bg p-4 shadow-lg">
                       <div className="text-[17px] font-extrabold">{t('verify.title')}</div>
                       <div className="mt-3 flex flex-col gap-3 text-[14px]">
@@ -394,6 +405,39 @@ export function ProfilePage() {
                           {t('profile.verifyManage')}
                         </button>
                       )}
+                    </div>
+                  </>
+                )}
+              </span>
+            )}
+            {/* 未认证的本人页：X 式"获得认证"药丸按钮，点击弹下拉直接选认证类型 */}
+            {isMe && u.verified === 'none' && (
+              <span className="relative flex items-center">
+                <button
+                  onClick={() => setVerifyMenuOpen((v) => !v)}
+                  className="flex items-center gap-1 rounded-full border border-x-border px-2.5 py-0.5 text-[13px] font-bold transition-colors duration-200 hover:bg-x-input"
+                >
+                  <i className="ri-verified-badge-fill text-[16px] text-x-blue" />
+                  {t('profile.verifyApply')}
+                </button>
+                {verifyMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setVerifyMenuOpen(false)} />
+                    <div className="absolute top-8 left-0 z-30 w-56 overflow-hidden rounded-xl border border-x-border bg-x-card shadow-lg">
+                      <button
+                        onClick={() => void applyVerified('personal')}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold transition-colors duration-200 hover:bg-x-input"
+                      >
+                        <VerifiedBadge verified="personal" size={18} />
+                        {t('profile.verifyPersonal')}
+                      </button>
+                      <button
+                        onClick={() => void applyVerified('org')}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-[15px] font-bold transition-colors duration-200 hover:bg-x-input"
+                      >
+                        <VerifiedBadge verified="org" size={18} />
+                        {t('profile.verifyOrg')}
+                      </button>
                     </div>
                   </>
                 )}

@@ -119,7 +119,7 @@ export const messages = {
     'verify.infoOrg': '这个账号是经过认证的组织。',
     'verify.since': '自 {date} 通过认证。',
     'verify.id': '这个账号的 ID 已通过认证。',
-    'profile.verifyApply': '申请认证',
+    'profile.verifyApply': '获得认证',
     'profile.verifyManage': '管理认证',
     'profile.verifyTitle': '账号认证',
     'profile.verifyNone': '无认证',
