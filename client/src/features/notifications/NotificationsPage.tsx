@@ -1,7 +1,7 @@
 import type { NotificationView, UserSummary } from '@socialsim/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../../api/endpoints';
 import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
@@ -86,13 +86,16 @@ function rankActors(items: NotificationView[]): RankedActor[] {
   );
 }
 
-/** X 式头像堆叠：领头完整在最上层，后续各遮一半，尾部渐变淡出，最多 4 个 */
-function AvatarStack({ actors }: { actors: RankedActor[] }) {
+/** X 式头像堆叠：领头完整在最上层，后续各遮一半，尾部渐变淡出，最多 4 个；点头像进对应主页 */
+function AvatarStack({ actors, onVisit }: { actors: RankedActor[]; onVisit?: () => void }) {
   const shown = actors.slice(0, 4);
   const OPACITY = ['', '', 'opacity-60', 'opacity-30'];
-  if (shown.length === 1) {
-    return <Avatar handle={shown[0]!.user.handle} avatarUrl={shown[0]!.user.avatarUrl} size={32} />;
-  }
+  const avatarLink = (a: RankedActor) => (
+    <Link to={`/u/${a.user.handle}`} onClick={(e) => { e.stopPropagation(); onVisit?.(); }}>
+      <Avatar handle={a.user.handle} avatarUrl={a.user.avatarUrl} size={32} />
+    </Link>
+  );
+  if (shown.length === 1) return avatarLink(shown[0]!);
   // 人越多叠得越紧：2 人露一半，3 人露 12px，4 人只露 8px
   const overlap = shown.length >= 4 ? '-ml-6' : shown.length === 3 ? '-ml-5' : '-ml-4';
   return (
@@ -103,7 +106,7 @@ function AvatarStack({ actors }: { actors: RankedActor[] }) {
           className={`relative rounded-full border-2 border-x-bg ${i > 0 ? overlap : ''} ${OPACITY[i] ?? ''}`}
           style={{ zIndex: shown.length - i }}
         >
-          <Avatar handle={a.user.handle} avatarUrl={a.user.avatarUrl} size={32} />
+          {avatarLink(a)}
         </div>
       ))}
     </div>
@@ -140,6 +143,7 @@ export function NotificationsPage() {
   const { t } = useI18n();
   const fmt = useFormatCount();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>('all');
   // 进页必拉最新（未读徽标先于列表更新），停留期间与未读数轮询同节拍刷新
@@ -214,32 +218,44 @@ export function NotificationsPage() {
         const lead = actors[0]!;
 
         return (
-          <Link key={group.key} to={groupTarget(group)} onClick={() => markGroupRead(group)}>
-            <div
-              className={`flex gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover ${
-                unread ? 'border-l-2 border-l-x-blue bg-x-blue/5' : ''
-              }`}
-            >
-              <i className={`${type.icon} ${type.color} w-8 shrink-0 text-center text-[26px] leading-none`} />
-              <div className="min-w-0 flex-1">
-                <AvatarStack actors={actors} />
-                {/* 三层文字层级：动作文案最实 > 帖子摘要居中且更小 > 时间最浅 */}
-                <div className="mt-2 text-[15px]">
-                  <span className="font-bold">{lead.user.displayName}</span>{' '}
-                  <span>{groupText(group, t, fmt)}</span>
-                  <span className="text-x-dim">
-                    {' '}
-                    · <TimeAgo at={first.createdAt} />
-                  </span>
-                </div>
-                {first.postExcerpt && (
-                  <p className="mt-1 line-clamp-2 text-[13px] text-x-text/60">
-                    {first.postExcerpt}
-                  </p>
-                )}
+          <div
+            key={group.key}
+            onClick={() => {
+              markGroupRead(group);
+              navigate(groupTarget(group));
+            }}
+            className={`flex cursor-pointer gap-3 border-b border-x-border px-4 py-3 transition-colors duration-200 hover:bg-x-hover ${
+              unread ? 'border-l-2 border-l-x-blue bg-x-blue/5' : ''
+            }`}
+          >
+            <i className={`${type.icon} ${type.color} w-8 shrink-0 text-center text-[26px] leading-none`} />
+            <div className="min-w-0 flex-1">
+              <AvatarStack actors={actors} onVisit={() => markGroupRead(group)} />
+              {/* 三层文字层级：动作文案最实 > 帖子摘要居中且更小 > 时间最浅 */}
+              <div className="mt-2 text-[15px]">
+                <Link
+                  to={`/u/${lead.user.handle}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    markGroupRead(group);
+                  }}
+                  className="font-bold hover:underline"
+                >
+                  {lead.user.displayName}
+                </Link>{' '}
+                <span>{groupText(group, t, fmt)}</span>
+                <span className="text-x-dim">
+                  {' '}
+                  · <TimeAgo at={first.createdAt} />
+                </span>
               </div>
+              {first.postExcerpt && (
+                <p className="mt-1 line-clamp-2 text-[13px] text-x-text/60">
+                  {first.postExcerpt}
+                </p>
+              )}
             </div>
-          </Link>
+          </div>
         );
       })}
       {query.isSuccess && query.items.length === 0 && (

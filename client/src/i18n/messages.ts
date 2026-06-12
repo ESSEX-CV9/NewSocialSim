@@ -114,7 +114,7 @@ export const messages = {
     'profile.tabLikes': '喜欢',
     'profile.emptyPosts': '暂无帖子',
     'profile.emptyReplies': '暂无回复',
-    'profile.emptyMedia': '暂无媒体（媒体功能尚未上线）',
+    'profile.emptyMedia': '暂无媒体',
     'profile.emptyLikes': '暂无喜欢的帖子',
 
     'notif.title': '通知',
@@ -331,7 +331,7 @@ export const messages = {
     'profile.tabLikes': 'Likes',
     'profile.emptyPosts': 'No posts yet',
     'profile.emptyReplies': 'No replies yet',
-    'profile.emptyMedia': 'No media yet (media is not available)',
+    'profile.emptyMedia': 'No media yet',
     'profile.emptyLikes': 'No liked posts yet',
 
     'notif.title': 'Notifications',
