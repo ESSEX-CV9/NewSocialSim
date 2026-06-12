@@ -91,10 +91,8 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
   );
 
   return (
-    <div
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20"
-    >
+    // 不做"点遮罩关闭"：编辑内容易因误触丢失，关闭只走左上 ✕
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 pt-20">
       <div
         onClick={stop}
         className="w-full max-w-xl overflow-hidden rounded-2xl border border-x-border bg-x-bg"
