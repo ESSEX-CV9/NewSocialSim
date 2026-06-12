@@ -33,7 +33,7 @@ export function ImageCropper({
   const { t } = useI18n();
   const boxRef = useRef<HTMLDivElement | null>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const [url] = useState(() => URL.createObjectURL(file));
+  const [url, setUrl] = useState<string | null>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
   const [boxW, setBoxW] = useState(0);
   const [zoom, setZoom] = useState(1);
@@ -41,7 +41,22 @@ export function ImageCropper({
   const [busy, setBusy] = useState(false);
   const dragRef = useRef<{ pointerId: number; startX: number; startY: number; baseX: number; baseY: number } | null>(null);
 
-  useEffect(() => () => URL.revokeObjectURL(url), [url]);
+  // objectURL 必须在 effect 内创建并配对 revoke：StrictMode 的"挂载→清理→再挂载"
+  // 会执行一次清理，若 URL 建在渲染期（useState 初始化器）会被提前撤销导致图片永远加载不出
+  useEffect(() => {
+    const objectUrl = URL.createObjectURL(file);
+    const probe = new Image();
+    probe.onload = () => {
+      setNatural({ w: probe.naturalWidth, h: probe.naturalHeight });
+      setUrl(objectUrl);
+    };
+    probe.src = objectUrl;
+    return () => {
+      setUrl(null);
+      setNatural(null);
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]);
 
   // 裁剪框宽度跟随容器实际宽度（弹窗内自适应）
   useEffect(() => {
@@ -141,7 +156,7 @@ export function ImageCropper({
         className="relative w-full cursor-grab touch-none overflow-hidden bg-black select-none active:cursor-grabbing"
         style={{ height: boxH || undefined }}
       >
-        {natural && (
+        {url && natural && (
           <img
             ref={imgRef}
             src={url}
@@ -154,14 +169,6 @@ export function ImageCropper({
               left: boxW / 2 - displayW / 2 + offset.x,
               top: boxH / 2 - displayH / 2 + offset.y,
             }}
-          />
-        )}
-        {!natural && (
-          <img
-            src={url}
-            alt=""
-            className="hidden"
-            onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
           />
         )}
         {round && boxW > 0 && (
