@@ -142,6 +142,7 @@ export function ProfilePage() {
   const [verifyInfoOpen, setVerifyInfoOpen] = useState(false);
   const [verifyMenuOpen, setVerifyMenuOpen] = useState(false);
   const verifyHoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const verifyCloseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tab, setTab] = useState<ProfileTab>('posts');
   // 媒体查看器：媒体 Tab 缩略图（带"查看帖子"入口）与头像/横幅大图共用
   const [mediaViewer, setMediaViewer] = useState<{
@@ -349,12 +350,14 @@ export function ProfilePage() {
               <span
                 className="relative flex items-center"
                 onMouseEnter={() => {
+                  // 取消待执行的关闭（从徽标移入说明卡会瞬时离开再进入）
+                  if (verifyCloseTimer.current) clearTimeout(verifyCloseTimer.current);
                   if (verifyHoverTimer.current) clearTimeout(verifyHoverTimer.current);
                   verifyHoverTimer.current = setTimeout(() => setVerifyInfoOpen(true), 400);
                 }}
                 onMouseLeave={() => {
                   if (verifyHoverTimer.current) clearTimeout(verifyHoverTimer.current);
-                  setVerifyInfoOpen(false);
+                  verifyCloseTimer.current = setTimeout(() => setVerifyInfoOpen(false), 300);
                 }}
               >
                 <button
