@@ -1,5 +1,5 @@
-import type { MediaView, PostView } from '@socialsim/shared';
-import { useRef, useState } from 'react';
+import type { MediaView, PostView, UserSummary } from '@socialsim/shared';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
 import { useI18n } from '../i18n/I18nContext';
@@ -10,6 +10,10 @@ const MAX_LENGTH = 280;
 /** 与服务端 MAX_PER_POST 一致：图/视频共享配额且可混排 */
 const MAX_MEDIA = 20;
 const MEDIA_ACCEPT = 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm';
+/** 输入框内实时高亮的片段：与发布后 PostContent 的解析口径一致（URL / #话题 / @用户名） */
+const HIGHLIGHT_RE = /https?:\/\/[^\s]+|#[^\s#@]+|@[a-zA-Z0-9_]{2,20}/g;
+/** 光标前进行中的 @mention（@ 前必须是行首或非 handle 字符，避免 email 误触发） */
+const ACTIVE_MENTION_RE = /(^|[^a-zA-Z0-9_])@([a-zA-Z0-9_]{0,20})$/;
 
 interface ComposerProps {
   replyToId?: number;
@@ -42,10 +46,91 @@ export function Composer({
   const [urlValue, setUrlValue] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // @ 候选：mention.start 为 @ 字符的下标，prefix 为已输入的 handle 前缀
+  const [mention, setMention] = useState<{ start: number; prefix: string } | null>(null);
+  const [candidates, setCandidates] = useState<UserSummary[]>([]);
+  const [candidateIdx, setCandidateIdx] = useState(0);
+
+  // 候选拉取：有前缀走用户搜索（300ms 防抖），裸 @ 立即给推荐关注作默认候选
+  useEffect(() => {
+    if (!mention) {
+      setCandidates([]);
+      return;
+    }
+    const timer = setTimeout(
+      () => {
+        const load = mention.prefix
+          ? api.searchUsers(mention.prefix, undefined, 5).then((r) => r.items)
+          : api.suggestedUsers().then((r) => r.users);
+        load
+          .then((items) => {
+            setCandidates(items.slice(0, 5));
+            setCandidateIdx(0);
+          })
+          .catch(() => setCandidates([]));
+      },
+      mention.prefix ? 300 : 0,
+    );
+    return () => clearTimeout(timer);
+  }, [mention]);
+
+  // 高亮镜像层内容：命中片段变蓝，其余原样（含尾随零宽字符保持与 textarea 等高）
+  const highlightNodes = useMemo(() => {
+    const nodes: ReactNode[] = [];
+    let last = 0;
+    for (const m of content.matchAll(HIGHLIGHT_RE)) {
+      if (m.index > last) nodes.push(content.slice(last, m.index));
+      nodes.push(
+        <span key={m.index} className="text-x-blue">
+          {m[0]}
+        </span>,
+      );
+      last = m.index + m[0].length;
+    }
+    if (last < content.length) nodes.push(content.slice(last));
+    return nodes;
+  }, [content]);
 
   if (!user) return null;
   const remaining = MAX_LENGTH - content.length;
   const empty = content.trim().length === 0 && media.length === 0;
+
+  /** 根据光标位置更新进行中的 @mention 状态（onChange/onSelect 共用） */
+  const updateMention = (el: HTMLTextAreaElement) => {
+    if (el.selectionStart !== el.selectionEnd) {
+      setMention(null);
+      return;
+    }
+    const before = el.value.slice(0, el.selectionStart);
+    const m = ACTIVE_MENTION_RE.exec(before);
+    if (!m) {
+      setMention(null);
+      return;
+    }
+    const prefix = m[2]!;
+    setMention((prev) => {
+      const start = before.length - prefix.length - 1;
+      return prev && prev.start === start && prev.prefix === prefix ? prev : { start, prefix };
+    });
+  };
+
+  /** 选中候选：把光标前的 @prefix 替换为 @handle + 空格 */
+  const pickMention = (u: UserSummary) => {
+    if (!mention) return;
+    const end = mention.start + 1 + mention.prefix.length;
+    setContent(`${content.slice(0, mention.start)}@${u.handle} ${content.slice(end)}`);
+    const pos = mention.start + u.handle.length + 2;
+    setMention(null);
+    setCandidates([]);
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(pos, pos);
+      }
+    });
+  };
 
   const pickFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -117,17 +202,78 @@ export function Composer({
     <div className={`flex gap-3 p-4 ${bordered ? 'border-b border-x-border' : ''}`}>
       <Avatar handle={user.handle} avatarUrl={user.avatarUrl} />
       <div className="min-w-0 flex-1">
-        <textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder={placeholder}
-          autoFocus={autoFocus}
-          rows={Math.min(6, Math.max(2, content.split('\n').length))}
-          className="w-full resize-none bg-transparent text-xl outline-none placeholder:text-x-dim"
-          onKeyDown={(e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
-          }}
-        />
+        {/* 高亮镜像层在文档流中撑高度（textarea 绝对覆盖、禁内部滚动），排版永不错位 */}
+        <div className="relative">
+          <div aria-hidden className="min-h-15 text-xl wrap-break-word whitespace-pre-wrap">
+            {highlightNodes}
+            {'​'}
+          </div>
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => {
+              setContent(e.target.value);
+              updateMention(e.target);
+            }}
+            onSelect={(e) => updateMention(e.currentTarget)}
+            onBlur={() => {
+              // 延迟关闭，给候选条目的 onMouseDown 留出执行窗口
+              setTimeout(() => setMention(null), 150);
+            }}
+            placeholder={placeholder}
+            autoFocus={autoFocus}
+            className="absolute inset-0 h-full w-full resize-none overflow-hidden bg-transparent text-xl text-transparent outline-none placeholder:text-x-dim"
+            style={{ caretColor: 'var(--th-text)' }}
+            onKeyDown={(e) => {
+              if (mention && candidates.length > 0) {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setCandidateIdx((i) => (i + 1) % candidates.length);
+                  return;
+                }
+                if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setCandidateIdx((i) => (i - 1 + candidates.length) % candidates.length);
+                  return;
+                }
+                if ((e.key === 'Enter' && !e.ctrlKey && !e.metaKey) || e.key === 'Tab') {
+                  e.preventDefault();
+                  pickMention(candidates[candidateIdx]!);
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  e.preventDefault();
+                  setMention(null);
+                  return;
+                }
+              }
+              if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') void submit();
+            }}
+          />
+          {mention && candidates.length > 0 && (
+            <div className="absolute top-full left-0 z-30 w-72 overflow-hidden rounded-xl border border-x-border bg-x-card shadow-lg">
+              {candidates.map((u, i) => (
+                <button
+                  key={u.id}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    pickMention(u);
+                  }}
+                  onMouseEnter={() => setCandidateIdx(i)}
+                  className={`flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors duration-200 ${
+                    i === candidateIdx ? 'bg-x-input' : ''
+                  }`}
+                >
+                  <Avatar handle={u.handle} avatarUrl={u.avatarUrl} size={36} />
+                  <div className="min-w-0">
+                    <div className="truncate text-[15px] font-bold">{u.displayName}</div>
+                    <div className="truncate text-[13px] text-x-dim">@{u.handle}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         {/* 预览：单媒体大图；多媒体横向滚动缩略条（20 个上限下网格会撑爆发帖框） */}
         {media.length === 1 && (
           <div className="relative mb-2 overflow-hidden rounded-2xl border border-x-border">

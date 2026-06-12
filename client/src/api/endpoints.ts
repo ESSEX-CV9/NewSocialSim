@@ -116,8 +116,11 @@ export const api = {
   // search
   searchPosts: (q: string, cursor?: string) =>
     http<Page<PostView>>('GET', withPage('/api/search/posts', cursor, { q })),
-  searchUsers: (q: string, cursor?: string) =>
-    http<Page<UserSummary>>('GET', withPage('/api/search/users', cursor, { q })),
+  searchUsers: (q: string, cursor?: string, limit?: number) =>
+    http<Page<UserSummary>>(
+      'GET',
+      withPage('/api/search/users', cursor, limit !== undefined ? { q, limit: String(limit) } : { q }),
+    ),
   trends: () => http<{ trends: TrendItem[] }>('GET', '/api/search/trends'),
 
   // worlds
