@@ -19,7 +19,8 @@ export function requestOptsFor(url: string): YtDlpRequestOpts {
   try {
     const host = new URL(url).hostname.toLowerCase();
     if (host === 'bilibili.com' || host.endsWith('.bilibili.com') || host === 'b23.tv') {
-      opts.cookie = cfg.bilibili?.cookies?.trim() || undefined;
+      const value = cfg.bilibili?.cookies?.trim();
+      if (value) opts.cookie = { domain: '.bilibili.com', value };
     }
   } catch {
     // URL 异常由后续 probe 报错

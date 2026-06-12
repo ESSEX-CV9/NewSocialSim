@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import type { ToolsService } from '../tools/tools.service.js';
 
@@ -70,10 +71,41 @@ interface RunOptions {
   onStdoutLine?: ((line: string) => void) | undefined;
 }
 
-/** 各方法的请求选项（cookie 用于 B站 等需要浏览器 Cookie 过风控的站点） */
+/**
+ * 各方法的请求选项。cookie 用于 B站 等需要浏览器 Cookie 过风控的站点——
+ * 必须走 --cookies（Netscape jar，按域作用于全部子域）；--add-header Cookie 被
+ * yt-dlp 限制为只作用于初始 URL 的域，跨子域 API（api.bilibili.com）带不上。
+ */
 export interface YtDlpRequestOpts {
   proxy?: string | undefined;
-  cookie?: string | undefined;
+  cookie?: { domain: string; value: string } | undefined;
+}
+
+let cookieJarSeq = 0;
+
+/** 把 "k=v; k2=v2" 串写成临时 Netscape cookie jar；返回追加参数与清理函数 */
+function cookieJarArgs(cookie: YtDlpRequestOpts['cookie']): { args: string[]; cleanup: () => void } {
+  if (!cookie?.value.trim()) return { args: [], cleanup: () => {} };
+  const lines = ['# Netscape HTTP Cookie File'];
+  for (const pair of cookie.value.split(/;\s*/)) {
+    const eq = pair.indexOf('=');
+    if (eq <= 0) continue;
+    const name = pair.slice(0, eq).trim();
+    const value = pair.slice(eq + 1).trim();
+    lines.push(`${cookie.domain}\tTRUE\t/\tTRUE\t2147483647\t${name}\t${value}`);
+  }
+  const file = path.join(os.tmpdir(), `socialsim-cookies-${process.pid}-${++cookieJarSeq}.txt`);
+  fs.writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
+  return {
+    args: ['--cookies', file],
+    cleanup: () => {
+      try {
+        fs.rmSync(file, { force: true });
+      } catch {
+        // 临时文件残留无害
+      }
+    },
+  };
 }
 
 /** 从 stderr 提取人类可读的错误：优先首个 ERROR: 行，限长 300 */
@@ -96,7 +128,6 @@ export class YtDlp {
   private commonArgs(opts: YtDlpRequestOpts): string[] {
     const args = ['--no-warnings', '--no-playlist'];
     if (opts.proxy) args.push('--proxy', opts.proxy);
-    if (opts.cookie) args.push('--add-header', `Cookie: ${opts.cookie}`);
     const ffmpegDir = this.tools.ffmpegDir();
     if (ffmpegDir) args.push('--ffmpeg-location', ffmpegDir);
     return args;
@@ -159,10 +190,16 @@ export class YtDlp {
   }
 
   async probe(url: string, opts: YtDlpRequestOpts, signal?: AbortSignal): Promise<ProbeResult> {
-    const out = await this.run(['-J', ...this.commonArgs(opts), url], {
-      timeoutMs: PROBE_TIMEOUT_MS,
-      signal,
-    });
+    const jar = cookieJarArgs(opts.cookie);
+    let out: string;
+    try {
+      out = await this.run(['-J', ...this.commonArgs(opts), ...jar.args, url], {
+        timeoutMs: PROBE_TIMEOUT_MS,
+        signal,
+      });
+    } finally {
+      jar.cleanup();
+    }
     let info: Record<string, unknown>;
     try {
       info = JSON.parse(out) as Record<string, unknown>;
@@ -193,8 +230,13 @@ export class YtDlp {
     // 搜索目标本身就是 playlist，这里不能带 --no-playlist
     const args = ['-J', '--flat-playlist', '--playlist-items', `1:${limit}`, '--no-warnings'];
     if (opts.proxy) args.push('--proxy', opts.proxy);
-    if (opts.cookie) args.push('--add-header', `Cookie: ${opts.cookie}`);
-    const out = await this.run([...args, target], { timeoutMs: SEARCH_TIMEOUT_MS, signal });
+    const jar = cookieJarArgs(opts.cookie);
+    let out: string;
+    try {
+      out = await this.run([...args, ...jar.args, target], { timeoutMs: SEARCH_TIMEOUT_MS, signal });
+    } finally {
+      jar.cleanup();
+    }
     let info: { entries?: Record<string, unknown>[] };
     try {
       info = JSON.parse(out) as { entries?: Record<string, unknown>[] };
@@ -237,20 +279,24 @@ export class YtDlp {
       ...this.commonArgs(opts),
       '-o',
       path.join(opts.outDir, 'video.%(ext)s'),
-      url,
     ];
     let sawMaxFilesizeSkip = false;
-    await this.run(args, {
-      timeoutMs: DOWNLOAD_TIMEOUT_MS,
-      signal,
-      onStdoutLine: (line) => {
-        if (line.includes('max-filesize')) sawMaxFilesizeSkip = true;
-        const m = PROGRESS_RE.exec(line);
-        if (m && m[1]) {
-          onProgress(Number(m[1]), m[2] && m[3] ? toBytes(m[2], m[3]) : null);
-        }
-      },
-    });
+    const jar = cookieJarArgs(opts.cookie);
+    try {
+      await this.run([...args, ...jar.args, url], {
+        timeoutMs: DOWNLOAD_TIMEOUT_MS,
+        signal,
+        onStdoutLine: (line) => {
+          if (line.includes('max-filesize')) sawMaxFilesizeSkip = true;
+          const m = PROGRESS_RE.exec(line);
+          if (m && m[1]) {
+            onProgress(Number(m[1]), m[2] && m[3] ? toBytes(m[2], m[3]) : null);
+          }
+        },
+      });
+    } finally {
+      jar.cleanup();
+    }
     const filePath = path.join(opts.outDir, 'video.mp4');
     if (!fs.existsSync(filePath)) {
       // 合并失败时可能留下其他扩展名，兜底找 outDir 里最大的文件
