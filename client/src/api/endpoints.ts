@@ -1,9 +1,14 @@
 import type {
   ActiveWorldInfo,
   AuthResponse,
+  ConversationDetailView,
+  ConversationView,
   CreatePostRequest,
+  DmUnreadCount,
   LoginRequest,
   MediaView,
+  MessageReactionView,
+  MessageView,
   NotificationView,
   Page,
   PostView,
@@ -112,6 +117,35 @@ export const api = {
   unreadCount: () => http<{ count: number }>('GET', '/api/notifications/unread-count'),
   markAllRead: () => http<void>('POST', '/api/notifications/read-all'),
   markRead: (ids: number[]) => http<void>('POST', '/api/notifications/read', { ids }),
+
+  // direct messages
+  dmConversations: (filter: 'inbox' | 'requests', cursor?: string) =>
+    http<Page<ConversationView>>('GET', withPage('/api/messages/conversations', cursor, { filter })),
+  dmFindOrCreate: (userId: number) =>
+    http<{ conversation: ConversationDetailView }>('POST', '/api/messages/conversations', { userId }),
+  dmGetConversation: (id: number) =>
+    http<{ conversation: ConversationDetailView }>('GET', `/api/messages/conversations/${id}`),
+  dmMessages: (id: number, cursor?: string) =>
+    http<Page<MessageView>>('GET', withPage(`/api/messages/conversations/${id}/messages`, cursor)),
+  dmSend: (id: number, content: string, mediaIds?: number[]) =>
+    http<{ message: MessageView }>('POST', `/api/messages/conversations/${id}/messages`, {
+      content,
+      ...(mediaIds && mediaIds.length > 0 ? { mediaIds } : {}),
+    }),
+  dmMarkRead: (id: number, messageId?: number) =>
+    http<{ lastReadMessageId: number }>('POST', `/api/messages/conversations/${id}/read`, {
+      ...(messageId !== undefined ? { messageId } : {}),
+    }),
+  dmAccept: (id: number) =>
+    http<{ conversation: ConversationDetailView }>('POST', `/api/messages/conversations/${id}/accept`, {}),
+  dmHideConversation: (id: number) => http<void>('DELETE', `/api/messages/conversations/${id}`),
+  dmDeleteMessage: (messageId: number) =>
+    http<{ message: MessageView }>('DELETE', `/api/messages/${messageId}`),
+  dmSetReaction: (messageId: number, emoji: string) =>
+    http<{ reactions: MessageReactionView[] }>('PUT', `/api/messages/${messageId}/reaction`, { emoji }),
+  dmRemoveReaction: (messageId: number) =>
+    http<{ reactions: MessageReactionView[] }>('DELETE', `/api/messages/${messageId}/reaction`),
+  dmUnreadCount: () => http<DmUnreadCount>('GET', '/api/messages/unread-count'),
 
   // search
   searchPosts: (q: string, cursor?: string) =>

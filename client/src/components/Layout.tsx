@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../api/endpoints';
 import { useAuth } from '../auth/AuthContext';
+import { DmStreamProvider } from '../features/messages/DmStreamContext';
 import { useI18n } from '../i18n/I18nContext';
 import { Avatar } from './Avatar';
 import { Composer } from './Composer';
@@ -51,6 +52,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [composeOpen, setComposeOpen] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  // 私信页占满中栏+右栏（X 同款双栏布局），其余页面保持三栏
+  const wide = useLocation().pathname.startsWith('/messages');
 
   const unread = useQuery({
     queryKey: ['unread-count'],
@@ -58,6 +61,13 @@ export function Layout({ children }: { children: ReactNode }) {
     enabled: !!user,
     refetchInterval: 30_000,
   });
+  const dmUnread = useQuery({
+    queryKey: ['dm-unread'],
+    queryFn: api.dmUnreadCount,
+    enabled: !!user,
+    refetchInterval: 30_000,
+  });
+  const dmBadge = (dmUnread.data?.count ?? 0) + (dmUnread.data?.requestCount ?? 0);
 
   const handleSwitchAccount = async (index: number) => {
     setAccountMenuOpen(false);
@@ -99,6 +109,15 @@ export function Layout({ children }: { children: ReactNode }) {
               activeIcon="ri-notification-2-fill"
               label={t('nav.notifications')}
               badge={unread.data?.count}
+            />
+          )}
+          {user && (
+            <NavItem
+              to="/messages"
+              icon="ri-mail-line"
+              activeIcon="ri-mail-fill"
+              label={t('nav.messages')}
+              badge={dmBadge}
             />
           )}
           {user && (
@@ -206,13 +225,17 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      {/* 中栏：内容 */}
-      <main className="min-h-screen w-full max-w-150 border-x border-x-border">{children}</main>
+      {/* 中栏：内容（私信页放宽并收起右栏） */}
+      <main className={`min-h-screen w-full border-x border-x-border ${wide ? 'max-w-247' : 'max-w-150'}`}>
+        <DmStreamProvider>{children}</DmStreamProvider>
+      </main>
 
       {/* 右栏：搜索 + 趋势 + 推荐关注 + 世界折叠卡 + 页脚 */}
-      <aside className="no-scrollbar sticky top-0 hidden h-screen w-87.5 flex-col gap-4 overflow-y-auto px-6 pb-3 min-[1100px]:flex">
-        <RightSidebar />
-      </aside>
+      {!wide && (
+        <aside className="no-scrollbar sticky top-0 hidden h-screen w-87.5 flex-col gap-4 overflow-y-auto px-6 pb-3 min-[1100px]:flex">
+          <RightSidebar />
+        </aside>
+      )}
 
       {/* 发帖弹窗 */}
       {composeOpen && (
