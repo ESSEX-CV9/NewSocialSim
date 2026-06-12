@@ -12,18 +12,25 @@ export interface ResolvedStream {
   expiresAt: number;
 }
 
-const STREAM_TTL_MS = 4 * 3600 * 1000;
+const STREAM_TTL_CAP_MS = 4 * 3600 * 1000;
+/**
+ * 无显式 expire 参数的直链给极短 TTL：rule34video/pornhub 等的签名直链常秒级失效，
+ * 长缓存会让后续播放复用陈旧直链导致 403/410。短 TTL 只为合并瞬时并发请求，
+ * 实际几乎每次起播都重解析，换取直链总是新鲜（代价是多一次 ~2-3s yt-dlp 解析）。
+ */
+const UNSIGNED_TTL_MS = 20_000;
 
-/** 直链有效期：取 TTL 与 URL 自带 expire 参数（unix 秒，YouTube 等）的较早者，留 60 秒余量 */
+/** 直链有效期：有 expire 参数（YouTube 等）按其计；否则给极短 TTL，强制频繁重解析 */
 function expiryOf(directUrl: string): number {
-  const cap = Date.now() + STREAM_TTL_MS;
   try {
     const e = Number(new URL(directUrl).searchParams.get('expire'));
-    if (Number.isFinite(e) && e > 0) return Math.min(cap, e * 1000 - 60_000);
+    if (Number.isFinite(e) && e > 0) {
+      return Math.min(Date.now() + STREAM_TTL_CAP_MS, e * 1000 - 60_000);
+    }
   } catch {
-    // URL 异常时用默认 TTL
+    // URL 异常时用短 TTL
   }
-  return cap;
+  return Date.now() + UNSIGNED_TTL_MS;
 }
 
 export class StreamResolver {
