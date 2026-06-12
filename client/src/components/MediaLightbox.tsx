@@ -1,7 +1,30 @@
 import type { MediaView } from '@socialsim/shared';
-import { useEffect, useState, type MouseEvent } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../i18n/I18nContext';
+import { attachVideoPlayback } from './videoPlayback';
+
+/** 查看器内的视频：有声自动播放，进度跨场景记忆；点击画面为默认播放/暂停行为 */
+function LightboxVideo({ media }: { media: MediaView }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    return attachVideoPlayback(el, media.url);
+  }, [media.url]);
+
+  return (
+    <video
+      ref={videoRef}
+      src={media.url}
+      controls
+      autoPlay
+      onClick={(e) => e.stopPropagation()}
+      className="max-h-[90vh] max-w-[90vw]"
+    />
+  );
+}
 
 /** 全屏媒体查看器：黑底居中原比例（图片/视频），多图左右切换，Esc/点空白关闭 */
 export function MediaLightbox({
@@ -85,14 +108,7 @@ export function MediaLightbox({
         </div>
       )}
       {current.type === 'video' ? (
-        <video
-          key={current.id}
-          src={current.url}
-          controls
-          autoPlay
-          onClick={stop}
-          className="max-h-[90vh] max-w-[90vw]"
-        />
+        <LightboxVideo key={current.id} media={current} />
       ) : (
         <img
           src={current.url}
