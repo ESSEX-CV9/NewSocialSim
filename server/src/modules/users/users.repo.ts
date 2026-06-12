@@ -15,6 +15,10 @@ export interface UserRow {
   banner_media_id: number | null;
   verified: string;
   website: string | null;
+  location: string | null;
+  birth_date: string | null;
+  profession: string | null;
+  verified_at: number | null;
 }
 
 export interface UserCounts {
@@ -164,7 +168,11 @@ export const usersRepo = {
       avatarMediaId?: number | null;
       bannerMediaId?: number | null;
       verified?: string;
+      verifiedAt?: number | null;
       website?: string | null;
+      location?: string | null;
+      birthDate?: string | null;
+      profession?: string | null;
     },
   ): void {
     if (patch.displayName !== undefined) {
@@ -182,8 +190,20 @@ export const usersRepo = {
     if (patch.verified !== undefined) {
       db.prepare('UPDATE users SET verified = ? WHERE id = ?').run(patch.verified, userId);
     }
+    if (patch.verifiedAt !== undefined) {
+      db.prepare('UPDATE users SET verified_at = ? WHERE id = ?').run(patch.verifiedAt, userId);
+    }
     if (patch.website !== undefined) {
       db.prepare('UPDATE users SET website = ? WHERE id = ?').run(patch.website, userId);
+    }
+    if (patch.location !== undefined) {
+      db.prepare('UPDATE users SET location = ? WHERE id = ?').run(patch.location, userId);
+    }
+    if (patch.birthDate !== undefined) {
+      db.prepare('UPDATE users SET birth_date = ? WHERE id = ?').run(patch.birthDate, userId);
+    }
+    if (patch.profession !== undefined) {
+      db.prepare('UPDATE users SET profession = ? WHERE id = ?').run(patch.profession, userId);
     }
   },
 };

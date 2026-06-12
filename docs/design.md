@@ -70,9 +70,9 @@ NewSocialSim/
 └── data/worlds/<id>/       # 运行时数据（不入 git）：world.db + world.json
 ```
 
-### 数据库 schema（当前 version 9）
+### 数据库 schema（当前 version 10）
 
-- `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at, pinned_post_id, avatar_media_id, banner_media_id, verified, website)` —— `verified` 为 'none'/'personal'/'org'（蓝标/金标，PATCH /api/users/me 自助设定），`website` 为个人链接（存储时无协议自动补 https://）
+- `users(id, handle UNIQUE NOCASE, display_name, bio, password_hash, is_bot, created_at, pinned_post_id, avatar_media_id, banner_media_id, verified, website, location, birth_date, profession, verified_at)` —— `verified` 为 'none'/'personal'/'org'（蓝标/金标，PATCH /api/users/me 自助设定，变更时以模拟时间打点 `verified_at`），`website` 为个人链接（存储时无协议自动补 https://），`location` 为自由文本地名（可虚构），`birth_date` 为 YYYY-MM-DD，`profession` 为专业类别 key（前端 i18n 映射展示）
 - `posts(id, author_id, content, reply_to_id, quote_of_id, created_at, like_count, repost_count, quote_count, reply_count, view_count, deleted)`
 - `likes(user_id, post_id, created_at)`、`reposts(...)`、`bookmarks(...)`、`hidden_posts(...)` —— 主键 (user_id, post_id)
 - `follows(follower_id, followee_id, created_at)`

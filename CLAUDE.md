@@ -20,7 +20,7 @@ npm workspaces monorepo：
 
 - `shared/` — 前后端共用纯类型（贫血实体 + 视图类型 + API DTO），改接口先改这里。
 - `server/` — Fastify + better-sqlite3。
-  - `src/core/` 基础设施：`clock/`（SimClock 模拟时钟）、`db/`（连接 + 版本化 migration，当前 v9）、`world/`（WorldManager 多世界热切换）、`auth/`（JWT 密钥与 requireAuth/optionalAuth 守卫）、`pagination.ts`（游标工具）。
+  - `src/core/` 基础设施：`clock/`（SimClock 模拟时钟）、`db/`（连接 + 版本化 migration，当前 v10）、`world/`（WorldManager 多世界热切换）、`auth/`（JWT 密钥与 requireAuth/optionalAuth 守卫）、`pagination.ts`（游标工具）。
   - `src/modules/` 按功能域分层，每模块四件套 `*.routes.ts / *.controller.ts / *.service.ts / *.repo.ts`：worlds、auth、users、posts、media（上传/外链入库/文件流，文件存各世界 media/ 目录）、media-search（七源关键字搜图 + Pixiv CDP 引导登录，凭证在 data/media-search.json）、link-cards（OG 链接卡片，无路由）、interactions（赞/转发/书签/隐藏帖）、follows、blocks、timeline、notifications、search。
 - `client/` — React 19 + Vite + Tailwind 4 + react-query + Remix Icon（均 npm 本地，离线可用）。
   - `src/api/` fetch 封装与全部接口；`src/auth|world|i18n|theme/` 四个全局 Context；`src/components/` 通用组件（Layout、PostCard、Composer、usePagedQuery 等）；`src/features/<页面>/` 按页面组织。

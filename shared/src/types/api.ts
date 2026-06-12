@@ -26,6 +26,12 @@ export interface UpdateProfileRequest {
   verified?: VerifiedType;
   /** 个人链接；空串或 null = 清除。无协议前缀时服务端补 https:// */
   website?: string | null;
+  /** 位置（自由文本）；空串或 null = 清除 */
+  location?: string | null;
+  /** 出生日期（YYYY-MM-DD）；null = 清除 */
+  birthDate?: string | null;
+  /** 专业类别 key；null = 清除 */
+  profession?: string | null;
 }
 
 export interface CreatePostRequest {

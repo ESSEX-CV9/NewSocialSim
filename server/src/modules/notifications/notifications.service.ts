@@ -75,6 +75,13 @@ function toView(row: NotificationRow, worldId: string): NotificationView {
     actorFollowerCount: row.actor_follower_count,
     actorFollowedByViewer: row.actor_followed === 1,
     postId: row.post_id,
+    postMedia:
+      row.post_media_id !== null && row.post_deleted === 0
+        ? {
+            type: (row.post_media_type ?? 'image') as 'image' | 'video',
+            url: mediaFileUrl(row.post_media_id, worldId) ?? '',
+          }
+        : null,
     postExcerpt:
       row.post_content !== null && row.post_deleted === 0
         ? row.post_content.slice(0, EXCERPT_LENGTH)

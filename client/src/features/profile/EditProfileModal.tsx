@@ -5,6 +5,7 @@ import { useAuth } from '../../auth/AuthContext';
 import { Avatar } from '../../components/Avatar';
 import { ImageCropper } from '../../components/ImageCropper';
 import { useI18n } from '../../i18n/I18nContext';
+import { PROFESSIONS } from '../../i18n/professions';
 import { inputClass } from '../auth/LoginPage';
 
 /** 头像/横幅编辑项：undefined=未改动；{id:null}=恢复默认 */
@@ -18,11 +19,14 @@ interface CropTask {
 /** X 式编辑个人资料弹窗：横幅/头像选图后进入缩放拖动裁剪，昵称/简介沿用原校验 */
 export function EditProfileModal({ onClose }: { onClose: () => void }) {
   const { user, setUser } = useAuth();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const queryClient = useQueryClient();
   const [displayName, setDisplayName] = useState(user?.displayName ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   const [website, setWebsite] = useState(user?.website ?? '');
+  const [location, setLocation] = useState(user?.location ?? '');
+  const [birthDate, setBirthDate] = useState(user?.birthDate ?? '');
+  const [profession, setProfession] = useState(user?.profession ?? '');
   const [avatar, setAvatar] = useState<MediaPatch>(undefined);
   const [banner, setBanner] = useState<MediaPatch>(undefined);
   const [cropping, setCropping] = useState<CropTask | null>(null);
@@ -75,6 +79,9 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
         displayName,
         bio,
         website: website.trim().length > 0 ? website.trim() : null,
+        location: location.trim().length > 0 ? location.trim() : null,
+        birthDate: birthDate.length > 0 ? birthDate : null,
+        profession: profession.length > 0 ? profession : null,
         ...(avatar !== undefined ? { avatarMediaId: avatar.id } : {}),
         ...(banner !== undefined ? { bannerMediaId: banner.id } : {}),
       });
@@ -209,6 +216,14 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
                 />
               </label>
               <label className="flex flex-col gap-1 text-[13px] text-x-dim">
+                {t('profile.location')}
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[13px] text-x-dim">
                 {t('profile.website')}
                 <input
                   value={website}
@@ -216,6 +231,30 @@ export function EditProfileModal({ onClose }: { onClose: () => void }) {
                   placeholder="https://example.com"
                   className={inputClass}
                 />
+              </label>
+              <label className="flex flex-col gap-1 text-[13px] text-x-dim">
+                {t('profile.birthDate')}
+                <input
+                  type="date"
+                  value={birthDate}
+                  onChange={(e) => setBirthDate(e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-[13px] text-x-dim">
+                {t('profile.profession')}
+                <select
+                  value={profession}
+                  onChange={(e) => setProfession(e.target.value)}
+                  className={inputClass}
+                >
+                  <option value="">{t('profile.professionNone')}</option>
+                  {PROFESSIONS.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {locale === 'zh-CN' ? p.zh : p.en}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
           </>

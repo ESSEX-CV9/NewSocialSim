@@ -13,6 +13,9 @@ const updateProfileBodySchema = {
     bannerMediaId: { type: ['integer', 'null'] },
     verified: { type: 'string', enum: ['none', 'personal', 'org'] },
     website: { type: ['string', 'null'], maxLength: 200 },
+    location: { type: ['string', 'null'], maxLength: 50 },
+    birthDate: { type: ['string', 'null'], maxLength: 10 },
+    profession: { type: ['string', 'null'], maxLength: 50 },
   },
 } as const;
 

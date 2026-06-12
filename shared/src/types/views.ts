@@ -65,6 +65,8 @@ export interface NotificationView {
   postId: number | null;
   /** 相关帖子的内容预览（前 100 字符）；无帖子或帖子已删除时为 null */
   postExcerpt: string | null;
+  /** 相关帖子的首个媒体（通知卡缩略图）；无媒体或帖子已删除时为 null */
+  postMedia: { type: 'image' | 'video'; url: string } | null;
   read: boolean;
   createdAt: number;
 }

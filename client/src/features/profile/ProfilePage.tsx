@@ -12,11 +12,22 @@ import { MediaLightbox } from '../../components/MediaLightbox';
 import { PostCard, PostContent } from '../../components/PostCard';
 import { usePagedQuery } from '../../components/usePagedQuery';
 import { VerifiedBadge } from '../../components/VerifiedBadge';
+import { professionLabel } from '../../i18n/professions';
 import { useFormatCount } from '../../i18n/formatCount';
 import { useI18n } from '../../i18n/I18nContext';
 import { EditProfileModal } from './EditProfileModal';
 
 type ProfileTab = 'posts' | 'replies' | 'media' | 'likes';
+
+/** 出生日期（YYYY-MM-DD）按 locale 格式化为完整年月日 */
+function birthDateText(birthDate: string, locale: string): string {
+  const [y, m, d] = birthDate.split('-').map(Number);
+  return new Date(y ?? 2000, (m ?? 1) - 1, d ?? 1).toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+}
 
 /** 共同关注文案：1 人 / 2 人 / 更多三种形态 */
 function knownFollowersText(
@@ -128,6 +139,7 @@ export function ProfilePage() {
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [verifyInfoOpen, setVerifyInfoOpen] = useState(false);
   const [tab, setTab] = useState<ProfileTab>('posts');
   // 媒体查看器：媒体 Tab 缩略图（带"查看帖子"入口）与头像/横幅大图共用
   const [mediaViewer, setMediaViewer] = useState<{
@@ -331,7 +343,62 @@ export function ProfilePage() {
         <div className="mt-3">
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-extrabold">{u.displayName}</h1>
-            <VerifiedBadge verified={u.verified} size={20} />
+            {u.verified !== 'none' && (
+              <span className="relative flex items-center">
+                <button
+                  aria-label={t('verify.title')}
+                  onClick={() => setVerifyInfoOpen((v) => !v)}
+                  className="flex items-center"
+                >
+                  <VerifiedBadge verified={u.verified} size={20} />
+                </button>
+                {/* X 式认证说明卡 */}
+                {verifyInfoOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setVerifyInfoOpen(false)} />
+                    <div className="absolute top-8 left-0 z-30 w-80 rounded-2xl border border-x-border bg-x-bg p-4 shadow-lg">
+                      <div className="text-[17px] font-extrabold">{t('verify.title')}</div>
+                      <div className="mt-3 flex flex-col gap-3 text-[14px]">
+                        <div className="flex items-start gap-3">
+                          <VerifiedBadge verified={u.verified} size={20} />
+                          <span>
+                            {u.verified === 'org' ? t('verify.infoOrg') : t('verify.infoPersonal')}
+                          </span>
+                        </div>
+                        {u.verifiedAt !== null && (
+                          <div className="flex items-start gap-3">
+                            <i className="ri-calendar-check-line text-[20px] text-x-dim" />
+                            <span>
+                              {t('verify.since', {
+                                date: new Date(u.verifiedAt).toLocaleDateString(locale, {
+                                  year: 'numeric',
+                                  month: 'long',
+                                }),
+                              })}
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-start gap-3">
+                          <i className="ri-shield-user-line text-[20px] text-x-dim" />
+                          <span>{t('verify.id')}</span>
+                        </div>
+                      </div>
+                      {isMe && (
+                        <button
+                          onClick={() => {
+                            setVerifyInfoOpen(false);
+                            setVerifying(true);
+                          }}
+                          className="mt-4 w-full rounded-full bg-x-text py-2 text-[14px] font-bold text-x-bg transition-opacity duration-200 hover:opacity-90"
+                        >
+                          {t('profile.verifyManage')}
+                        </button>
+                      )}
+                    </div>
+                  </>
+                )}
+              </span>
+            )}
             {u.isBot && (
               <span className="rounded bg-x-input px-1.5 py-0.5 text-xs text-x-dim">
                 <i className="ri-robot-2-line mr-1" />
@@ -348,8 +415,20 @@ export function ProfilePage() {
           </div>
         )}
 
-        {/* 元信息行：个人链接（用户设置时）+ 加入时间（X 同款一行排布） */}
+        {/* 元信息行（X 顺序）：专业类别 / 位置 / 个人链接 / 出生日期 / 加入时间 */}
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[14px] text-x-dim">
+          {u.profession && (
+            <span className="flex items-center gap-1">
+              <i className="ri-briefcase-line" />
+              <span>{professionLabel(u.profession, locale)}</span>
+            </span>
+          )}
+          {u.location && (
+            <span className="flex items-center gap-1">
+              <i className="ri-map-pin-line" />
+              <span>{u.location}</span>
+            </span>
+          )}
           {u.website && (
             <span className="flex items-center gap-1">
               <i className="ri-links-line" />
@@ -361,6 +440,12 @@ export function ProfilePage() {
               >
                 {u.website.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')}
               </a>
+            </span>
+          )}
+          {u.birthDate && (
+            <span className="flex items-center gap-1">
+              <i className="ri-cake-2-line" />
+              <span>{t('profile.born', { date: birthDateText(u.birthDate, locale) })}</span>
             </span>
           )}
           <span className="flex items-center gap-1">

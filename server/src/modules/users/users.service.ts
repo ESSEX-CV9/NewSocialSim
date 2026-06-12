@@ -70,14 +70,38 @@ export class UsersService {
         throw new ValidationError('链接过长（最多 200 字符）');
       }
     }
-    const { db } = this.worldManager.current();
+    if (
+      patch.birthDate !== undefined &&
+      patch.birthDate !== null &&
+      patch.birthDate.length > 0 &&
+      !/^\d{4}-\d{2}-\d{2}$/.test(patch.birthDate)
+    ) {
+      throw new ValidationError('出生日期格式须为 YYYY-MM-DD');
+    }
+    const { db, clock } = this.worldManager.current();
+    // 认证状态变化时记录"通过认证"的模拟时间（取消认证清空）
+    let verifiedAt: number | null | undefined;
+    if (patch.verified !== undefined) {
+      const row = usersRepo.findById(db, userId);
+      if (row && row.verified !== patch.verified) {
+        verifiedAt = patch.verified === 'none' ? null : clock.now();
+      }
+    }
+    const emptyToNull = (v: string | null | undefined) => {
+      const s = v?.trim() ?? '';
+      return s.length === 0 ? null : s;
+    };
     usersRepo.updateProfile(db, userId, {
       ...(patch.displayName !== undefined ? { displayName: patch.displayName.trim() } : {}),
       ...(patch.bio !== undefined ? { bio: patch.bio } : {}),
       ...(patch.avatarMediaId !== undefined ? { avatarMediaId: patch.avatarMediaId } : {}),
       ...(patch.bannerMediaId !== undefined ? { bannerMediaId: patch.bannerMediaId } : {}),
       ...(patch.verified !== undefined ? { verified: patch.verified } : {}),
+      ...(verifiedAt !== undefined ? { verifiedAt } : {}),
       ...(website !== undefined ? { website } : {}),
+      ...(patch.location !== undefined ? { location: emptyToNull(patch.location) } : {}),
+      ...(patch.birthDate !== undefined ? { birthDate: emptyToNull(patch.birthDate) } : {}),
+      ...(patch.profession !== undefined ? { profession: emptyToNull(patch.profession) } : {}),
     });
     return this.getProfileById(userId);
   }
@@ -114,7 +138,11 @@ export class UsersService {
       avatarMediaId: row.avatar_media_id,
       bannerMediaId: row.banner_media_id,
       verified: row.verified as VerifiedType,
+      verifiedAt: row.verified_at,
       website: row.website,
+      location: row.location,
+      birthDate: row.birth_date,
+      profession: row.profession,
       knownFollowers: known.rows.map((r) => ({
         id: r.id,
         handle: r.handle,

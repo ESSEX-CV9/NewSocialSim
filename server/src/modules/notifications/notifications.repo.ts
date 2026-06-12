@@ -18,6 +18,8 @@ export interface NotificationRow {
   actor_followed: number;
   post_content: string | null;
   post_deleted: number | null;
+  post_media_id: number | null;
+  post_media_type: string | null;
 }
 
 /** 被屏蔽用户产生的通知（含历史）不再展示 */
@@ -64,10 +66,14 @@ export const notificationsRepo = {
                   SELECT 1 FROM follows WHERE follower_id = @userId AND followee_id = n.actor_id
                 ) AS actor_followed,
                 p.content      AS post_content,
-                p.deleted      AS post_deleted
+                p.deleted      AS post_deleted,
+                m.id           AS post_media_id,
+                m.type         AS post_media_type
          FROM notifications n
          JOIN users u ON u.id = n.actor_id
          LEFT JOIN posts p ON p.id = n.post_id
+         LEFT JOIN post_media pm ON pm.post_id = p.id AND pm.position = 0
+         LEFT JOIN media m ON m.id = pm.media_id
          WHERE n.user_id = @userId ${NOT_BLOCKED_ACTOR} ${filterClause} ${cursorClause}
          ORDER BY n.id DESC
          LIMIT @limit`,

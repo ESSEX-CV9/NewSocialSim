@@ -35,8 +35,16 @@ export interface UserProfile extends User {
   bannerMediaId: number | null;
   /** 认证标识（模拟器内自助设定） */
   verified: VerifiedType;
+  /** 通过认证的模拟时间（unix 毫秒）；未认证或 v10 前设定的为 null */
+  verifiedAt: number | null;
   /** 简介下方展示的个人链接；null = 未设置 */
   website: string | null;
+  /** 位置（自由文本地名，可为虚构世界地点）；null = 未设置 */
+  location: string | null;
+  /** 出生日期（YYYY-MM-DD）；null = 未设置 */
+  birthDate: string | null;
+  /** 专业类别 key（前端 i18n 映射展示）；null = 未设置 */
+  profession: string | null;
   /** 观察者关注的人里也关注此人的（最多 3 个，匿名或本人页为空数组） */
   knownFollowers: UserSummary[];
   knownFollowerCount: number;

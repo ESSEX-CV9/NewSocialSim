@@ -93,12 +93,12 @@ function AvatarStack({ actors, onVisit }: { actors: RankedActor[]; onVisit?: () 
   const OPACITY = ['', '', 'opacity-60', 'opacity-30'];
   const avatarLink = (a: RankedActor) => (
     <Link to={`/u/${a.user.handle}`} onClick={(e) => { e.stopPropagation(); onVisit?.(); }}>
-      <Avatar handle={a.user.handle} avatarUrl={a.user.avatarUrl} size={32} />
+      <Avatar handle={a.user.handle} avatarUrl={a.user.avatarUrl} size={26} />
     </Link>
   );
   if (shown.length === 1) return avatarLink(shown[0]!);
-  // 人越多叠得越紧：2 人露一半，3 人露 12px，4 人只露 8px
-  const overlap = shown.length >= 4 ? '-ml-6' : shown.length === 3 ? '-ml-5' : '-ml-4';
+  // 人越多叠得越紧：2 人露一半，3 人露 10px，4 人只露 6px
+  const overlap = shown.length >= 4 ? '-ml-5' : shown.length === 3 ? '-ml-4' : '-ml-3';
   return (
     <div className="flex items-center">
       {shown.map((a, i) => (
@@ -229,7 +229,7 @@ export function NotificationsPage() {
               unread ? 'border-l-2 border-l-x-blue bg-x-blue/5' : ''
             }`}
           >
-            <i className={`${type.icon} ${type.color} w-8 shrink-0 text-center text-[26px] leading-none`} />
+            <i className={`${type.icon} ${type.color} w-6 shrink-0 text-center text-[18px] leading-none`} />
             <div className="min-w-0 flex-1">
               <AvatarStack actors={actors} onVisit={() => markGroupRead(group)} />
               {/* 三层文字层级：动作文案最实 > 帖子摘要居中且更小 > 时间最浅 */}
@@ -257,6 +257,29 @@ export function NotificationsPage() {
                 </p>
               )}
             </div>
+            {/* 帖子首媒体缩略图（有则显示） */}
+            {first.postMedia && (
+              <div className="relative size-14 shrink-0 self-center overflow-hidden rounded-lg border border-x-border bg-x-input">
+                {first.postMedia.type === 'video' ? (
+                  <>
+                    <video
+                      src={first.postMedia.url}
+                      preload="metadata"
+                      muted
+                      className="pointer-events-none h-full w-full object-cover"
+                    />
+                    <i className="ri-play-circle-fill absolute right-0.5 bottom-0.5 text-[14px] text-white drop-shadow" />
+                  </>
+                ) : (
+                  <img
+                    src={first.postMedia.url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+            )}
           </div>
         );
       })}

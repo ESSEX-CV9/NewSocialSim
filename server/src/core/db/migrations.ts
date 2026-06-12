@@ -191,6 +191,16 @@ const migrations: Migration[] = [
       ALTER TABLE users ADD COLUMN website TEXT;
     `,
   },
+  {
+    version: 10,
+    name: 'user-profile-extras',
+    sql: `
+      ALTER TABLE users ADD COLUMN location TEXT;
+      ALTER TABLE users ADD COLUMN birth_date TEXT;
+      ALTER TABLE users ADD COLUMN profession TEXT;
+      ALTER TABLE users ADD COLUMN verified_at INTEGER;
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {
