@@ -64,7 +64,7 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 短期：**全站 UX 体验修改**——用户将逐项提出修改清单（先计划确认再动手），这是当前对话周期的工作内容。
+- 短期：全站 UX 体验修改的 11 项清单已全部实施（详见 devlog 2026-06-12 第九周期）；末两批（发帖框 @ 候选与输入高亮、编辑资料弹窗与裁剪）**待用户统一人工验收**，验收清单在该 devlog 章节末尾。
 - 中期：M5 模拟器（ECS 架构虚拟用户、ContentGenerator 接口先模板后 LLM、上帝控制台、数据导出）；其前置后端能力（世界时钟控制 API、虚拟用户管理 API）与无排期待办清单见 docs/design.md 的"后续路线"。虚拟用户发图帖的链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 媒体系统四期（A 图片地基 / B 视频 / C URL 引入+OG 链接卡片 / D 关键字搜图）已全部完成，设计细节见 docs/design.md。
 - 未实现的大块：自定义历法换算、生产构建流程。
