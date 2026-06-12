@@ -28,9 +28,10 @@ export const searchRepo = {
     return db
       .prepare(
         `SELECT p.*,
-                u.handle       AS author_handle,
-                u.display_name AS author_display_name,
-                u.is_bot       AS author_is_bot
+                u.handle          AS author_handle,
+                u.display_name    AS author_display_name,
+                u.is_bot          AS author_is_bot,
+                u.avatar_media_id AS author_avatar_media_id
          FROM posts p
          JOIN users u ON u.id = p.author_id
          WHERE p.deleted = 0

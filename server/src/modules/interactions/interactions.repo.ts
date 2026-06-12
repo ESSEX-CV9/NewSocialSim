@@ -42,10 +42,11 @@ export const interactionsRepo = {
     return db
       .prepare(
         `SELECT p.*,
-                u.handle       AS author_handle,
-                u.display_name AS author_display_name,
-                u.is_bot       AS author_is_bot,
-                b.created_at   AS marked_at
+                u.handle          AS author_handle,
+                u.display_name    AS author_display_name,
+                u.is_bot          AS author_is_bot,
+                u.avatar_media_id AS author_avatar_media_id,
+                b.created_at      AS marked_at
          FROM bookmarks b
          JOIN posts p ON p.id = b.post_id
          JOIN users u ON u.id = p.author_id
