@@ -1,4 +1,4 @@
-import type { ContentRating } from '@socialsim/shared';
+import type { SearchRating } from '@socialsim/shared';
 import type { MediaSearchConfig } from '../search-config.js';
 
 /** 各源返回的统一候选格式 */
@@ -17,7 +17,8 @@ export interface SearchResult {
 }
 
 export interface SearchOptions {
-  contentRating: ContentRating;
+  /** 本次搜索的分级（世界设定只是默认值；r18 = 仅成人内容） */
+  rating: SearchRating;
   limit: number;
 }
 

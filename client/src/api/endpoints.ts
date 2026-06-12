@@ -136,10 +136,10 @@ export const api = {
   activeWorld: () => http<ActiveWorldInfo>('GET', '/api/admin/worlds/active'),
 
   // media search
-  mediaSearch: (q: string, source?: string) =>
+  mediaSearch: (q: string, source?: string, rating?: 'safe' | 'all' | 'r18') =>
     http<{ results: MediaSearchResult[] }>(
       'GET',
-      `/api/media-search?q=${encodeURIComponent(q)}${source ? `&source=${encodeURIComponent(source)}` : ''}`,
+      `/api/media-search?q=${encodeURIComponent(q)}${source ? `&source=${encodeURIComponent(source)}` : ''}${rating ? `&rating=${rating}` : ''}`,
     ),
   mediaSearchSources: () =>
     http<{ sources: { id: string; ok: boolean; reason?: string }[] }>(

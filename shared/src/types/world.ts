@@ -13,8 +13,11 @@ export interface CalendarConfig {
   label: string;
 }
 
-/** 媒体搜索的内容分级：safe = 仅全年龄；all = 不过滤（R-18G 由实例配置单独把门） */
+/** 世界级内容分级默认值：safe = 仅全年龄；all = 不过滤（R-18G 由实例配置单独把门） */
 export type ContentRating = 'safe' | 'all';
+
+/** 单次搜索可指定的分级（世界设定只是默认值）：r18 = 仅成人内容 */
+export type SearchRating = ContentRating | 'r18';
 
 /** 一个世界的元数据，对应 data/worlds/<id>/world.json */
 export interface WorldMeta {

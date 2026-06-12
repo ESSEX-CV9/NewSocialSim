@@ -1,5 +1,5 @@
 import type { MediaSearchConfig } from '../search-config.js';
-import { buildBooruTags, fetchJson, ratingExcludes, TagResolver } from './booru.js';
+import { buildBooruTags, fetchJson, ratingTags, TagResolver } from './booru.js';
 import type { SearchAdapter, SearchOptions, SearchResult } from './types.js';
 
 const BASE = 'https://danbooru.donmai.us';
@@ -38,9 +38,9 @@ export class DanbooruAdapter implements SearchAdapter {
   }
 
   async search(query: string, cfg: MediaSearchConfig, opts: SearchOptions): Promise<SearchResult[]> {
-    // Danbooru 免费档至多 2 个标签（rating 排除也占名额，故词条限 2、排除限 1 合并）
-    const excludes = ratingExcludes('danbooru', opts.contentRating);
-    const tags = await buildBooruTags(query, this.resolver, excludes.slice(0, 1), 1);
+    // Danbooru 免费档至多 2 个标签（rating 标签也占名额，故词条限 1、rating 限 1）
+    const rTags = ratingTags('danbooru', opts.rating);
+    const tags = await buildBooruTags(query, this.resolver, rTags.slice(0, 1), 1);
     const params = new URLSearchParams({ tags, limit: String(opts.limit) });
     if (cfg.danbooru?.username && cfg.danbooru.apiKey) {
       params.set('login', cfg.danbooru.username);

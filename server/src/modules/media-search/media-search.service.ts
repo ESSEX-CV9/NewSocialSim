@@ -60,13 +60,17 @@ export class MediaSearchService {
     });
   }
 
-  /** 单源直查 / 缺省全可用源并行（单源失败静默吞掉） */
-  async search(query: string, source?: string): Promise<SearchResult[]> {
+  /** 单源直查 / 缺省全可用源并行（单源失败静默吞掉）；rating 缺省取世界设定 */
+  async search(
+    query: string,
+    source?: string,
+    rating?: 'safe' | 'all' | 'r18',
+  ): Promise<SearchResult[]> {
     const q = query.trim();
     if (!q) throw new ValidationError('搜索关键词不能为空');
     const cfg = readSearchConfig();
     const { meta } = this.worldManager.current();
-    const opts = { contentRating: meta.contentRating, limit: PER_SOURCE_LIMIT };
+    const opts = { rating: rating ?? meta.contentRating, limit: PER_SOURCE_LIMIT };
 
     let chosen: SearchAdapter[];
     if (source) {

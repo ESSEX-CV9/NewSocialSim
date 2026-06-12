@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import type { Pixiv } from '@book000/pixivts';
-import type { ContentRating } from '@socialsim/shared';
+import type { SearchRating } from '@socialsim/shared';
 import type { MediaSearchConfig } from '../search-config.js';
 import type { SearchAdapter, SearchOptions, SearchResult } from './types.js';
 
@@ -53,7 +53,7 @@ export class PixivAdapter implements SearchAdapter {
 
   private filterIllusts(
     illusts: PixivIllust[],
-    rating: ContentRating,
+    rating: SearchRating,
     allowR18G: boolean,
   ): PixivIllust[] {
     return illusts.filter((i) => {
@@ -61,8 +61,14 @@ export class PixivAdapter implements SearchAdapter {
       const isR18 = tags.includes('r-18');
       const isR18G = tags.includes('r-18g');
       if (isR18G && !allowR18G) return false;
-      if (rating === 'safe' && (isR18 || isR18G)) return false;
-      return true;
+      switch (rating) {
+        case 'safe':
+          return !isR18 && !isR18G;
+        case 'r18':
+          return isR18 || isR18G;
+        default:
+          return true;
+      }
     });
   }
 
@@ -102,7 +108,7 @@ export class PixivAdapter implements SearchAdapter {
 
     const pick = (illusts: PixivIllust[] | undefined): SearchResult[] | null => {
       if (!illusts || illusts.length === 0) return null;
-      const filtered = this.filterIllusts(illusts, opts.contentRating, allowR18G);
+      const filtered = this.filterIllusts(illusts, opts.rating, allowR18G);
       if (filtered.length === 0) return null;
       return this.mapResults(filtered, opts.limit);
     };

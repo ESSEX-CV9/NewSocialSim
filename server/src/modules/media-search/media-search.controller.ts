@@ -6,10 +6,14 @@ export class MediaSearchController {
   constructor(private readonly service: MediaSearchService) {}
 
   search = async (
-    req: FastifyRequest<{ Querystring: { q: string; source?: string } }>,
+    req: FastifyRequest<{
+      Querystring: { q: string; source?: string; rating?: 'safe' | 'all' | 'r18' };
+    }>,
     reply: FastifyReply,
   ) => {
-    reply.send({ results: await this.service.search(req.query.q, req.query.source) });
+    reply.send({
+      results: await this.service.search(req.query.q, req.query.source, req.query.rating),
+    });
   };
 
   sources = async (_req: FastifyRequest, reply: FastifyReply) => {

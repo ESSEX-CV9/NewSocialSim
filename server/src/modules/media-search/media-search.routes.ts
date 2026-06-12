@@ -10,6 +10,7 @@ const searchQuerySchema = {
   properties: {
     q: { type: 'string', minLength: 1, maxLength: 100 },
     source: { type: 'string', maxLength: 20 },
+    rating: { type: 'string', enum: ['safe', 'all', 'r18'] },
   },
 } as const;
 
@@ -78,7 +79,7 @@ export function registerMediaSearchRoutes(app: FastifyInstance, deps: MediaSearc
   const controller = new MediaSearchController(deps.mediaSearchService);
   const auth = { preHandler: deps.requireAuth };
 
-  app.get<{ Querystring: { q: string; source?: string } }>(
+  app.get<{ Querystring: { q: string; source?: string; rating?: 'safe' | 'all' | 'r18' } }>(
     '/api/media-search',
     { ...auth, schema: { querystring: searchQuerySchema } },
     controller.search,

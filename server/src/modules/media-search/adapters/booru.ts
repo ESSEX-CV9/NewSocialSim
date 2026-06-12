@@ -1,4 +1,4 @@
-import type { ContentRating } from '@socialsim/shared';
+import type { SearchRating } from '@socialsim/shared';
 import { SEARCH_UA } from './types.js';
 
 /**
@@ -34,11 +34,11 @@ export class TagResolver {
   }
 }
 
-/** 把查询词（逗号分隔）解析为标签串，并拼接 rating 排除项 */
+/** 把查询词（逗号分隔）解析为标签串，并拼接 rating 标签 */
 export async function buildBooruTags(
   query: string,
   resolver: TagResolver,
-  excludeRatings: string[],
+  ratingTags: string[],
   maxTerms = Infinity,
 ): Promise<string> {
   const terms = query
@@ -52,23 +52,22 @@ export async function buildBooruTags(
     const tag = await resolver.resolve(term);
     if (tag) tags.push(tag);
   }
-  const excludes = excludeRatings.map((r) => `-rating:${r}`);
-  return [...tags, ...excludes].join(' ').trim();
+  return [...tags, ...ratingTags].join(' ').trim();
 }
 
-/** contentRating → 各站的 rating 排除清单 */
-export function ratingExcludes(
+/** 分级 → 各站的 rating 标签：safe 排除成人，all 不过滤，r18 仅成人 */
+export function ratingTags(
   site: 'danbooru' | 'gelbooru' | 'yandere',
-  rating: ContentRating,
+  rating: SearchRating,
 ): string[] {
   if (rating === 'all') return [];
   switch (site) {
     case 'danbooru':
-      return ['e', 'q'];
+      return rating === 'r18' ? ['rating:e'] : ['-rating:e', '-rating:q'];
     case 'gelbooru':
-      return ['explicit', 'questionable'];
+      return rating === 'r18' ? ['rating:explicit'] : ['-rating:explicit', '-rating:questionable'];
     case 'yandere':
-      return ['e'];
+      return rating === 'r18' ? ['rating:e'] : ['-rating:e'];
   }
 }
 

@@ -1,5 +1,5 @@
 import type { MediaSearchConfig } from '../search-config.js';
-import { buildBooruTags, fetchJson, ratingExcludes, TagResolver } from './booru.js';
+import { buildBooruTags, fetchJson, ratingTags, TagResolver } from './booru.js';
 import type { SearchAdapter, SearchOptions, SearchResult } from './types.js';
 
 const BASE = 'https://gelbooru.com';
@@ -43,11 +43,7 @@ export class GelbooruAdapter implements SearchAdapter {
   }
 
   async search(query: string, cfg: MediaSearchConfig, opts: SearchOptions): Promise<SearchResult[]> {
-    const tags = await buildBooruTags(
-      query,
-      this.resolver,
-      ratingExcludes('gelbooru', opts.contentRating),
-    );
+    const tags = await buildBooruTags(query, this.resolver, ratingTags('gelbooru', opts.rating));
     const params = new URLSearchParams({
       page: 'dapi',
       s: 'post',

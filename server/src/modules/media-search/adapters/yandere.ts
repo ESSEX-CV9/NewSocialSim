@@ -1,4 +1,4 @@
-import { buildBooruTags, fetchJson, ratingExcludes, TagResolver } from './booru.js';
+import { buildBooruTags, fetchJson, ratingTags, TagResolver } from './booru.js';
 import type { SearchAdapter, SearchOptions, SearchResult } from './types.js';
 
 const BASE = 'https://yande.re';
@@ -32,11 +32,7 @@ export class YandereAdapter implements SearchAdapter {
   }
 
   async search(query: string, _cfg: unknown, opts: SearchOptions): Promise<SearchResult[]> {
-    const tags = await buildBooruTags(
-      query,
-      this.resolver,
-      ratingExcludes('yandere', opts.contentRating),
-    );
+    const tags = await buildBooruTags(query, this.resolver, ratingTags('yandere', opts.rating));
     const params = new URLSearchParams({ tags, limit: String(opts.limit) });
     const posts = (await fetchJson(`${BASE}/post.json?${params}`)) as YanderePost[];
     if (!Array.isArray(posts)) return [];

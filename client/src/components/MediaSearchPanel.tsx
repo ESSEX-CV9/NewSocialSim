@@ -2,6 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api, type MediaSearchResult } from '../api/endpoints';
 import { useI18n } from '../i18n/I18nContext';
+import { useWorld } from '../world/WorldContext';
+
+type Rating = 'safe' | 'all' | 'r18';
 
 /** 需要 Referer 的站点经服务端代理显示预览 */
 function previewSrc(item: MediaSearchResult): string {
@@ -21,23 +24,28 @@ export function MediaSearchPanel({
   disabled: boolean;
 }) {
   const { t } = useI18n();
+  const { world } = useWorld();
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('');
-  const [submitted, setSubmitted] = useState<{ q: string; source: string } | null>(null);
+  // 分级默认取世界设定，单次搜索可随时改
+  const [rating, setRating] = useState<Rating>(world?.meta.contentRating ?? 'safe');
+  const [submitted, setSubmitted] = useState<{ q: string; source: string; rating: Rating } | null>(
+    null,
+  );
   const [ingesting, setIngesting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const sources = useQuery({ queryKey: ['media-search-sources'], queryFn: api.mediaSearchSources });
   const results = useQuery({
-    queryKey: ['media-search', submitted?.q, submitted?.source],
-    queryFn: () => api.mediaSearch(submitted!.q, submitted!.source || undefined),
+    queryKey: ['media-search', submitted?.q, submitted?.source, submitted?.rating],
+    queryFn: () => api.mediaSearch(submitted!.q, submitted!.source || undefined, submitted!.rating),
     enabled: submitted !== null,
     staleTime: 5 * 60 * 1000,
   });
 
   const submit = () => {
     const q = query.trim();
-    if (q) setSubmitted({ q, source });
+    if (q) setSubmitted({ q, source, rating });
   };
 
   const pick = async (item: MediaSearchResult) => {
@@ -81,6 +89,16 @@ export function MediaSearchPanel({
               {s.ok ? '' : ` (${t('mediaSearch.sourceNeedsConfig')})`}
             </option>
           ))}
+        </select>
+        <select
+          value={rating}
+          onChange={(e) => setRating(e.target.value as Rating)}
+          title={t('mediaSearch.rating')}
+          className="rounded-full border border-x-border bg-x-bg px-3 py-1.5 text-[13px] outline-none"
+        >
+          <option value="safe">{t('mediaSearch.ratingSafe')}</option>
+          <option value="all">{t('mediaSearch.ratingAll')}</option>
+          <option value="r18">{t('mediaSearch.ratingR18')}</option>
         </select>
         <button
           onClick={submit}
