@@ -38,6 +38,8 @@ import { VideoSearchService } from './modules/video-search/video-search.service.
 import { registerWorldsRoutes } from './modules/worlds/worlds.routes.js';
 import { registerAdminRoutes } from './modules/admin/admin.routes.js';
 import { AdminService } from './modules/admin/admin.service.js';
+import { LoreService } from './modules/admin/lore.service.js';
+import { NpcService } from './modules/admin/npc.service.js';
 
 const ADMIN_KEY = process.env.SOCIALSIM_ADMIN_KEY ?? 'dev-admin-key';
 
@@ -119,7 +121,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerSearchRoutes(app, { searchService, optionalAuth });
 
   const adminService = new AdminService(worldManager);
-  registerAdminRoutes(app, { adminService, adminKey: ADMIN_KEY });
+  const loreService = new LoreService(worldManager);
+  const npcService = new NpcService(worldManager);
+  registerAdminRoutes(app, { adminService, loreService, npcService, adminKey: ADMIN_KEY });
 
   return app;
 }

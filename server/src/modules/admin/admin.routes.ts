@@ -1,41 +1,53 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply, preHandlerHookHandler } from 'fastify';
+import type { FastifyInstance, FastifyRequest, preHandlerHookHandler } from 'fastify';
 import { AdminController } from './admin.controller.js';
 import type { AdminService } from './admin.service.js';
+import type { LoreService } from './lore.service.js';
+import type { NpcService } from './npc.service.js';
 import { UnauthorizedError } from '../../core/errors/app-error.js';
 
 export interface AdminRoutesDeps {
   adminService: AdminService;
+  loreService: LoreService;
+  npcService: NpcService;
   adminKey: string;
 }
 
 export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps): void {
-  const controller = new AdminController(deps.adminService);
+  const controller = new AdminController(deps.adminService, deps.loreService, deps.npcService);
   const requireAdmin = makeAdminKeyAuth(deps.adminKey);
 
-  app.post<{
-    Body: {
-      authorId: number;
-      content: string;
-      createdAt?: number;
-      replyToId?: number;
-      quoteOfId?: number;
-    };
-  }>('/api/admin/posts', { preHandler: requireAdmin }, controller.createPost);
+  // Posts
+  app.post<{ Body: { authorId: number; content: string; createdAt?: number; replyToId?: number; quoteOfId?: number } }>(
+    '/api/admin/posts', { preHandler: requireAdmin }, controller.createPost);
+  app.post<{ Body: { pairs: Array<{ followerId: number; followeeId: number }> } }>(
+    '/api/admin/follows', { preHandler: requireAdmin }, controller.bulkFollow);
+  app.post<{ Params: { id: string }; Body: { likeCount?: number; repostCount?: number; replyCount?: number; viewCount?: number } }>(
+    '/api/admin/posts/:id/counts', { preHandler: requireAdmin }, controller.updateCounts);
+  app.post<{ Body: { posts?: Array<{ authorId: number; content: string; createdAt?: number; replyToId?: number }>; follows?: Array<{ followerId: number; followeeId: number }>; counts?: Array<{ postId: number; likeCount?: number; repostCount?: number; viewCount?: number }> } }>(
+    '/api/admin/import', { preHandler: requireAdmin }, controller.bulkImport);
 
-  app.post<{
-    Body: { pairs: Array<{ followerId: number; followeeId: number }> };
-  }>('/api/admin/follows', { preHandler: requireAdmin }, controller.bulkFollow);
+  // Lore
+  app.get('/api/admin/lore', { preHandler: requireAdmin }, controller.listLore);
+  app.get<{ Params: { filename: string } }>(
+    '/api/admin/lore/:filename', { preHandler: requireAdmin }, controller.readLore);
+  app.put<{ Params: { filename: string }; Body: { content: string } }>(
+    '/api/admin/lore/:filename', { preHandler: requireAdmin }, controller.writeLore);
+  app.delete<{ Params: { filename: string } }>(
+    '/api/admin/lore/:filename', { preHandler: requireAdmin }, controller.deleteLore);
 
-  app.post<{
-    Params: { id: string };
-    Body: {
-      likeCount?: number;
-      repostCount?: number;
-      replyCount?: number;
-      viewCount?: number;
-    };
-  }>('/api/admin/posts/:id/counts', { preHandler: requireAdmin }, controller.updateCounts);
+  // NPC profiles
+  app.get('/api/admin/npc-profiles', { preHandler: requireAdmin }, controller.listNpcProfiles);
+  app.get<{ Params: { userId: string } }>(
+    '/api/admin/npc-profiles/:userId', { preHandler: requireAdmin }, controller.getNpcProfile);
+  app.put<{ Params: { userId: string }; Body: Record<string, unknown> }>(
+    '/api/admin/npc-profiles/:userId', { preHandler: requireAdmin }, controller.upsertNpcProfile);
+  app.delete<{ Params: { userId: string } }>(
+    '/api/admin/npc-profiles/:userId', { preHandler: requireAdmin }, controller.deleteNpcProfile);
 
+  // Users
+  app.get('/api/admin/users', { preHandler: requireAdmin }, controller.listUsers);
+
+  // Simulator status (no auth required for editor polling)
   app.get('/api/simulator/status', controller.simulatorStatus);
 }
 

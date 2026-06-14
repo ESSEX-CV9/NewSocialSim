@@ -364,7 +364,6 @@ export class MediaService {
     const dir = this.mediaDir();
     const src = withFile.find((r) => fs.existsSync(path.join(dir, r.file_name)));
     if (!src) return null;
-    const ext = path.extname(src.file_name).slice(1) || 'mp4';
     const id = db.transaction(() => {
       const mediaId = mediaRepo.insert(db, {
         ownerId,
@@ -377,24 +376,11 @@ export class MediaService {
         originUrl,
         createdAt: clock.now(),
         durationMs: src.duration_ms,
-        // 海报行不挂帖、文件端点公开，跨用户引用同一张海报无害
         posterMediaId: src.poster_media_id,
       });
-      mediaRepo.updateFileName(db, mediaId, `${mediaId}.${ext}`);
+      mediaRepo.updateFileName(db, mediaId, src.file_name);
       return mediaId;
     })();
-    const srcPath = path.join(dir, src.file_name);
-    const destPath = path.join(dir, `${id}.${ext}`);
-    try {
-      try {
-        fs.linkSync(srcPath, destPath);
-      } catch {
-        fs.copyFileSync(srcPath, destPath);
-      }
-    } catch (err) {
-      mediaRepo.delete(db, id);
-      throw err;
-    }
     return this.toView(mediaRepo.findById(db, id)!);
   }
 

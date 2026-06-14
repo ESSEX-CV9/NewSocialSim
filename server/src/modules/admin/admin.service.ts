@@ -99,6 +99,42 @@ export class AdminService {
     db.prepare(`UPDATE posts SET ${sets.join(', ')} WHERE id = ?`).run(...params, postId);
   }
 
+  async bulkImport(input: {
+    posts?: Array<{ authorId: number; content: string; createdAt?: number; replyToId?: number }>;
+    follows?: Array<{ followerId: number; followeeId: number }>;
+    counts?: Array<{ postId: number; likeCount?: number; repostCount?: number; viewCount?: number }>;
+  }): Promise<{ postsCreated: number; followsCreated: number; countsUpdated: number }> {
+    let postsCreated = 0;
+    let followsCreated = 0;
+    let countsUpdated = 0;
+
+    if (input.posts?.length) {
+      for (const post of input.posts) {
+        await this.createPost(post);
+        postsCreated++;
+      }
+    }
+
+    if (input.follows?.length) {
+      const result = this.bulkFollow(input.follows);
+      followsCreated = result.created;
+    }
+
+    if (input.counts?.length) {
+      for (const c of input.counts) {
+        this.updateCounts(c.postId, c);
+        countsUpdated++;
+      }
+    }
+
+    return { postsCreated, followsCreated, countsUpdated };
+  }
+
+  listUsers(): Array<{ id: number; handle: string; displayName: string; isBot: number }> {
+    const { db } = this.worldManager.current();
+    return db.prepare('SELECT id, handle, display_name AS displayName, is_bot AS isBot FROM users ORDER BY id').all() as any[];
+  }
+
   getSimulatorStatus(): {
     running: boolean;
     tickNumber: number;

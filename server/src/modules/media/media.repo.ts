@@ -152,4 +152,9 @@ export const mediaRepo = {
       )
       .all(...postIds) as (MediaRow & { post_id: number; position: number })[];
   },
+
+  countByFileName(db: WorldDb, fileName: string): number {
+    const row = db.prepare('SELECT COUNT(*) AS cnt FROM media WHERE file_name = ?').get(fileName) as { cnt: number };
+    return row.cnt;
+  },
 };

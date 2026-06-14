@@ -44,4 +44,12 @@ export function registerWorldsRoutes(app: FastifyInstance, deps: WorldsRoutesDep
   app.post('/api/admin/worlds', { schema: { body: createWorldBodySchema } }, controller.create);
   app.post('/api/admin/worlds/:id/activate', controller.activate);
   app.get('/api/admin/worlds/active', controller.active);
+  app.patch('/api/admin/worlds/:id', controller.updateMeta);
+  app.post('/api/admin/worlds/clock', controller.clockControl);
+  app.post<{ Params: { id: string }; Body: { newId: string } }>('/api/admin/worlds/:id/copy', controller.copyWorld);
+  app.post<{ Body: { name: string; description?: string } }>('/api/admin/worlds/snapshots', controller.createSnapshot);
+  app.get<{ Params: { id: string } }>('/api/admin/worlds/:id/snapshots', controller.listSnapshots);
+  app.post<{ Params: { id: string; name: string } }>('/api/admin/worlds/:id/snapshots/:name/restore', controller.restoreSnapshot);
+  app.delete<{ Params: { id: string; name: string } }>('/api/admin/worlds/:id/snapshots/:name', controller.removeSnapshot);
+  app.delete('/api/admin/worlds/:id', controller.deleteWorld);
 }

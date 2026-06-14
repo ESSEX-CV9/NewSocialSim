@@ -14,6 +14,12 @@ export interface WorldContext {
   meta: WorldMeta;
 }
 
+export interface SnapshotInfo {
+  name: string;
+  description: string;
+  createdAtRealMs: number;
+}
+
 export interface CreateWorldInput {
   id: string;
   name: string;
@@ -181,6 +187,140 @@ export class WorldManager {
     if (!this.context) return;
     this.context.meta.clock = this.context.clock.snapshot();
     this.writeMeta(this.context.meta);
+  }
+
+  /** 更新世界元数据（不含时钟，时钟用 clockControl） */
+  updateMeta(worldId: string, patch: {
+    name?: string;
+    description?: string;
+    locale?: WorldMeta['locale'];
+    contentRating?: WorldMeta['contentRating'];
+    calendar?: { label: string };
+  }): WorldMeta {
+    if (!this.exists(worldId)) throw new NotFoundError(`世界 "${worldId}" 不存在`);
+    const meta = this.readMeta(worldId);
+    if (patch.name !== undefined) meta.name = patch.name;
+    if (patch.description !== undefined) meta.description = patch.description;
+    if (patch.locale !== undefined) meta.locale = patch.locale;
+    if (patch.contentRating !== undefined) meta.contentRating = patch.contentRating;
+    if (patch.calendar !== undefined) meta.calendar = patch.calendar;
+    this.writeMeta(meta);
+    if (this.context?.worldId === worldId) this.context.meta = meta;
+    return meta;
+  }
+
+  /** 时钟控制：暂停/恢复/调速/跳转，仅对当前活动世界生效 */
+  clockControl(action: { type: 'pause' } | { type: 'resume' } | { type: 'setScale'; scale: number } | { type: 'setTime'; simTimeMs: number }): ClockState {
+    const ctx = this.current();
+    switch (action.type) {
+      case 'pause': ctx.clock.pause(); break;
+      case 'resume': ctx.clock.resume(); break;
+      case 'setScale': ctx.clock.setScale(action.scale); break;
+      case 'setTime': ctx.clock.setTime(action.simTimeMs); break;
+    }
+    this.persistClock();
+    return ctx.clock.snapshot();
+  }
+
+  /** 复制世界为独立平行宇宙（含 media 完整拷贝） */
+  copyWorld(sourceId: string, newId: string): WorldMeta {
+    if (!WORLD_ID_PATTERN.test(newId)) {
+      throw new ValidationError(`世界 id 格式不合法：${newId}`);
+    }
+    if (!this.exists(sourceId)) throw new NotFoundError(`世界 "${sourceId}" 不存在`);
+    if (this.exists(newId)) throw new ConflictError(`世界 "${newId}" 已存在`);
+
+    if (this.context?.worldId === sourceId) this.persistClock();
+
+    const src = this.worldDir(sourceId);
+    const dst = this.worldDir(newId);
+    fs.cpSync(src, dst, { recursive: true });
+
+    const meta = this.readMeta(newId);
+    meta.id = newId;
+    meta.name = `${meta.name} (copy)`;
+    meta.createdAtRealMs = Date.now();
+    this.writeMeta(meta);
+    return meta;
+  }
+
+  /** 创建快照：只备份 db + json，不复制 media（media 只增不减，所有快照共享） */
+  createSnapshot(name: string, description?: string): SnapshotInfo {
+    if (!/^[a-z0-9][a-z0-9_-]{0,49}$/.test(name)) {
+      throw new ValidationError('快照名只能由小写字母、数字、连字符、下划线组成（1-50 字符）');
+    }
+    const ctx = this.current();
+    this.persistClock();
+
+    const snapshotsDir = path.join(this.worldDir(ctx.worldId), 'snapshots', name);
+    if (fs.existsSync(snapshotsDir)) throw new ConflictError(`快照 "${name}" 已存在`);
+    fs.mkdirSync(snapshotsDir, { recursive: true });
+
+    ctx.db.backup(path.join(snapshotsDir, 'world.db'));
+    fs.copyFileSync(
+      path.join(this.worldDir(ctx.worldId), 'world.json'),
+      path.join(snapshotsDir, 'world.json'),
+    );
+
+    const info: SnapshotInfo = { name, description: description ?? '', createdAtRealMs: Date.now() };
+    fs.writeFileSync(path.join(snapshotsDir, '_snapshot.json'), JSON.stringify(info, null, 2), 'utf8');
+    return info;
+  }
+
+  listSnapshots(worldId: string): SnapshotInfo[] {
+    const snapshotsRoot = path.join(this.worldDir(worldId), 'snapshots');
+    if (!fs.existsSync(snapshotsRoot)) return [];
+    const entries = fs.readdirSync(snapshotsRoot, { withFileTypes: true });
+    const result: SnapshotInfo[] = [];
+    for (const e of entries) {
+      if (!e.isDirectory()) continue;
+      const metaFile = path.join(snapshotsRoot, e.name, '_snapshot.json');
+      if (!fs.existsSync(metaFile)) continue;
+      result.push(readJsonFile(metaFile) as SnapshotInfo);
+    }
+    return result.sort((a, b) => b.createdAtRealMs - a.createdAtRealMs);
+  }
+
+  /** 回滚到快照：关连接 → 覆盖 db + json → 重建 context */
+  restoreSnapshot(name: string): void {
+    const ctx = this.current();
+    const snapshotDir = path.join(this.worldDir(ctx.worldId), 'snapshots', name);
+    if (!fs.existsSync(path.join(snapshotDir, '_snapshot.json'))) {
+      throw new NotFoundError(`快照 "${name}" 不存在`);
+    }
+
+    const worldDir = this.worldDir(ctx.worldId);
+    ctx.db.close();
+
+    fs.copyFileSync(path.join(snapshotDir, 'world.db'), path.join(worldDir, 'world.db'));
+    fs.copyFileSync(path.join(snapshotDir, 'world.json'), path.join(worldDir, 'world.json'));
+
+    const meta = this.readMeta(ctx.worldId);
+    const db = openDb(path.join(worldDir, 'world.db'));
+    migrate(db);
+    this.context = { worldId: ctx.worldId, db, clock: new SimClock(meta.clock), meta };
+    for (const cb of this.activatedListeners) cb();
+  }
+
+  removeSnapshot(worldId: string, name: string): void {
+    const snapshotDir = path.join(this.worldDir(worldId), 'snapshots', name);
+    if (!fs.existsSync(snapshotDir)) throw new NotFoundError(`快照 "${name}" 不存在`);
+    fs.rmSync(snapshotDir, { recursive: true, force: true });
+  }
+
+  /** 删除非活动世界 */
+  deleteWorld(worldId: string): void {
+    if (!this.exists(worldId)) throw new NotFoundError(`世界 "${worldId}" 不存在`);
+    if (this.context?.worldId === worldId) {
+      throw new ConflictError('不能删除当前活动的世界');
+    }
+    fs.rmSync(this.worldDir(worldId), { recursive: true, force: true });
+  }
+
+  /** 获取世界目录路径（供设定文件库等外部模块使用） */
+  getWorldDir(worldId: string): string {
+    if (!this.exists(worldId)) throw new NotFoundError(`世界 "${worldId}" 不存在`);
+    return this.worldDir(worldId);
   }
 
   private exists(worldId: string): boolean {

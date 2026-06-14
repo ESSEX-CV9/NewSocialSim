@@ -1,18 +1,20 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AdminService } from './admin.service.js';
+import type { LoreService } from './lore.service.js';
+import type { NpcService, NpcProfile } from './npc.service.js';
 
 export class AdminController {
-  constructor(private readonly service: AdminService) {}
+  constructor(
+    private readonly service: AdminService,
+    private readonly lore: LoreService,
+    private readonly npc: NpcService,
+  ) {}
+
+  // --- Posts ---
 
   createPost = async (
     req: FastifyRequest<{
-      Body: {
-        authorId: number;
-        content: string;
-        createdAt?: number;
-        replyToId?: number;
-        quoteOfId?: number;
-      };
+      Body: { authorId: number; content: string; createdAt?: number; replyToId?: number; quoteOfId?: number };
     }>,
     reply: FastifyReply,
   ) => {
@@ -26,25 +28,87 @@ export class AdminController {
     }>,
     reply: FastifyReply,
   ) => {
-    const result = this.service.bulkFollow(req.body.pairs);
-    reply.send(result);
+    reply.send(this.service.bulkFollow(req.body.pairs));
   };
 
   updateCounts = async (
     req: FastifyRequest<{
       Params: { id: string };
-      Body: {
-        likeCount?: number;
-        repostCount?: number;
-        replyCount?: number;
-        viewCount?: number;
-      };
+      Body: { likeCount?: number; repostCount?: number; replyCount?: number; viewCount?: number };
     }>,
     reply: FastifyReply,
   ) => {
     this.service.updateCounts(Number(req.params.id), req.body);
     reply.send({ ok: true });
   };
+
+  bulkImport = async (
+    req: FastifyRequest<{
+      Body: {
+        posts?: Array<{ authorId: number; content: string; createdAt?: number; replyToId?: number }>;
+        follows?: Array<{ followerId: number; followeeId: number }>;
+        counts?: Array<{ postId: number; likeCount?: number; repostCount?: number; viewCount?: number }>;
+      };
+    }>,
+    reply: FastifyReply,
+  ) => {
+    const result = await this.service.bulkImport(req.body);
+    reply.status(201).send(result);
+  };
+
+  // --- Lore ---
+
+  listLore = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send(this.lore.list());
+  };
+
+  readLore = async (req: FastifyRequest<{ Params: { filename: string } }>, reply: FastifyReply) => {
+    reply.send(this.lore.read(req.params.filename));
+  };
+
+  writeLore = async (
+    req: FastifyRequest<{ Params: { filename: string }; Body: { content: string } }>,
+    reply: FastifyReply,
+  ) => {
+    this.lore.write(req.params.filename, req.body.content);
+    reply.send({ ok: true });
+  };
+
+  deleteLore = async (req: FastifyRequest<{ Params: { filename: string } }>, reply: FastifyReply) => {
+    this.lore.remove(req.params.filename);
+    reply.status(204).send();
+  };
+
+  // --- NPC Profiles ---
+
+  listNpcProfiles = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send({ profiles: this.npc.list() });
+  };
+
+  getNpcProfile = async (req: FastifyRequest<{ Params: { userId: string } }>, reply: FastifyReply) => {
+    reply.send(this.npc.get(Number(req.params.userId)));
+  };
+
+  upsertNpcProfile = async (
+    req: FastifyRequest<{ Params: { userId: string }; Body: Record<string, unknown> }>,
+    reply: FastifyReply,
+  ) => {
+    const profile = this.npc.upsert({ ...req.body, userId: Number(req.params.userId) } as NpcProfile);
+    reply.send(profile);
+  };
+
+  deleteNpcProfile = async (req: FastifyRequest<{ Params: { userId: string } }>, reply: FastifyReply) => {
+    this.npc.remove(Number(req.params.userId));
+    reply.status(204).send();
+  };
+
+  // --- Users ---
+
+  listUsers = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send({ users: this.service.listUsers() });
+  };
+
+  // --- Simulator ---
 
   simulatorStatus = async (_req: FastifyRequest, reply: FastifyReply) => {
     reply.send(this.service.getSimulatorStatus());
