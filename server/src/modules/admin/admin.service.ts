@@ -83,6 +83,23 @@ const topicsRepo = {
   },
 };
 
+export interface LlmProviderConfig {
+  id: string;
+  name: string;
+  source: 'anthropic' | 'google' | 'openai' | 'deepseek';
+  baseUrl: string;
+  apiKey: string;
+  models: string[];
+}
+
+interface LlmConfigFile {
+  providers: LlmProviderConfig[];
+  highModel: string;
+  lowModel: string;
+}
+
+type LlmConfigFilePublic = LlmConfigFile;
+
 export class AdminService {
   constructor(private readonly worldManager: WorldManager) {}
 
@@ -296,6 +313,106 @@ export class AdminService {
   listUsers(): Array<{ id: number; handle: string; displayName: string; isBot: number }> {
     const { db } = this.worldManager.current();
     return db.prepare('SELECT id, handle, display_name AS displayName, is_bot AS isBot FROM users ORDER BY id').all() as any[];
+  }
+
+  // --- LLM Config ---
+
+  private llmConfigPath(): string {
+    return path.resolve('data', 'llm-config.json');
+  }
+
+  private readRawConfig(): LlmConfigFile {
+    const filePath = this.llmConfigPath();
+    if (!fs.existsSync(filePath)) return { providers: [], highModel: '', lowModel: '' };
+    const raw = fs.readFileSync(filePath, 'utf-8').replace(/^﻿/, '');
+    return JSON.parse(raw) as LlmConfigFile;
+  }
+
+  private writeRawConfig(config: LlmConfigFile): void {
+    const filePath = this.llmConfigPath();
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, JSON.stringify(config, null, 2), 'utf-8');
+  }
+
+  getLlmConfig(): LlmConfigFilePublic {
+    const config = this.readRawConfig();
+    return {
+      ...config,
+      providers: config.providers.map(p => ({
+        ...p,
+        apiKey: p.apiKey ? p.apiKey.slice(0, 8) + '...' + p.apiKey.slice(-4) : '',
+      })),
+    };
+  }
+
+  saveLlmConfig(input: { providers?: LlmProviderConfig[]; highModel?: string; lowModel?: string }): void {
+    const existing = this.readRawConfig();
+    if (input.providers) {
+      existing.providers = input.providers.map(p => {
+        if (p.apiKey.includes('...')) {
+          const old = existing.providers.find(op => op.id === p.id);
+          if (old) p.apiKey = old.apiKey;
+        }
+        return p;
+      });
+    }
+    if (input.highModel !== undefined) existing.highModel = input.highModel;
+    if (input.lowModel !== undefined) existing.lowModel = input.lowModel;
+    this.writeRawConfig(existing);
+  }
+
+  async fetchModels(source: string, apiKey: string, baseUrl?: string): Promise<string[]> {
+    try {
+      switch (source) {
+        case 'openai':
+        case 'deepseek': {
+          const url = (baseUrl || (source === 'deepseek' ? 'https://api.deepseek.com' : 'https://api.openai.com')) + '/v1/models';
+          const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
+          if (!res.ok) throw new Error(`${res.status}`);
+          const data = await res.json() as { data: Array<{ id: string }> };
+          return data.data.map(m => m.id).sort();
+        }
+        case 'anthropic': {
+          const url = (baseUrl || 'https://api.anthropic.com') + '/v1/models';
+          const res = await fetch(url, { headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' } });
+          if (!res.ok) throw new Error(`${res.status}`);
+          const data = await res.json() as { data: Array<{ id: string }> };
+          return data.data.map(m => m.id).sort();
+        }
+        case 'google': {
+          const url = `${baseUrl || 'https://generativelanguage.googleapis.com'}/v1beta/models?key=${apiKey}`;
+          const res = await fetch(url);
+          if (!res.ok) throw new Error(`${res.status}`);
+          const data = await res.json() as { models: Array<{ name: string }> };
+          return data.models.map(m => m.name.replace('models/', '')).sort();
+        }
+        default:
+          return [];
+      }
+    } catch {
+      return [];
+    }
+  }
+
+  // --- Agent Logs (placeholder, real logs come from simulator process) ---
+
+  private agentLogs: Array<{ taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[]; timestamp: number }> = [];
+
+  addAgentLog(entry: { taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[] }): void {
+    this.agentLogs.push({ ...entry, timestamp: Date.now() });
+    if (this.agentLogs.length > 100) this.agentLogs.shift();
+  }
+
+  getAgentLogs(): typeof this.agentLogs {
+    return this.agentLogs;
+  }
+
+  async runAgent(prompt: string): Promise<unknown> {
+    const { AgentRunner } = await import('./agent-runner.js');
+    const runner = new AgentRunner(this.worldManager);
+    const result = await runner.run(prompt);
+    this.addAgentLog({ taskLabel: result.taskLabel, steps: result.steps, tokens: result.tokens, log: result.log });
+    return result;
   }
 
   getSimulatorStatus(): {

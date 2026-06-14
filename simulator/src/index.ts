@@ -5,6 +5,7 @@ import { InteractionSystem } from './systems/interaction-system.js';
 import { CascadeSystem } from './systems/cascade-system.js';
 import { TickEngine } from './tick-engine.js';
 import { loadConfig } from './config.js';
+import { createToolExecutor, LLMScheduler } from './llm/index.js';
 import { logger } from './logger.js';
 
 const ADMIN_TOKEN = process.env.SOCIALSIM_ADMIN_KEY ?? 'dev-admin-key';
@@ -45,9 +46,12 @@ async function main() {
   }
 
   const entityMap = new Map(registry.getAll().map(e => [e.id, e]));
+  const tools = createToolExecutor(api);
+  const scheduler = new LLMScheduler(2);
+  const postingSystem = new PostingSystem(api, [...config.contentPool], ADMIN_TOKEN, tools, scheduler);
 
   const systems = [
-    new PostingSystem(api, [...config.contentPool], ADMIN_TOKEN),
+    postingSystem,
     new InteractionSystem(api),
     new CascadeSystem(api, entityMap, [...REPLY_POOL]),
   ];

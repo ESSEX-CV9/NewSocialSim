@@ -115,7 +115,7 @@ export class ApiClient {
 
   // --- Low-level HTTP ---
 
-  private async get(path: string, token?: string): Promise<any> {
+  async get(path: string, token?: string): Promise<any> {
     const res = await fetch(`${this.baseUrl}${path}`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });

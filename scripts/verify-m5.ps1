@@ -170,6 +170,36 @@ Delete-Admin "$api/admin/content-pools/topic/test-topic"
 $pools3 = Get-Admin "$api/admin/content-pools"
 Assert "pools cleared" ($null -eq $pools3.scenePools.'test-scene')
 
+# === LLM Config ===
+Write-Output "`n--- LLM Config ---"
+$llmCfg = Get-Admin "$api/admin/llm-config"
+Assert "llm config GET succeeds" ($null -ne $llmCfg)
+
+$testProvider = @{ id = 'test-prov'; name = 'Test Provider'; source = 'deepseek'; baseUrl = ''; apiKey = 'test-key-12345678'; models = @('deepseek-chat') }
+Put-Admin "$api/admin/llm-config" @{ providers = @($testProvider); highModel = 'test-prov|deepseek-chat'; lowModel = 'test-prov|deepseek-chat' } | Out-Null
+$llmCfg2 = Get-Admin "$api/admin/llm-config"
+Assert "llm config saved with providers" (@($llmCfg2.providers).Count -eq 1)
+Assert "llm config API key masked" ($llmCfg2.providers[0].apiKey -like 'test-key*...*')
+Assert "llm config highModel set" ($llmCfg2.highModel -eq 'test-prov|deepseek-chat')
+
+# Clean up test config
+Put-Admin "$api/admin/llm-config" @{ providers = @(); highModel = ''; lowModel = '' } | Out-Null
+
+# === Agent Logs ===
+Write-Output "`n--- Agent Logs ---"
+$agentLogs = Get-Admin "$api/admin/agent-logs"
+Assert "agent logs GET succeeds" ($null -ne $agentLogs.logs)
+
+Post-Admin "$api/admin/agent-logs" @{ taskLabel = 'test-task'; steps = 3; tokens = @{ input = 100; output = 50 }; log = @() } | Out-Null
+$agentLogs2 = Get-Admin "$api/admin/agent-logs"
+Assert "agent log posted" (@($agentLogs2.logs).Count -gt 0)
+
+# === Run Agent ===
+Write-Output "`n--- Run Agent ---"
+$runAgentStatus = Get-StatusCode { Post-Admin "$api/admin/run-agent" @{ prompt = 'test prompt' } }
+# 400 expected (no valid API key after cleanup above), 200 if a real key is configured
+Assert "run-agent endpoint exists (400 or 200)" ($runAgentStatus -eq 400 -or $runAgentStatus -eq 200)
+
 # === No-auth guard ===
 Write-Output "`n--- Auth Guard ---"
 Assert "admin API rejects no auth" ((Get-StatusCode { Invoke-RestMethod "$api/admin/posts" -Method Post -ContentType $json -Body '{"authorId":1,"content":"x"}' }) -eq 401)

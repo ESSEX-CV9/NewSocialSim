@@ -1,5 +1,14 @@
 import type { System, Entity, TickContext } from '../ecs/types.js';
 import type { ApiClient } from '../api-client.js';
+import type { AgentResult } from '../llm/agent-runtime.js';
+import { AgentRuntime } from '../llm/agent-runtime.js';
+import type { LLMScheduler } from '../llm/scheduler.js';
+import type { ToolExecutor, ToolContext } from '../llm/tools.js';
+import type { LLMProvider, LLMConfig } from '../llm/types.js';
+import { ClaudeProvider } from '../llm/provider-claude.js';
+import { DeepSeekProvider } from '../llm/provider-deepseek.js';
+import { GeminiProvider } from '../llm/provider-gemini.js';
+import { loadLLMConfig } from '../llm/config.js';
 import { logger } from '../logger.js';
 
 interface Topic {
@@ -18,11 +27,39 @@ export class PostingSystem implements System {
   private lastPoolRefresh = 0;
   private readonly poolRefreshIntervalMs = 60_000;
 
+  private cachedConfigJson = '';
+  private cachedRuntime: AgentRuntime | null = null;
+  private agentLogs: AgentResult[] = [];
+
   constructor(
     private api: ApiClient,
     private fallbackPool: string[],
     private adminToken: string,
+    private tools: ToolExecutor,
+    private scheduler: LLMScheduler,
   ) {}
+
+  private getRuntime(): AgentRuntime | null {
+    const config = loadLLMConfig();
+    if (!config) return null;
+    const json = JSON.stringify(config);
+    if (json !== this.cachedConfigJson) {
+      this.cachedConfigJson = json;
+      let provider: LLMProvider;
+      switch (config.provider) {
+        case 'deepseek': provider = new DeepSeekProvider(config.apiKey, config.baseUrl || undefined); break;
+        case 'gemini': provider = new GeminiProvider(config.apiKey); break;
+        default: provider = new ClaudeProvider(config.apiKey); break;
+      }
+      this.cachedRuntime = new AgentRuntime(provider, this.tools);
+      logger.info(`LLM provider switched to ${config.provider} (${config.highModel})`);
+    }
+    return this.cachedRuntime;
+  }
+
+  getAgentLogs(): AgentResult[] {
+    return this.agentLogs;
+  }
 
   async update(entities: Entity[], ctx: TickContext): Promise<void> {
     await this.refreshPoolsIfNeeded(ctx);
@@ -71,15 +108,64 @@ export class PostingSystem implements System {
   }
 
   private async post(entity: Entity): Promise<void> {
+    if (entity.profile.tier === 'core' && this.getRuntime()) {
+      await this.postViaAgent(entity);
+    } else {
+      await this.postViaTemplate(entity);
+    }
+  }
+
+  private async postViaTemplate(entity: Entity): Promise<void> {
     const content = this.pickContent(entity);
     if (!content) return;
 
     try {
       const result = await this.api.createPost(entity.auth!.token, content);
       this.scheduleNext(entity);
-      logger.info(`[${entity.profile.handle}] posted: "${content.slice(0, 50)}..." (id: ${result.id})`);
+      logger.info(`[${entity.profile.handle}] posted (template): "${content.slice(0, 50)}..." (id: ${result.id})`);
     } catch (err) {
       logger.error(`[${entity.profile.handle}] failed to post:`, err);
+    }
+  }
+
+  private async postViaAgent(entity: Entity): Promise<void> {
+    const ctx: ToolContext = {
+      token: entity.auth!.token,
+      adminToken: this.adminToken,
+      userId: entity.profile.userId,
+      handle: entity.profile.handle,
+    };
+
+    const topicHint = this.topics.length > 0
+      ? `Currently trending topics: ${this.topics.slice(0, 3).map(t => t.title).join(', ')}.`
+      : '';
+
+    const systemPrompt = [
+      `You are @${entity.profile.handle}, a user on a social network.`,
+      entity.profile.personality ? `Personality: ${entity.profile.personality}` : '',
+      entity.profile.stance ? `Stance: ${entity.profile.stance}` : '',
+      entity.profile.writingStyle ? `Writing style: ${entity.profile.writingStyle}` : '',
+      entity.profile.interests.length > 0 ? `Interests: ${entity.profile.interests.join(', ')}` : '',
+      '',
+      'You interact with the social network through tools. Browse the timeline, read lore if needed, then create a post that fits your personality.',
+      'Your post should be natural and in-character. Keep it under 280 characters.',
+      'Write in the language that the world uses (check lore or existing posts for context).',
+    ].filter(Boolean).join('\n');
+
+    const userMessage = `It's time for you to post something on the social network. ${topicHint} Use the available tools to check what's going on, then create a post.`;
+
+    try {
+      const runtime = this.getRuntime()!;
+      const result = await this.scheduler.enqueue('normal', `post:${entity.profile.handle}`, () =>
+        runtime.run({ systemPrompt, userMessage, toolContext: ctx }),
+      );
+      this.agentLogs.push(result);
+      if (this.agentLogs.length > 50) this.agentLogs.shift();
+      this.scheduleNext(entity);
+      logger.info(`[${entity.profile.handle}] posted (agent, ${result.steps} steps, ${result.totalTokens.input}+${result.totalTokens.output} tokens)`);
+    } catch (err) {
+      logger.error(`[${entity.profile.handle}] agent post failed:`, err);
+      await this.postViaTemplate(entity);
     }
   }
 

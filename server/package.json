@@ -9,13 +9,16 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@book000/pixivts": "^0.48.91",
     "@fastify/jwt": "^10.1.0",
     "@fastify/multipart": "^10.0.0",
+    "@google/genai": "^2.8.0",
     "@socialsim/shared": "*",
     "better-sqlite3": "^12.2.0",
     "fastify": "^5.4.0",
     "image-size": "^2.0.2",
+    "openai": "^6.42.0",
     "undici": "^7.27.2"
   },
   "devDependencies": {

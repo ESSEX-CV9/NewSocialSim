@@ -63,6 +63,20 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
   // Users
   app.get('/api/admin/users', { preHandler: requireAdmin }, controller.listUsers);
 
+  // LLM config
+  app.get('/api/admin/llm-config', { preHandler: requireAdmin }, controller.getLlmConfig);
+  app.put<{ Body: Record<string, unknown> }>(
+    '/api/admin/llm-config', { preHandler: requireAdmin }, controller.saveLlmConfig);
+  app.post<{ Body: { source: string; apiKey: string; baseUrl?: string } }>(
+    '/api/admin/llm-config/fetch-models', { preHandler: requireAdmin }, controller.fetchModels);
+
+  // Agent logs & manual trigger
+  app.get('/api/admin/agent-logs', { preHandler: requireAdmin }, controller.getAgentLogs);
+  app.post<{ Body: { taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[] } }>(
+    '/api/admin/agent-logs', { preHandler: requireAdmin }, controller.postAgentLog);
+  app.post<{ Body: { prompt: string } }>(
+    '/api/admin/run-agent', { preHandler: requireAdmin }, controller.runAgent);
+
   // Simulator status (no auth required for editor polling)
   app.get('/api/simulator/status', controller.simulatorStatus);
 }

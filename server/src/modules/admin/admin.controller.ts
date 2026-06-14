@@ -161,6 +161,50 @@ export class AdminController {
     reply.send({ users: this.service.listUsers() });
   };
 
+  // --- LLM Config ---
+
+  getLlmConfig = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send(this.service.getLlmConfig());
+  };
+
+  saveLlmConfig = async (
+    req: FastifyRequest<{ Body: Record<string, unknown> }>,
+    reply: FastifyReply,
+  ) => {
+    this.service.saveLlmConfig(req.body as any);
+    reply.send({ ok: true });
+  };
+
+  fetchModels = async (
+    req: FastifyRequest<{ Body: { source: string; apiKey: string; baseUrl?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const models = await this.service.fetchModels(req.body.source, req.body.apiKey, req.body.baseUrl);
+    reply.send({ models });
+  };
+
+  // --- Agent Logs ---
+
+  getAgentLogs = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send({ logs: this.service.getAgentLogs() });
+  };
+
+  postAgentLog = async (
+    req: FastifyRequest<{ Body: { taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[] } }>,
+    reply: FastifyReply,
+  ) => {
+    this.service.addAgentLog(req.body);
+    reply.send({ ok: true });
+  };
+
+  runAgent = async (
+    req: FastifyRequest<{ Body: { prompt: string } }>,
+    reply: FastifyReply,
+  ) => {
+    const result = await this.service.runAgent(req.body.prompt);
+    reply.send(result);
+  };
+
   // --- Simulator ---
 
   simulatorStatus = async (_req: FastifyRequest, reply: FastifyReply) => {

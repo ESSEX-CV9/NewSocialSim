@@ -5,6 +5,7 @@ import { NpcPanel } from './panels/NpcPanel.js';
 import { TimelinePanel } from './panels/TimelinePanel.js';
 import { TopicsPanel } from './panels/TopicsPanel.js';
 import { PoolsPanel } from './panels/PoolsPanel.js';
+import { LlmPanel } from './panels/LlmPanel.js';
 
 const TABS = [
   { id: 'console', label: 'Console' },
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'pools', label: 'Pools' },
   { id: 'lore', label: 'Lore' },
   { id: 'npc', label: 'NPC Designer' },
+  { id: 'llm', label: 'LLM' },
 ] as const;
 
 type TabId = (typeof TABS)[number]['id'];
@@ -47,6 +49,7 @@ export function App() {
         {tab === 'pools' && <PoolsPanel />}
         {tab === 'lore' && <LorePanel />}
         {tab === 'npc' && <NpcPanel />}
+        {tab === 'llm' && <LlmPanel />}
       </main>
     </div>
   );
