@@ -36,6 +36,10 @@ import { UsersService } from './modules/users/users.service.js';
 import { registerVideoSearchRoutes } from './modules/video-search/video-search.routes.js';
 import { VideoSearchService } from './modules/video-search/video-search.service.js';
 import { registerWorldsRoutes } from './modules/worlds/worlds.routes.js';
+import { registerAdminRoutes } from './modules/admin/admin.routes.js';
+import { AdminService } from './modules/admin/admin.service.js';
+
+const ADMIN_KEY = process.env.SOCIALSIM_ADMIN_KEY ?? 'dev-admin-key';
 
 export interface AppDeps {
   worldManager: WorldManager;
@@ -113,6 +117,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerMessagesRoutes(app, { messagesService, sseHub, worldManager, requireAuth });
   registerTimelineRoutes(app, { timelineService, requireAuth, optionalAuth });
   registerSearchRoutes(app, { searchService, optionalAuth });
+
+  const adminService = new AdminService(worldManager);
+  registerAdminRoutes(app, { adminService, adminKey: ADMIN_KEY });
 
   return app;
 }
