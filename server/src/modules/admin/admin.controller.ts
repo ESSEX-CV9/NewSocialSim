@@ -102,6 +102,59 @@ export class AdminController {
     reply.status(204).send();
   };
 
+  // --- Topics ---
+
+  listTopics = async (req: FastifyRequest, reply: FastifyReply) => {
+    const activeOnly = (req.query as Record<string, string>).active === 'true';
+    reply.send({ topics: this.service.listTopics(activeOnly) });
+  };
+
+  createTopic = async (
+    req: FastifyRequest<{ Body: { title: string; description?: string; heat?: number; tags?: string[] } }>,
+    reply: FastifyReply,
+  ) => {
+    const topic = this.service.createTopic(req.body);
+    reply.status(201).send(topic);
+  };
+
+  updateTopic = async (
+    req: FastifyRequest<{ Params: { id: string }; Body: Record<string, unknown> }>,
+    reply: FastifyReply,
+  ) => {
+    const topic = this.service.updateTopic(Number(req.params.id), req.body as any);
+    reply.send(topic);
+  };
+
+  deleteTopic = async (
+    req: FastifyRequest<{ Params: { id: string } }>,
+    reply: FastifyReply,
+  ) => {
+    this.service.deleteTopic(Number(req.params.id));
+    reply.status(204).send();
+  };
+
+  // --- Content Pools ---
+
+  getContentPools = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send(this.service.getContentPools());
+  };
+
+  addToPool = async (
+    req: FastifyRequest<{ Body: { poolType: string; key: string; items: string[] } }>,
+    reply: FastifyReply,
+  ) => {
+    this.service.addToPool(req.body.poolType as 'scene' | 'topic', req.body.key, req.body.items);
+    reply.send({ ok: true });
+  };
+
+  clearPool = async (
+    req: FastifyRequest<{ Params: { poolType: string; key: string } }>,
+    reply: FastifyReply,
+  ) => {
+    this.service.clearPool(req.params.poolType as 'scene' | 'topic', req.params.key);
+    reply.status(204).send();
+  };
+
   // --- Users ---
 
   listUsers = async (_req: FastifyRequest, reply: FastifyReply) => {

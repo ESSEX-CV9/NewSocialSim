@@ -74,6 +74,20 @@ export class ApiClient {
     return await this.get(`/api/users/by-handle/${encodeURIComponent(handle)}`, token);
   }
 
+  // --- Topics & Content Pools (admin) ---
+
+  async getActiveTopics(adminToken: string): Promise<{ topics: any[] }> {
+    return await this.get('/api/admin/topics?active=true', adminToken);
+  }
+
+  async getContentPools(adminToken: string): Promise<{ scenePools: Record<string, string[]>; topicPools: Record<string, string[]> }> {
+    return await this.get('/api/admin/content-pools', adminToken);
+  }
+
+  async getFollowers(userId: string, token: string, limit = 50): Promise<{ items: any[] }> {
+    return await this.get(`/api/users/${userId}/followers?limit=${limit}`, token);
+  }
+
   // --- Admin APIs (simulator management key) ---
 
   async adminCreatePost(adminToken: string, body: {

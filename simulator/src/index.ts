@@ -2,9 +2,20 @@ import { ApiClient } from './api-client.js';
 import { EntityRegistry } from './ecs/entity-registry.js';
 import { PostingSystem } from './systems/posting-system.js';
 import { InteractionSystem } from './systems/interaction-system.js';
+import { CascadeSystem } from './systems/cascade-system.js';
 import { TickEngine } from './tick-engine.js';
 import { loadConfig } from './config.js';
 import { logger } from './logger.js';
+
+const ADMIN_TOKEN = process.env.SOCIALSIM_ADMIN_KEY ?? 'dev-admin-key';
+
+const REPLY_POOL = [
+  '确实', '有道理', '笑死', '真的吗', '同意',
+  '不太认同', '这个说法有点意思', '哈哈哈',
+  '说的好', '学到了', '第一次听说', '太真实了',
+  '蹲一个后续', '已关注', 'mark', '+1',
+  '不好说', '离谱', '什么情况', '有没有懂的来说说',
+];
 
 async function main() {
   const configPath = process.argv[2];
@@ -33,9 +44,12 @@ async function main() {
     process.exit(1);
   }
 
+  const entityMap = new Map(registry.getAll().map(e => [e.id, e]));
+
   const systems = [
-    new PostingSystem(api, [...config.contentPool]),
+    new PostingSystem(api, [...config.contentPool], ADMIN_TOKEN),
     new InteractionSystem(api),
+    new CascadeSystem(api, entityMap, [...REPLY_POOL]),
   ];
 
   const engine = new TickEngine(registry, systems, config.tickIntervalMs);

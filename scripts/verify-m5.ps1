@@ -137,6 +137,39 @@ $snapAfter = Get-Admin "$api/admin/worlds/modern-earth/snapshots"
 $testSnapExists = @($snapAfter.snapshots) | Where-Object { $_.name -eq 'test-snap' }
 Assert "snapshot deleted" ($testSnapExists.Count -eq 0)
 
+# === Topics ===
+Write-Output "`n--- Topics ---"
+$topic = Post-Admin "$api/admin/topics" @{ title = 'Test Topic'; description = 'A test'; heat = 0.7; tags = @('tech','gaming') }
+Assert "topic created" ($topic.id -gt 0)
+Assert "topic stage is emerging" ($topic.stage -eq 'emerging')
+Assert "topic heat" ($topic.heat -eq 0.7)
+
+$topicList = Get-Admin "$api/admin/topics"
+Assert "topic listed" (@($topicList.topics).Count -gt 0)
+
+$updated = Patch-Admin "$api/admin/topics/$($topic.id)" @{ stage = 'peak'; heat = 1.0 }
+Assert "topic updated to peak" ($updated.stage -eq 'peak')
+
+Delete-Admin "$api/admin/topics/$($topic.id)"
+$afterDelete = Get-Admin "$api/admin/topics"
+$exists = @($afterDelete.topics) | Where-Object { $_.id -eq $topic.id }
+Assert "topic deleted" ($exists.Count -eq 0)
+
+# === Content Pools ===
+Write-Output "`n--- Content Pools ---"
+Post-Admin "$api/admin/content-pools" @{ poolType = 'scene'; key = 'test-scene'; items = @('hello','world','test') } | Out-Null
+$pools = Get-Admin "$api/admin/content-pools"
+Assert "scene pool created" ($pools.scenePools.'test-scene'.Count -eq 3)
+
+Post-Admin "$api/admin/content-pools" @{ poolType = 'topic'; key = 'test-topic'; items = @('topic item 1','topic item 2') } | Out-Null
+$pools2 = Get-Admin "$api/admin/content-pools"
+Assert "topic pool created" ($pools2.topicPools.'test-topic'.Count -eq 2)
+
+Delete-Admin "$api/admin/content-pools/scene/test-scene"
+Delete-Admin "$api/admin/content-pools/topic/test-topic"
+$pools3 = Get-Admin "$api/admin/content-pools"
+Assert "pools cleared" ($null -eq $pools3.scenePools.'test-scene')
+
 # === No-auth guard ===
 Write-Output "`n--- Auth Guard ---"
 Assert "admin API rejects no auth" ((Get-StatusCode { Invoke-RestMethod "$api/admin/posts" -Method Post -ContentType $json -Body '{"authorId":1,"content":"x"}' }) -eq 401)

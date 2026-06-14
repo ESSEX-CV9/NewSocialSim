@@ -3,10 +3,14 @@ import { ConsolePanel } from './panels/ConsolePanel.js';
 import { LorePanel } from './panels/LorePanel.js';
 import { NpcPanel } from './panels/NpcPanel.js';
 import { TimelinePanel } from './panels/TimelinePanel.js';
+import { TopicsPanel } from './panels/TopicsPanel.js';
+import { PoolsPanel } from './panels/PoolsPanel.js';
 
 const TABS = [
   { id: 'console', label: 'Console' },
   { id: 'timeline', label: 'Timeline' },
+  { id: 'topics', label: 'Topics' },
+  { id: 'pools', label: 'Pools' },
   { id: 'lore', label: 'Lore' },
   { id: 'npc', label: 'NPC Designer' },
 ] as const;
@@ -39,6 +43,8 @@ export function App() {
       <main className="flex-1 p-6">
         {tab === 'console' && <ConsolePanel />}
         {tab === 'timeline' && <TimelinePanel />}
+        {tab === 'topics' && <TopicsPanel />}
+        {tab === 'pools' && <PoolsPanel />}
         {tab === 'lore' && <LorePanel />}
         {tab === 'npc' && <NpcPanel />}
       </main>

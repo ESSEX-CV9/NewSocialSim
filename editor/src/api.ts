@@ -14,33 +14,27 @@ async function get(path: string) {
 }
 
 async function post(path: string, body?: unknown) {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: headersFor(body),
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const init: RequestInit = { method: 'POST', headers: headersFor(body) };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const res = await fetch(path, init);
   if (!res.ok) throw new Error(`POST ${path}: ${res.status} ${await res.text()}`);
   const text = await res.text();
   return text ? JSON.parse(text) : undefined;
 }
 
 async function put(path: string, body?: unknown) {
-  const res = await fetch(path, {
-    method: 'PUT',
-    headers: headersFor(body),
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const init: RequestInit = { method: 'PUT', headers: headersFor(body) };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const res = await fetch(path, init);
   if (!res.ok) throw new Error(`PUT ${path}: ${res.status}`);
   const text = await res.text();
   return text ? JSON.parse(text) : undefined;
 }
 
 async function patch(path: string, body?: unknown) {
-  const res = await fetch(path, {
-    method: 'PATCH',
-    headers: headersFor(body),
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  const init: RequestInit = { method: 'PATCH', headers: headersFor(body) };
+  if (body !== undefined) init.body = JSON.stringify(body);
+  const res = await fetch(path, init);
   if (!res.ok) throw new Error(`PATCH ${path}: ${res.status}`);
   return res.json();
 }

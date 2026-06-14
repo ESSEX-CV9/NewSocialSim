@@ -276,6 +276,23 @@ const migrations: Migration[] = [
       CREATE INDEX idx_media_origin_url ON media(origin_url) WHERE origin_url IS NOT NULL;
     `,
   },
+  {
+    version: 14,
+    name: 'topics',
+    sql: `
+      CREATE TABLE topics (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        title       TEXT    NOT NULL,
+        description TEXT    NOT NULL DEFAULT '',
+        stage       TEXT    NOT NULL DEFAULT 'emerging',
+        heat        REAL    NOT NULL DEFAULT 0.5,
+        tags        TEXT    NOT NULL DEFAULT '[]',
+        created_at  INTEGER NOT NULL,
+        peak_at     INTEGER,
+        retired_at  INTEGER
+      );
+    `,
+  },
 ];
 
 export function migrate(db: WorldDb): void {

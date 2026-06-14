@@ -44,6 +44,22 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
   app.delete<{ Params: { userId: string } }>(
     '/api/admin/npc-profiles/:userId', { preHandler: requireAdmin }, controller.deleteNpcProfile);
 
+  // Topics
+  app.get('/api/admin/topics', { preHandler: requireAdmin }, controller.listTopics);
+  app.post<{ Body: { title: string; description?: string; heat?: number; tags?: string[] } }>(
+    '/api/admin/topics', { preHandler: requireAdmin }, controller.createTopic);
+  app.patch<{ Params: { id: string }; Body: Record<string, unknown> }>(
+    '/api/admin/topics/:id', { preHandler: requireAdmin }, controller.updateTopic);
+  app.delete<{ Params: { id: string } }>(
+    '/api/admin/topics/:id', { preHandler: requireAdmin }, controller.deleteTopic);
+
+  // Content Pools
+  app.get('/api/admin/content-pools', { preHandler: requireAdmin }, controller.getContentPools);
+  app.post<{ Body: { poolType: string; key: string; items: string[] } }>(
+    '/api/admin/content-pools', { preHandler: requireAdmin }, controller.addToPool);
+  app.delete<{ Params: { poolType: string; key: string } }>(
+    '/api/admin/content-pools/:poolType/:key', { preHandler: requireAdmin }, controller.clearPool);
+
   // Users
   app.get('/api/admin/users', { preHandler: requireAdmin }, controller.listUsers);
 
