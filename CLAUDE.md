@@ -1,6 +1,6 @@
 # NewSocialSim 交接说明
 
-本地运行的社交媒体模拟器（仿 X/Twitter），全 TypeScript。两阶段计划：第一阶段是真实可用的社交网站（**已完成**，含完整媒体系统）；第二阶段以网站 HTTP API 为唯一接口构建模拟器（**M5-1 至 M5-4 已完成**：ECS tick 引擎 + 世界管理 + 话题/内容池 + LLM Agent 三厂接入），虚拟用户与真人走相同 API。用途：观察娱乐 + 小说世界观创作辅助 + 信息传播研究。
+本地运行的社交媒体模拟器（仿 X/Twitter），全 TypeScript。两阶段计划：第一阶段是真实可用的社交网站（**已完成**，含完整媒体系统）；第二阶段以网站 HTTP API 为唯一接口构建模拟器（**M5-1 至 M5-4 已完成**：ECS tick 引擎 + 世界管理 + 话题/内容池 + LLM Agent 三厂接入；当前在 `feat-M5-X-RE` 分支重启 M5-X 行为层，先确定性后 LLM，Step 0a/0b 已落地，纲领见 `docs/m5-x-re-plan.md`），虚拟用户与真人走相同 API。用途：观察娱乐 + 小说世界观创作辅助 + 信息传播研究。
 
 ## 运行
 
@@ -23,11 +23,11 @@ npm workspaces monorepo：
 - `shared/` — 前后端共用纯类型（贫血实体 + 视图类型 + API DTO），改接口先改这里。
 - `server/` — Fastify + better-sqlite3。
   - `src/core/` 基础设施：`clock/`（SimClock 模拟时钟）、`db/`（连接 + 版本化 migration，当前 v14）、`world/`（WorldManager 多世界热切换 + 快照 + 时钟控制，含 onActivated 钩子）、`auth/`（JWT 密钥与 requireAuth/optionalAuth 守卫）、`events/`（SseHub：SSE 连接中枢，心跳/按用户推送/热切换清场）、`pagination.ts`（游标工具）。
-  - `src/modules/` 按功能域分层，每模块四件套 `*.routes.ts / *.controller.ts / *.service.ts / *.repo.ts`：worlds、auth、users、posts、media（上传/外链入库/文件流，文件存各世界 media/ 目录）、media-search（七源关键字搜图 + Pixiv/B站 CDP 引导登录，凭证在 data/media-search.json）、link-cards（OG 链接卡片 + embed 嵌入推导，无路由）、tools（yt-dlp/ffmpeg 二进制管理，一键安装到 data/bin/）、video-search（外站视频搜索与引入：嵌入卡/下载/流式三形态、异步任务、流式 Range 代理、三搜索源）、interactions（赞/转发/书签/隐藏帖）、follows、blocks、timeline、notifications、search、messages（私信：1v1 会话/消息请求/已读回执/表情回应/SSE 流）、admin（管理端：代理发帖/批量关注/计数注水/话题CRUD/内容池/LLM配置/NPC档案/设定文件库/快照/Agent执行，admin key 认证）。
+  - `src/modules/` 按功能域分层，每模块四件套 `*.routes.ts / *.controller.ts / *.service.ts / *.repo.ts`：worlds、auth、users、posts、media（上传/外链入库/文件流，文件存各世界 media/ 目录）、media-search（七源关键字搜图 + Pixiv/B站 CDP 引导登录，凭证在 data/media-search.json）、link-cards（OG 链接卡片 + embed 嵌入推导，无路由）、tools（yt-dlp/ffmpeg 二进制管理，一键安装到 data/bin/）、video-search（外站视频搜索与引入：嵌入卡/下载/流式三形态、异步任务、流式 Range 代理、三搜索源）、interactions（赞/转发/书签/隐藏帖）、follows、blocks、timeline、notifications、search、messages（私信：1v1 会话/消息请求/已读回执/表情回应/SSE 流）、admin（管理端：代理建号(is_bot,拒绝 bot 命名)/登录票(login-as,凭 admin key 换 JWT)/代理发帖/批量关注/计数注水/话题CRUD/内容池/LLM配置/NPC档案/设定文件库/快照/Agent执行，admin key 认证）。
 - `client/` — React 19 + Vite + Tailwind 4 + react-query + Remix Icon（均 npm 本地，离线可用）。
   - `src/api/` fetch 封装与全部接口；`src/auth|world|i18n|theme/` 四个全局 Context；`src/components/` 通用组件（Layout、PostCard、Composer、usePagedQuery 等）；`src/features/<页面>/` 按页面组织。
-- `simulator/` — 模拟引擎（ECS tick + 内容生成 + 互动级联 + LLM Agent）。
-  - `src/ecs/` Entity/Component/System 框架；`src/systems/` PostingSystem（话题感知+内容池）、InteractionSystem（概率互动）、CascadeSystem（级联反应）；`src/llm/` LLMProvider 抽象 + Claude/DeepSeek/Gemini 三家实现、AgentRuntime agentic 循环、工具集（12 个）、调度器。
+- `simulator/` — 模拟引擎（独立进程，跟随活动世界，不持有任何特定世界数据）。
+  - `src/simulator.ts` 编排器：启动只读基础设施配置，运行时查 `GET /api/admin/worlds/active` 跟随活动世界，世界变更则 flush→重登账号（login-as 票据，不存密码）→重建系统；被驱动账号 = 有 npc 档案者，驱动配置取自 npc-profiles.json。tick 在世界模拟时间下运行。`src/ecs/` Entity/Component/System 框架；`src/systems/` PostingSystem（确定性发帖：话题感知+内容池，LLM 路径已移出关键链路）、InteractionSystem（概率互动）、CascadeSystem（级联反应）；`src/llm/` LLMProvider 抽象 + 三家实现 + agentic 循环 + 工具集（暂未接入关键路径，待行为状态机阶段）。
 - `editor/` — 世界编辑器（临时 UI，端口 5174）。
   - 六个 Tab 面板：Console（时钟控制/快照/世界管理）、Timeline（预填帖子）、Topics（话题管理）、Pools（内容池）、Lore（设定文档）、NPC Designer（人设档案）、LLM（提供商配置/Agent 触发/执行日志）。
 - `data/worlds/<id>/` — 运行时数据（不入 git）：world.db（该世界全部数据）+ world.json（元数据与时钟状态）+ media/（该世界全部媒体文件）+ lore/（设定文档 .md）+ npc-profiles.json + content-pools.json + snapshots/（轻量快照）。
@@ -71,7 +71,7 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 短期：M5-1 至 M5-4 已完成（ECS 骨架/世界管理/话题内容池/LLM Agent 三厂接入）。下一步为 M5-5 GM 导演层（GM 唤醒控制器 + 任务分发 + 决策日志 + 预算降级）和 M5-6 Electron 打包。详见 docs/m5-design.md 实施顺序。
+- 当前主线：`feat-M5-X-RE` 分支重启 M5-X 行为层，纲领见 `docs/m5-x-re-plan.md`（先确定性后 LLM、编辑器为唯一观察窗逐里程碑同步、四步阶梯）。Step 0a（代理建号）、0b（模拟器跟随活动世界 + 不存密码驱动）已完成并端到端演示（`scripts/demo-stp0.mjs`，demo 世界）；下一步 Step 0c（决策轨迹落盘 per-world JSONL）→ 0d/0e（正式编辑器重建：多窗格 IDE 壳 + 独立 Fastify 后端 + 控制台 + 最小时间轴）→ Step 1（按 ECS 内容池发顶层帖）。GM 导演层（M5-5）与 Electron 打包（M5-6）顺延至四步阶梯之后。
 - 编辑器当前为临时验证 UI（端口 5174），正式编辑器按 docs/m5-design.md "世界编辑器"章节设计重做（Premiere 式时间轴/Obsidian 式设定编辑器/Cursor 式 LLM 面板等十面板）。
 - 媒体系统四期已全部完成，设计细节见 docs/design.md。虚拟用户发图帖链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 未实现的大块：GM 导演层、Electron 打包、正式编辑器 UI、自定义历法换算、生产构建流程。
