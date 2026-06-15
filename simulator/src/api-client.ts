@@ -113,6 +113,18 @@ export class ApiClient {
     return await this.post('/api/admin/users', body, adminToken) as { id: number; handle: string; displayName: string; password: string };
   }
 
+  async getRoster(adminToken: string): Promise<{ accounts: Array<Record<string, unknown>> }> {
+    return await this.get('/api/admin/roster', adminToken) as { accounts: Array<Record<string, unknown>> };
+  }
+
+  async getActiveWorld(): Promise<{ meta: { id: string } } | null> {
+    try {
+      return await this.get('/api/admin/worlds/active') as { meta: { id: string } };
+    } catch {
+      return null;
+    }
+  }
+
   async adminUpdateCounts(adminToken: string, postId: string, deltas: {
     likeCount?: number;
     repostCount?: number;

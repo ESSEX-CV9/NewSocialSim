@@ -367,6 +367,19 @@ export class AdminService {
     return { id: Number(r.lastInsertRowid), handle, displayName, password };
   }
 
+  /** 读取活动世界文件夹的账号 roster（驱动配置随世界走）。容忍 BOM、缺文件返回空。
+   *  数据形态对 server 透明，由模拟器解释（含 handle/password/tier/活跃时段/行为概率等）。 */
+  getRoster(): { accounts: Array<Record<string, unknown>> } {
+    const ctx = this.worldManager.current();
+    const filePath = path.join(this.worldManager.getWorldDir(ctx.worldId), 'roster.json');
+    if (!fs.existsSync(filePath)) return { accounts: [] };
+    const raw = fs.readFileSync(filePath, 'utf-8').replace(/^﻿/, '');
+    const parsed = JSON.parse(raw) as unknown;
+    if (Array.isArray(parsed)) return { accounts: parsed as Array<Record<string, unknown>> };
+    const accounts = (parsed as { accounts?: unknown }).accounts;
+    return { accounts: Array.isArray(accounts) ? (accounts as Array<Record<string, unknown>>) : [] };
+  }
+
   // --- LLM Config ---
 
   private llmConfigPath(): string {

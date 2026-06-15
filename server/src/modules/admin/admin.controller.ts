@@ -168,6 +168,10 @@ export class AdminController {
     reply.status(201).send(this.service.createBotUser(req.body));
   };
 
+  getRoster = async (_req: FastifyRequest, reply: FastifyReply) => {
+    reply.send(this.service.getRoster());
+  };
+
   // --- LLM Config ---
 
   getLlmConfig = async (_req: FastifyRequest, reply: FastifyReply) => {
