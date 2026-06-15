@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import type { WorldDb } from '../../core/db/database.js';
 import { ValidationError, NotFoundError } from '../../core/errors/app-error.js';
+import { config } from '../../config.js';
 import { postsRepo } from '../posts/posts.repo.js';
 import { followsRepo } from '../follows/follows.repo.js';
 
@@ -318,7 +319,7 @@ export class AdminService {
   // --- LLM Config ---
 
   private llmConfigPath(): string {
-    return path.resolve('data', 'llm-config.json');
+    return path.join(config.dataDir, 'llm-config.json');
   }
 
   private readRawConfig(): LlmConfigFile {

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { config as appConfig } from '../../config.js';
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -52,7 +53,7 @@ export class AgentRunner {
   constructor(private worldManager: WorldManager) {}
 
   private resolveModel(): ResolvedModel {
-    const file = path.resolve('data', 'llm-config.json');
+    const file = path.join(appConfig.dataDir, 'llm-config.json');
     if (!fs.existsSync(file)) throw new ValidationError('No LLM config. Please set up in the LLM Config panel first.');
     const raw = fs.readFileSync(file, 'utf-8').replace(/^﻿/, '');
     const config = JSON.parse(raw) as LLMConfigFile;

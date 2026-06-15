@@ -10,6 +10,8 @@
 npm install        # 首次
 npm run dev:server # 后端 http://127.0.0.1:3000
 npm run dev:client # 前端 http://localhost:5173
+npm run dev:simulator 
+npm run dev:editor # 编辑器  http://localhost:5174
 ```
 
 打开 <http://localhost:5173>。演示账号：`alice` / `bob` / `carol`，密码均为 `secret123`（位于"现代地球"世界）。

@@ -1,8 +1,10 @@
 import { readFileSync, existsSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname, join } from 'path';
+import { fileURLToPath } from 'url';
 import type { LLMConfig } from './types.js';
 
-const DEFAULT_CONFIG_PATH = resolve('data', 'llm-config.json');
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
+const DEFAULT_CONFIG_PATH = join(repoRoot, 'data', 'llm-config.json');
 
 interface ProviderEntry {
   id: string;

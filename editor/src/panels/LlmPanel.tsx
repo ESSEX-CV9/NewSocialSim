@@ -29,33 +29,39 @@ export function LlmPanel() {
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
 
-  const refresh = useCallback(async () => {
+  const loadConfig = useCallback(async () => {
     try {
-      const [cfgRes, logsRes] = await Promise.all([
-        fetch('/api/admin/llm-config', { headers: authHeader }),
-        fetch('/api/admin/agent-logs', { headers: authHeader }),
-      ]);
-      if (cfgRes.ok) {
-        const data = await cfgRes.json();
+      const res = await fetch('/api/admin/llm-config', { headers: authHeader });
+      if (res.ok) {
+        const data = await res.json();
         setProviders(data.providers ?? []);
         setHighModel(data.highModel ?? '');
         setLowModel(data.lowModel ?? '');
       }
-      if (logsRes.ok) {
-        const data = await logsRes.json();
+    } catch { /* ignore */ }
+  }, []);
+
+  const refreshLogs = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/agent-logs', { headers: authHeader });
+      if (res.ok) {
+        const data = await res.json();
         setLogs(data.logs ?? []);
       }
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { refresh(); const t = setInterval(refresh, 10000); return () => clearInterval(t); }, [refresh]);
+  useEffect(() => { loadConfig(); refreshLogs(); }, [loadConfig, refreshLogs]);
+  useEffect(() => { const t = setInterval(refreshLogs, 10000); return () => clearInterval(t); }, [refreshLogs]);
 
   const allModels = providers.flatMap(p => p.models.map(m => ({ label: `${p.name} | ${m}`, value: `${p.id}|${m}` })));
 
   const saveConfig = async () => {
     try {
       const init: RequestInit = { method: 'PUT', headers: jsonHeaders, body: JSON.stringify({ providers, highModel, lowModel }) };
-      await fetch('/api/admin/llm-config', init);
+      const res = await fetch('/api/admin/llm-config', init);
+      if (!res.ok) { setError(`Save failed: ${res.status}`); return; }
+      await loadConfig();
       setSaved(true); setTimeout(() => setSaved(false), 2000);
       setError('');
     } catch (e: any) { setError(e.message); }
@@ -112,7 +118,7 @@ export function LlmPanel() {
       const init: RequestInit = { method: 'POST', headers: jsonHeaders, body: JSON.stringify({ prompt: prompt.trim() }) };
       const res = await fetch('/api/admin/run-agent', init);
       if (!res.ok) { const t = await res.text(); setError(`Agent failed: ${res.status} ${t}`); }
-      else { setPrompt(''); refresh(); }
+      else { setPrompt(''); refreshLogs(); }
     } catch (e: any) { setError(e.message); }
     setRunning(false);
   };
