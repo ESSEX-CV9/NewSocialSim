@@ -1,11 +1,28 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import type { WorldDb } from '../../core/db/database.js';
-import { ValidationError, NotFoundError } from '../../core/errors/app-error.js';
+import { ValidationError, NotFoundError, ConflictError } from '../../core/errors/app-error.js';
 import { config } from '../../config.js';
+import { hashPassword } from '../auth/password.js';
 import { postsRepo } from '../posts/posts.repo.js';
 import { followsRepo } from '../follows/follows.repo.js';
+
+/** 暴露虚拟身份的命名约定——代理建号一律拒绝（见 docs/m5-real-usage-contract.md 账号模型）。
+ *  取高精度模式，避免误杀 blink182 / john_k 这类拟真名；模式可在此增删。
+ *  系统化的"通用 stem + 序号/字母枚举"无法从单个 handle 可靠区分于真实名，建号方须自负其责。 */
+const BOT_HANDLE_PATTERNS: RegExp[] = [
+  /sim[_-]/i,                                                     // sim_xxx
+  /[_-]amb([_-]|$)/i,                                             // xxx_amb / xxx_amb_1
+  /bot/i,                                                         // 任意位置含 bot
+  /npc/i,                                                         // 任意位置含 npc
+  /^(user|users|acct|account|test|temp|guest|npc|amb|sim)\d+$/i,  // 通用 stem + 序号枚举
+];
+
+function looksLikeBotHandle(handle: string): boolean {
+  return BOT_HANDLE_PATTERNS.some((re) => re.test(handle));
+}
 
 // --- Topic types & repo ---
 
@@ -314,6 +331,40 @@ export class AdminService {
   listUsers(): Array<{ id: number; handle: string; displayName: string; isBot: number }> {
     const { db } = this.worldManager.current();
     return db.prepare('SELECT id, handle, display_name AS displayName, is_bot AS isBot FROM users ORDER BY id').all() as any[];
+  }
+
+  /** 代理建号：创建 is_bot=1 的虚拟账号，拒绝暴露虚拟身份的命名约定。
+   *  未提供 password 时随机生成并在响应中返回（roster 需凭证登录驱动）。 */
+  createBotUser(input: { handle: string; displayName: string; password?: string }): {
+    id: number;
+    handle: string;
+    displayName: string;
+    password: string;
+  } {
+    const { db, clock } = this.worldManager.current();
+    const handle = (input.handle ?? '').trim();
+    const displayName = (input.displayName ?? '').trim();
+
+    if (!/^[a-zA-Z0-9_]{2,20}$/.test(handle)) {
+      throw new ValidationError('handle 只能由字母、数字、下划线组成（2-20 字符）');
+    }
+    if (looksLikeBotHandle(handle)) {
+      throw new ValidationError(`handle "${handle}" 含暴露虚拟身份的命名约定，须用拟真名称`);
+    }
+    if (!displayName) throw new ValidationError('displayName 不能为空');
+
+    const password = input.password ?? randomBytes(9).toString('base64url');
+    if (password.length < 6) throw new ValidationError('密码至少 6 位');
+
+    if (db.prepare('SELECT 1 FROM users WHERE handle = ?').get(handle)) {
+      throw new ConflictError(`@${handle} 已存在`);
+    }
+
+    const r = db
+      .prepare('INSERT INTO users (handle, display_name, password_hash, is_bot, created_at) VALUES (?, ?, ?, 1, ?)')
+      .run(handle, displayName, hashPassword(password), clock.now());
+
+    return { id: Number(r.lastInsertRowid), handle, displayName, password };
   }
 
   // --- LLM Config ---

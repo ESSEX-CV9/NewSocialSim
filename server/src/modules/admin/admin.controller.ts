@@ -161,6 +161,13 @@ export class AdminController {
     reply.send({ users: this.service.listUsers() });
   };
 
+  createUser = async (
+    req: FastifyRequest<{ Body: { handle: string; displayName: string; password?: string } }>,
+    reply: FastifyReply,
+  ) => {
+    reply.status(201).send(this.service.createBotUser(req.body));
+  };
+
   // --- LLM Config ---
 
   getLlmConfig = async (_req: FastifyRequest, reply: FastifyReply) => {

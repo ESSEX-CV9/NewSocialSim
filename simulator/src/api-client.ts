@@ -104,6 +104,15 @@ export class ApiClient {
     await this.post('/api/admin/follows', { pairs }, adminToken);
   }
 
+  async adminCreateUser(adminToken: string, body: { handle: string; displayName: string; password?: string }): Promise<{
+    id: number;
+    handle: string;
+    displayName: string;
+    password: string;
+  }> {
+    return await this.post('/api/admin/users', body, adminToken) as { id: number; handle: string; displayName: string; password: string };
+  }
+
   async adminUpdateCounts(adminToken: string, postId: string, deltas: {
     likeCount?: number;
     repostCount?: number;
