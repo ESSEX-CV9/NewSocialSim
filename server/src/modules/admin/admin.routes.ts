@@ -65,8 +65,9 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
   app.post<{ Body: { handle: string; displayName: string; password?: string } }>(
     '/api/admin/users', { preHandler: requireAdmin }, controller.createUser);
 
-  // Roster (per-world driving config)
-  app.get('/api/admin/roster', { preHandler: requireAdmin }, controller.getRoster);
+  // Login-as: 凭 admin key 为某账号换一张登录票，供模拟器驱动（不存明文密码）
+  app.post<{ Body: { userId: number } }>(
+    '/api/admin/login-as', { preHandler: requireAdmin }, controller.loginAs);
 
   // LLM config
   app.get('/api/admin/llm-config', { preHandler: requireAdmin }, controller.getLlmConfig);

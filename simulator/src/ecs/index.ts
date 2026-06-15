@@ -3,5 +3,5 @@ export type {
   Entity, System, TickContext,
   ProfileComponent, ScheduleComponent, BehaviorComponent,
   EmotionComponent, TopicInterestComponent, AuthComponent,
-  SimulatorConfig, AccountConfig,
+  SimulatorConfig, DrivenAccount,
 } from './types.js';

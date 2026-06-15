@@ -12,6 +12,30 @@ export interface LoginResult {
   user: { id: string; handle: string; displayName: string };
 }
 
+/** 活动世界 npc 档案 = 被驱动账号的完整驱动配置（GET /api/admin/npc-profiles 形态）。 */
+export interface NpcProfileDto {
+  userId: number;
+  handle: string;
+  tier: 'core' | 'ambient';
+  personality?: string;
+  stance?: string;
+  writingStyle?: string;
+  interests: string[];
+  activeHoursStart: number;
+  activeHoursEnd: number;
+  postProbability: number;
+  likeProbability: number;
+  repostProbability: number;
+  replyProbability: number;
+  actionIntervalMinutes: number;
+}
+
+/** GET /api/admin/worlds/active 形态：含世界 id 与时钟（流速/暂停态）。 */
+export interface ActiveWorld {
+  meta: { id: string; clock: { simTimeMs: number; scale: number; paused: boolean } };
+  simTimeMs: number;
+}
+
 export class ApiClient {
   private baseUrl: string;
 
@@ -27,7 +51,8 @@ export class ApiClient {
   async createPost(token: string, content: string, replyToId?: string): Promise<{ id: string }> {
     const body: Record<string, string> = { content };
     if (replyToId) body.replyToId = replyToId;
-    return await this.post('/api/posts', body, token) as { id: string };
+    const res = await this.post('/api/posts', body, token) as { post: { id: string | number } };
+    return { id: String(res.post.id) };
   }
 
   async likePost(token: string, postId: string): Promise<void> {
@@ -113,13 +138,17 @@ export class ApiClient {
     return await this.post('/api/admin/users', body, adminToken) as { id: number; handle: string; displayName: string; password: string };
   }
 
-  async getRoster(adminToken: string): Promise<{ accounts: Array<Record<string, unknown>> }> {
-    return await this.get('/api/admin/roster', adminToken) as { accounts: Array<Record<string, unknown>> };
+  async getNpcProfiles(adminToken: string): Promise<{ profiles: NpcProfileDto[] }> {
+    return await this.get('/api/admin/npc-profiles', adminToken) as { profiles: NpcProfileDto[] };
   }
 
-  async getActiveWorld(): Promise<{ meta: { id: string } } | null> {
+  async adminLoginAs(adminToken: string, userId: number): Promise<{ token: string; userId: number; handle: string; displayName: string }> {
+    return await this.post('/api/admin/login-as', { userId }, adminToken) as { token: string; userId: number; handle: string; displayName: string };
+  }
+
+  async getActiveWorld(): Promise<ActiveWorld | null> {
     try {
-      return await this.get('/api/admin/worlds/active') as { meta: { id: string } };
+      return await this.get('/api/admin/worlds/active') as ActiveWorld;
     } catch {
       return null;
     }

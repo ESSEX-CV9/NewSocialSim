@@ -1,30 +1,33 @@
-import type { Entity, AccountConfig } from './types.js';
+import type { Entity, DrivenAccount } from './types.js';
 
 export class EntityRegistry {
   private entities = new Map<string, Entity>();
 
-  register(config: AccountConfig, userId: string): Entity {
+  register(account: DrivenAccount): Entity {
     const entity: Entity = {
-      id: userId,
+      id: account.userId,
       profile: {
-        userId,
-        handle: config.handle,
-        displayName: config.handle,
-        tier: config.tier,
-        interests: config.interests ?? [],
+        userId: account.userId,
+        handle: account.handle,
+        displayName: account.displayName,
+        tier: account.tier,
+        interests: account.interests,
+        ...(account.personality !== undefined ? { personality: account.personality } : {}),
+        ...(account.stance !== undefined ? { stance: account.stance } : {}),
+        ...(account.writingStyle !== undefined ? { writingStyle: account.writingStyle } : {}),
       },
       schedule: {
-        activeHoursStart: config.activeHoursStart ?? 0,
-        activeHoursEnd: config.activeHoursEnd ?? 24,
+        activeHoursStart: account.activeHoursStart,
+        activeHoursEnd: account.activeHoursEnd,
         nextActionAt: 0,
         timezone: 0,
       },
       behavior: {
-        postProbability: config.postProbability ?? (config.tier === 'core' ? 0.3 : 0.15),
-        likeProbability: config.likeProbability ?? 0.5,
-        repostProbability: config.repostProbability ?? 0.1,
-        replyProbability: config.replyProbability ?? (config.tier === 'core' ? 0.2 : 0.05),
-        actionIntervalMinutes: config.actionIntervalMinutes ?? (config.tier === 'core' ? 30 : 60),
+        postProbability: account.postProbability,
+        likeProbability: account.likeProbability,
+        repostProbability: account.repostProbability,
+        replyProbability: account.replyProbability,
+        actionIntervalMinutes: account.actionIntervalMinutes,
       },
       emotion: {
         mood: 'neutral',
@@ -34,7 +37,7 @@ export class EntityRegistry {
         topicWeights: new Map(),
       },
     };
-    this.entities.set(userId, entity);
+    this.entities.set(account.userId, entity);
     return entity;
   }
 

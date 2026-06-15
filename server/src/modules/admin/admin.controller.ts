@@ -168,8 +168,16 @@ export class AdminController {
     reply.status(201).send(this.service.createBotUser(req.body));
   };
 
-  getRoster = async (_req: FastifyRequest, reply: FastifyReply) => {
-    reply.send(this.service.getRoster());
+  loginAs = async (
+    req: FastifyRequest<{ Body: { userId: number } }>,
+    reply: FastifyReply,
+  ) => {
+    const claims = this.service.loginClaims(req.body.userId);
+    const token = await reply.jwtSign(
+      { sub: claims.sub, worldId: claims.worldId, handle: claims.handle },
+      { expiresIn: '30d' },
+    );
+    reply.send({ token, userId: claims.sub, handle: claims.handle, displayName: claims.displayName });
   };
 
   // --- LLM Config ---

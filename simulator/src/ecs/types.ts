@@ -66,24 +66,29 @@ export interface TickContext {
   deltaMs: number;
 }
 
+/** 模拟器启动配置：只含与世界无关的基础设施，不含任何特定世界的数据。
+ *  worldId / 账号名单 / 内容池均随活动世界从世界文件夹加载，不写在这里。 */
 export interface SimulatorConfig {
   apiBaseUrl: string;
-  worldId: string;
+  adminToken: string;
   tickIntervalMs: number;
-  accounts: AccountConfig[];
-  contentPool: string[];
 }
 
-export interface AccountConfig {
+/** 一个被驱动账号的完整配置，来自活动世界的 npc 档案。 */
+export interface DrivenAccount {
+  userId: string;
   handle: string;
-  password: string;
+  displayName: string;
   tier: 'core' | 'ambient';
-  interests?: string[];
-  activeHoursStart?: number;
-  activeHoursEnd?: number;
-  postProbability?: number;
-  likeProbability?: number;
-  repostProbability?: number;
-  replyProbability?: number;
-  actionIntervalMinutes?: number;
+  interests: string[];
+  personality?: string;
+  stance?: string;
+  writingStyle?: string;
+  activeHoursStart: number;
+  activeHoursEnd: number;
+  postProbability: number;
+  likeProbability: number;
+  repostProbability: number;
+  replyProbability: number;
+  actionIntervalMinutes: number;
 }

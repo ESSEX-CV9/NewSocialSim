@@ -367,17 +367,15 @@ export class AdminService {
     return { id: Number(r.lastInsertRowid), handle, displayName, password };
   }
 
-  /** 读取活动世界文件夹的账号 roster（驱动配置随世界走）。容忍 BOM、缺文件返回空。
-   *  数据形态对 server 透明，由模拟器解释（含 handle/password/tier/活跃时段/行为概率等）。 */
-  getRoster(): { accounts: Array<Record<string, unknown>> } {
+  /** 为指定账号签发登录票据所需的声明（凭 admin key）。模拟器拿声明换 JWT 后，
+   *  走与真人完全相同的用户端点驱动账号，任何地方不存明文密码。 */
+  loginClaims(userId: number): { sub: number; worldId: string; handle: string; displayName: string } {
     const ctx = this.worldManager.current();
-    const filePath = path.join(this.worldManager.getWorldDir(ctx.worldId), 'roster.json');
-    if (!fs.existsSync(filePath)) return { accounts: [] };
-    const raw = fs.readFileSync(filePath, 'utf-8').replace(/^﻿/, '');
-    const parsed = JSON.parse(raw) as unknown;
-    if (Array.isArray(parsed)) return { accounts: parsed as Array<Record<string, unknown>> };
-    const accounts = (parsed as { accounts?: unknown }).accounts;
-    return { accounts: Array.isArray(accounts) ? (accounts as Array<Record<string, unknown>>) : [] };
+    const user = ctx.db
+      .prepare('SELECT id, handle, display_name AS displayName FROM users WHERE id = ?')
+      .get(userId) as { id: number; handle: string; displayName: string } | undefined;
+    if (!user) throw new NotFoundError(`User ${userId} not found`);
+    return { sub: user.id, worldId: ctx.worldId, handle: user.handle, displayName: user.displayName };
   }
 
   // --- LLM Config ---
