@@ -1,20 +1,24 @@
 import path from 'node:path';
 import { mkdirSync } from 'node:fs';
 import Database from 'better-sqlite3';
-import type { SimTraceEvent } from '@socialsim/shared';
+import type { SimTraceEvent, StoredSimTraceEvent } from '@socialsim/shared';
 import { logger } from '../logger.js';
 
 /**
  * 决策轨迹 sink：把模拟器每次写世界的轨迹落到该世界独占的 sim-trace.db。
  * 分库原则：轨迹属观测线，模拟器独占、绝不进社交站 world.db。
  * 库随活动世界切换：setWorld 关旧库、开新库。落盘失败降级（记一次告警后静默），不中断写世界。
+ * 落盘后若配了 sinkUrl，尽力而为 POST 一份（带 db 自增 id）供编辑器时间轴实时长块；
+ * 推流失败被吞，绝不因 sink 不可达中断写世界。
  */
 export class TraceSink {
   private db: Database.Database | null = null;
   private insertStmt: Database.Statement | null = null;
   private worldId: string | null = null;
+  private sinkWarned = false;
 
-  constructor(private dataDir: string) {}
+  /** sinkUrl 为编辑器后端 ingest 基址；空/缺失则只落盘不推流。 */
+  constructor(private dataDir: string, private sinkUrl?: string) {}
 
   /** 切到某世界的轨迹库；同世界重复调用为 no-op。 */
   setWorld(worldId: string): void {
@@ -79,7 +83,7 @@ export class TraceSink {
   emit(event: SimTraceEvent): void {
     if (!this.insertStmt) return;
     try {
-      this.insertStmt.run({
+      const info = this.insertStmt.run({
         at: event.at,
         simTime: event.simTime,
         entity: event.entity,
@@ -93,9 +97,26 @@ export class TraceSink {
         mediaReason: event.mediaReason ?? null,
         targetPostId: event.targetPostId ?? null,
       });
+      this.push({ ...event, id: Number(info.lastInsertRowid) });
     } catch (err) {
       logger.error('Trace sink emit failed:', err);
     }
+  }
+
+  /** 落盘后尽力而为推一份到编辑器后端 ingest；fire-and-forget，失败只首次告警一次。 */
+  private push(event: StoredSimTraceEvent): void {
+    if (!this.sinkUrl) return;
+    const url = `${this.sinkUrl.replace(/\/$/, '')}/api/trace/ingest`;
+    void fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(event),
+    }).catch(() => {
+      if (!this.sinkWarned) {
+        this.sinkWarned = true;
+        logger.warn(`Trace sink push unreachable (${url}); 仅本地落盘，不再重复告警`);
+      }
+    });
   }
 
   close(): void {

@@ -50,7 +50,7 @@ export class Simulator {
 
   constructor(private config: SimulatorConfig) {
     this.api = new ApiClient({ baseUrl: config.apiBaseUrl });
-    this.traceSink = new TraceSink(config.dataDir);
+    this.traceSink = new TraceSink(config.dataDir, config.traceSinkUrl);
   }
 
   start(): void {

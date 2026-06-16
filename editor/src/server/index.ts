@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import Fastify from 'fastify';
+import type { StoredSimTraceEvent } from '@socialsim/shared';
 import { TraceReader } from './trace-reader.js';
 import { TraceSseHub } from './trace-sse.js';
 
@@ -158,6 +159,17 @@ app.get('/api/trace/stream', (req, reply) => {
   reply.hijack();
   const unregister = traceSse.addClient(reply.raw);
   req.raw.on('close', unregister);
+});
+
+/** 轨迹 ingest：模拟器落盘后尽力而为 POST 一份，后端转发给时间轴 SSE 订阅者。 */
+app.post<{ Body: StoredSimTraceEvent }>('/api/trace/ingest', async (req, reply) => {
+  const e = req.body;
+  if (!e || typeof e.id !== 'number' || typeof e.entity !== 'string') {
+    reply.status(400);
+    return { error: 'bad trace event' };
+  }
+  traceSse.broadcast(e);
+  return { ok: true };
 });
 
 app

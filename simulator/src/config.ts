@@ -17,6 +17,8 @@ export function loadConfig(configPath?: string): SimulatorConfig {
     adminToken: process.env.SOCIALSIM_ADMIN_KEY ?? DEFAULT_ADMIN_TOKEN,
     tickIntervalMs: 10_000,
     dataDir: DEFAULT_DATA_DIR,
+    // 默认指向本机编辑器后端；编辑器未起时 POST 失败被吞，不影响写世界。空串=关闭推流。
+    traceSinkUrl: process.env.SOCIALSIM_TRACE_SINK_URL ?? 'http://127.0.0.1:5176',
   };
 
   if (configPath && existsSync(configPath)) {
@@ -27,6 +29,7 @@ export function loadConfig(configPath?: string): SimulatorConfig {
       adminToken: parsed.adminToken ?? base.adminToken,
       tickIntervalMs: parsed.tickIntervalMs ?? base.tickIntervalMs,
       dataDir: parsed.dataDir ?? base.dataDir,
+      traceSinkUrl: parsed.traceSinkUrl ?? base.traceSinkUrl,
     };
   }
 
