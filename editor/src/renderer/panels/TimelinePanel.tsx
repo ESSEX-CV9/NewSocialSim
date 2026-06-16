@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { TimelineItem, PostView } from '@socialsim/shared';
+import type { TimelineItem, PostView, InteractionEvent } from '@socialsim/shared';
 import { useSelectedBlock, setSelectedBlock } from '../state/selection.js';
 import { ACTION_COLOR, formatSimTime } from './trace-meta.js';
 import { Avatar } from './Avatar.js';
-import { type TimelineBlock, itemKey, itemToBlock, postToBlock, blockLabel } from './timeline-model.js';
+import { type TimelineBlock, interactionKey, interactionToBlock, postToBlock, blockLabel } from './timeline-model.js';
 
 /**
  * 时间轴面板（Premiere 范式，见 docs/m5-design.md）：横轴为时间、纵轴每行一个账号，
@@ -72,13 +72,13 @@ function niceStepMin(pxPerMin: number): number {
   return NICE_STEPS.find((n) => n >= target) ?? NICE_STEPS[NICE_STEPS.length - 1]!;
 }
 function isActBlock(b: TimelineBlock): boolean {
-  return b.kind === 'repost';
+  return b.kind !== 'post'; // 赞/转/关注均为灰色小条（互动）
 }
 function estBlockWidth(b: TimelineBlock): number {
   return Math.min(230, blockLabel(b).length * 7 + 18);
 }
 function blockColor(b: TimelineBlock): string {
-  return b.kind === 'repost' ? ACTION_COLOR.repost : ACTION_COLOR[b.action];
+  return b.kind === 'post' ? ACTION_COLOR[b.action] : ACTION_COLOR[b.kind];
 }
 
 function computeLayout(blocks: TimelineBlock[], lanes: string[], originSim: number, pxPerMin: number): Layout {
@@ -117,7 +117,7 @@ function computeLayout(blocks: TimelineBlock[], lanes: string[], originSim: numb
 
 export function TimelinePanel(_props: IDockviewPanelProps) {
   const [posts, setPosts] = useState<PostView[]>([]); // 顶层帖（global）+ 回复（per-account）
-  const [reposts, setReposts] = useState<TimelineItem[]>([]); // 转发（per-account）
+  const [acts, setActs] = useState<Array<{ actor: string; ev: InteractionEvent }>>([]); // 赞/转/关注（per-account）
   const [worldId, setWorldId] = useState<string | null>(null);
   const selected = useSelectedBlock();
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +131,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const tlRef = useRef<HTMLDivElement | null>(null);
   const expectedLeftRef = useRef(0);
   const postIdsRef = useRef<Set<number>>(new Set());
-  const repostKeysRef = useRef<Set<string>>(new Set());
+  const actKeysRef = useRef<Set<string>>(new Set());
   const fetchedExtraRef = useRef<Set<string>>(new Set());
   const oldestCursorRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
@@ -161,30 +161,28 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     });
     if (fresh.length) setPosts((prev) => [...prev, ...fresh]);
   }
-  function addReposts(items: TimelineItem[]): void {
-    const fresh = items.filter((it) => {
-      if (it.type !== 'repost' || !it.repostedBy) return false;
-      const k = itemKey(it);
-      if (repostKeysRef.current.has(k)) return false;
-      repostKeysRef.current.add(k);
+  function addActs(actor: string, events: InteractionEvent[]): void {
+    const fresh = events.filter((ev) => {
+      const k = interactionKey(actor, ev);
+      if (actKeysRef.current.has(k)) return false;
+      actKeysRef.current.add(k);
       return true;
     });
-    if (fresh.length) setReposts((prev) => [...prev, ...fresh]);
+    if (fresh.length) setActs((prev) => [...prev, ...fresh.map((ev) => ({ actor, ev }))]);
   }
-  /** 把一页全站流并入：顶层帖入 posts、转发入 reposts。 */
+  /** 把一页全站流并入：取顶层帖（转发等互动改由 per-account /interactions 取）。 */
   function ingestFeed(items: TimelineItem[]): void {
     addPosts(items.filter((it) => it.type === 'post').map((it) => it.post));
-    addReposts(items);
   }
 
   async function loadInitial(): Promise<void> {
     postIdsRef.current = new Set();
-    repostKeysRef.current = new Set();
+    actKeysRef.current = new Set();
     fetchedExtraRef.current = new Set();
     oldestCursorRef.current = null;
     prevMinRef.current = null;
     setPosts([]);
-    setReposts([]);
+    setActs([]);
     try {
       let cursor: string | undefined;
       const acc: TimelineItem[] = [];
@@ -238,22 +236,22 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     } catch {
       /* ignore */
     }
-    // 转发
+    // 互动（赞/转/关注）
     try {
       let cursor: string | undefined;
-      const rps: TimelineItem[] = [];
+      const evs: InteractionEvent[] = [];
       for (let p = 0; p < EXTRA_PAGE_CAP; p++) {
-        const u = new URL(`${backend}/api/users/${encodeURIComponent(handle)}/timeline`);
+        const u = new URL(`${backend}/api/users/${encodeURIComponent(handle)}/interactions`);
         u.searchParams.set('limit', '50');
         if (cursor) u.searchParams.set('cursor', cursor);
         const r = await fetch(u);
         if (!r.ok) break;
-        const j = (await r.json()) as { items: TimelineItem[]; nextCursor: string | null };
-        rps.push(...j.items);
+        const j = (await r.json()) as { items: InteractionEvent[]; nextCursor: string | null };
+        evs.push(...j.items);
         if (!j.nextCursor) break;
         cursor = j.nextCursor;
       }
-      addReposts(rps);
+      addActs(handle, evs);
     } catch {
       /* ignore */
     }
@@ -330,17 +328,17 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const names = useMemo(() => {
     const m: Record<string, string> = {};
     for (const p of posts) m[p.author.handle] = p.author.displayName;
-    for (const it of reposts) {
-      m[it.post.author.handle] = it.post.author.displayName;
-      if (it.repostedBy) m[it.repostedBy.handle] = it.repostedBy.displayName;
+    for (const a of acts) {
+      if (a.ev.type === 'follow') m[a.ev.target.handle] = a.ev.target.displayName;
+      else m[a.ev.post.author.handle] = a.ev.post.author.displayName;
     }
     return m;
-  }, [posts, reposts]);
+  }, [posts, acts]);
   const nameOf = (h: string): string => names[h] || h;
 
   const blocks = useMemo<TimelineBlock[]>(
-    () => [...posts.map(postToBlock), ...reposts.map(itemToBlock)],
-    [posts, reposts],
+    () => [...posts.map(postToBlock), ...acts.map((a) => interactionToBlock(a.actor, names[a.actor] || a.actor, a.ev))],
+    [posts, acts, names],
   );
 
   const { lanes, minTime, maxTime } = useMemo(() => {

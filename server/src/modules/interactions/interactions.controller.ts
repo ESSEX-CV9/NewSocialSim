@@ -44,4 +44,11 @@ export class InteractionsController {
   ) => {
     reply.send(this.service.listBookmarks(req.user.sub, req.query.cursor, req.query.limit));
   };
+
+  listUserInteractions = async (
+    req: FastifyRequest<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>,
+    reply: FastifyReply,
+  ) => {
+    reply.send(this.service.listUserActivity(req.params.handle, req.user?.sub ?? null, req.query.cursor, req.query.limit));
+  };
 }

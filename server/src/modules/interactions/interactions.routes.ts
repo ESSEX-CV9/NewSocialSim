@@ -11,6 +11,7 @@ const idParamsSchema = {
 export interface InteractionsRoutesDeps {
   interactionsService: InteractionsService;
   requireAuth: preHandlerHookHandler;
+  optionalAuth: preHandlerHookHandler;
 }
 
 export function registerInteractionsRoutes(
@@ -32,6 +33,12 @@ export function registerInteractionsRoutes(
     '/api/bookmarks',
     { preHandler: deps.requireAuth, schema: { querystring: bookmarksQuerySchema } },
     controller.listBookmarks,
+  );
+  // 某账号的互动事件流（赞/转/关注，带时间）——供编辑器时间轴；免鉴权（匿名 viewer）。
+  app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>(
+    '/api/users/:handle/interactions',
+    { preHandler: deps.optionalAuth, schema: { querystring: bookmarksQuerySchema } },
+    controller.listUserInteractions,
   );
 }
 

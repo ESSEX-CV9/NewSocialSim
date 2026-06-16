@@ -95,7 +95,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     mediaService,
     linkCardsService,
   );
-  const interactionsService = new InteractionsService(worldManager, postsService, notificationsService);
+  const interactionsService = new InteractionsService(worldManager, postsService, notificationsService, usersService);
   const followsService = new FollowsService(worldManager, usersService, notificationsService);
   const blocksService = new BlocksService(worldManager, usersService, followsService);
   const timelineService = new TimelineService(worldManager, postsService, usersService);
@@ -112,7 +112,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerAuthRoutes(app, { authService, worldManager, requireAuth });
   registerUsersRoutes(app, { usersService, requireAuth, optionalAuth });
   registerPostsRoutes(app, { postsService, requireAuth, optionalAuth });
-  registerInteractionsRoutes(app, { interactionsService, requireAuth });
+  registerInteractionsRoutes(app, { interactionsService, requireAuth, optionalAuth });
   registerFollowsRoutes(app, { followsService, requireAuth });
   registerBlocksRoutes(app, { blocksService, requireAuth });
   registerNotificationsRoutes(app, { notificationsService, requireAuth });

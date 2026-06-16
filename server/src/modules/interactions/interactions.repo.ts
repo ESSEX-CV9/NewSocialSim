@@ -29,6 +29,32 @@ export const interactionsRepo = {
     return result.changes > 0;
   },
 
+  /** 某账号的互动事件（赞/转/关注），按互动时间倒序，UNION 三表；游标 [created_at, kind, ref]。 */
+  listUserActivity(
+    db: WorldDb,
+    userId: number,
+    before: { ts: number; kind: string; ref: number } | null,
+    limit: number,
+  ): { kind: 'like' | 'repost' | 'follow'; ref: number; created_at: number }[] {
+    // 排序键：created_at DESC, kind ASC, ref DESC。游标谓词按各分支字面 kind 注入。
+    const pred = (kind: string, refCol: string) =>
+      before
+        ? `AND (created_at < @cts OR (created_at = @cts AND '${kind}' > @ck) OR (created_at = @cts AND '${kind}' = @ck AND ${refCol} < @cref))`
+        : '';
+    const sql = `
+      SELECT kind, ref, created_at FROM (
+        SELECT 'like'   AS kind, post_id     AS ref, created_at FROM likes   WHERE user_id     = @uid ${pred('like', 'post_id')}
+        UNION ALL
+        SELECT 'repost' AS kind, post_id     AS ref, created_at FROM reposts WHERE user_id     = @uid ${pred('repost', 'post_id')}
+        UNION ALL
+        SELECT 'follow' AS kind, followee_id AS ref, created_at FROM follows WHERE follower_id = @uid ${pred('follow', 'followee_id')}
+      )
+      ORDER BY created_at DESC, kind ASC, ref DESC
+      LIMIT @lim`;
+    const params = { uid: userId, lim: limit, ...(before ? { cts: before.ts, ck: before.kind, cref: before.ref } : {}) };
+    return db.prepare(sql).all(params) as { kind: 'like' | 'repost' | 'follow'; ref: number; created_at: number }[];
+  },
+
   /** 某用户收藏的帖子，按收藏时间倒序；marked_at 供游标使用 */
   listBookmarkedBy(
     db: WorldDb,

@@ -1,14 +1,14 @@
 import type { IDockviewPanelProps } from 'dockview';
 import type { PostView } from '@socialsim/shared';
 import { useSelectedBlock, setSelectedBlock } from '../state/selection.js';
-import type { TimelineBlock, PostBlock, RepostBlock } from './timeline-model.js';
+import type { TimelineBlock, PostBlock, LikeBlock, RepostBlock, FollowBlock } from './timeline-model.js';
 import { formatSimTime } from './trace-meta.js';
 import { Avatar } from './Avatar.js';
 
 /**
  * 检视器：展示当前选中块的详情（样式对齐 docs/editor-mockup.html）。
- * 帖子块 → 帖子预览（作者/正文/计数/媒体/形态）；转发块 → 转发者 + 被转发原帖预览。
- * 决策轨迹"为什么"待 postId 合并后作为帖子块的增强字段接入。
+ * 帖子块→帖子预览；赞/转块→互动者 + 被作用帖预览；关注块→关注者 + 被关注者。
+ * 决策轨迹"为什么"待 postId 合并后作为帖子块增强接入。
  */
 export function InspectorPanel(_props: IDockviewPanelProps) {
   const block = useSelectedBlock();
@@ -22,13 +22,14 @@ export function InspectorPanel(_props: IDockviewPanelProps) {
   }
 
   const pill = blockPill(block);
+  const title = block.kind === 'follow' ? '关注' : `帖子 #${block.post.id}`;
   return (
     <div className="text-xs text-(--text) overflow-y-auto h-full">
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-(--border)">
         <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md text-white" style={{ background: pill.color }}>
           {pill.label}
         </span>
-        <b className="text-[13px]">帖子 #{block.post.id}</b>
+        <b className="text-[13px]">{title}</b>
         <button
           onClick={() => setSelectedBlock(null)}
           className="ml-auto text-(--dim) hover:text-(--text) cursor-pointer"
@@ -37,7 +38,10 @@ export function InspectorPanel(_props: IDockviewPanelProps) {
           <i className="ri-close-line" />
         </button>
       </div>
-      {block.kind === 'post' ? <PostDetail block={block} /> : <RepostDetail block={block} />}
+      {block.kind === 'post' && <PostDetail block={block} />}
+      {block.kind === 'like' && <ActorPostDetail block={block} verb="赞了" />}
+      {block.kind === 'repost' && <ActorPostDetail block={block} verb="转发了" />}
+      {block.kind === 'follow' && <FollowDetail block={block} />}
     </div>
   );
 }
@@ -57,24 +61,40 @@ function PostDetail({ block }: { block: PostBlock }) {
   );
 }
 
-function RepostDetail({ block }: { block: RepostBlock }) {
+function ActorPostDetail({ block, verb }: { block: LikeBlock | RepostBlock; verb: string }) {
   return (
     <>
       <div className="flex items-center gap-1.5 px-3 pt-3 text-(--dim)">
-        <i className="ri-repeat-line" />
-        <Avatar handle={block.by.handle} name={block.by.displayName} size={16} />
-        <span className="text-(--text)">{block.by.displayName}</span> 转发了
+        <i className={block.kind === 'like' ? 'ri-heart-line' : 'ri-repeat-line'} />
+        <Avatar handle={block.entity} name={block.actorName} size={16} />
+        <span className="text-(--text)">{block.actorName}</span> {verb}
       </div>
       <PostCard post={block.post} />
-      <Field k="转发者">{block.by.displayName} · @{block.by.handle}</Field>
-      <Field k="转发时间"><span className="font-mono">{formatSimTime(block.time)}</span></Field>
+      <Field k={block.kind === 'like' ? '点赞者' : '转发者'}>{block.actorName} · @{block.entity}</Field>
+      <Field k={block.kind === 'like' ? '点赞时间' : '转发时间'}><span className="font-mono">{formatSimTime(block.time)}</span></Field>
       <Field k="原帖作者">{block.post.author.displayName} · @{block.post.author.handle}</Field>
       <Field k="原帖 id"><span className="font-mono">#{block.post.id}</span></Field>
     </>
   );
 }
 
-/** 帖子预览卡（作者/正文/媒体/计数）。 */
+function FollowDetail({ block }: { block: FollowBlock }) {
+  return (
+    <>
+      <div className="flex items-center gap-1.5 px-3 py-3 border-b border-[#15171b]">
+        <Avatar handle={block.entity} name={block.actorName} size={20} />
+        <span className="font-semibold">{block.actorName}</span>
+        <i className="ri-arrow-right-line text-(--dim)" /> 关注了
+        <Avatar handle={block.target.handle} name={block.target.displayName} size={20} />
+        <span className="font-semibold">{block.target.displayName}</span>
+      </div>
+      <Field k="关注者">{block.actorName} · @{block.entity}</Field>
+      <Field k="被关注者">{block.target.displayName} · @{block.target.handle}</Field>
+      <Field k="关注时间"><span className="font-mono">{formatSimTime(block.time)}</span></Field>
+    </>
+  );
+}
+
 function PostCard({ post: p }: { post: PostView }) {
   return (
     <div className="m-3 px-3 py-2.5 rounded-xl bg-(--panel2) border border-(--border)">
@@ -100,10 +120,17 @@ function PostCard({ post: p }: { post: PostView }) {
 }
 
 function blockPill(b: TimelineBlock): { label: string; color: string } {
-  if (b.kind === 'repost') return { label: '转发', color: '#3a3f46' };
-  if (b.action === 'reply') return { label: '回复', color: 'var(--green)' };
-  if (b.action === 'quote') return { label: '引用', color: 'var(--amber)' };
-  return { label: '顶层帖', color: 'var(--blue)' };
+  switch (b.kind) {
+    case 'like': return { label: '点赞', color: '#3a3f46' };
+    case 'repost': return { label: '转发', color: '#3a3f46' };
+    case 'follow': return { label: '关注', color: '#3a3f46' };
+    default:
+      return b.action === 'reply'
+        ? { label: '回复', color: 'var(--green)' }
+        : b.action === 'quote'
+          ? { label: '引用', color: 'var(--amber)' }
+          : { label: '顶层帖', color: 'var(--blue)' };
+  }
 }
 
 function Field({ k, children }: { k: string; children: React.ReactNode }) {

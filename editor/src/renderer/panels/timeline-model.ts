@@ -1,30 +1,45 @@
-import type { PostView, TimelineItem, UserSummary } from '@socialsim/shared';
+import type { PostView, UserSummary, InteractionEvent } from '@socialsim/shared';
 
 /**
  * 时间轴块模型：块 = 世界真实内容（按 m5-design.md，时间轴是查看/编辑全部帖子与互动的面板）。
- * 数据源为社交站全站时间流 GET /api/timeline/global——纯读 world.db、与模拟器无关。
- * - 帖子/回复/引用：TimelineItem.type='post'。
- * - 转发：TimelineItem.type='repost'（一种互动，由 repostedBy 在 activityAt 转发某帖）。
- * 赞/关注等其余互动需服务端互动事件流端点，后续轮次接入；决策轨迹"为什么"亦后续以 postId 合并。
+ * - 帖子/回复/引用：社交站全站流 /api/timeline/global（顶层帖）+ 按账号 ?type=replies（回复）。
+ * - 互动（赞/转/关注）：按账号 /api/users/:handle/interactions（带发生时间 at）。
+ * 全部来自 world.db、与模拟器无关；决策轨迹"为什么"待 postId 合并后作为帖子块增强。
  */
 
 export interface PostBlock {
   kind: 'post';
   key: string;
   entity: string; // 作者 handle（轨道）
-  time: number; // activityAt（= 发布的模拟时间）
+  time: number; // post.createdAt
   action: 'post' | 'reply' | 'quote';
   post: PostView;
+}
+export interface LikeBlock {
+  kind: 'like';
+  key: string;
+  entity: string; // 点赞者 handle
+  time: number; // 点赞时间
+  actorName: string;
+  post: PostView; // 被赞帖
 }
 export interface RepostBlock {
   kind: 'repost';
   key: string;
-  entity: string; // 转发者 handle（轨道）
-  time: number; // activityAt（转发的模拟时间）
-  post: PostView; // 被转发的原帖
-  by: UserSummary; // 转发者
+  entity: string; // 转发者 handle
+  time: number; // 转发时间
+  actorName: string;
+  post: PostView; // 原帖
 }
-export type TimelineBlock = PostBlock | RepostBlock;
+export interface FollowBlock {
+  kind: 'follow';
+  key: string;
+  entity: string; // 关注者 handle
+  time: number; // 关注时间
+  actorName: string;
+  target: UserSummary; // 被关注者
+}
+export type TimelineBlock = PostBlock | LikeBlock | RepostBlock | FollowBlock;
 
 export function postAction(p: PostView): 'post' | 'reply' | 'quote' {
   if (p.quoteOfId != null) return 'quote';
@@ -32,26 +47,29 @@ export function postAction(p: PostView): 'post' | 'reply' | 'quote' {
   return 'post';
 }
 
-/** 全站流条目的稳定 key（用于去重与块标识）。 */
-export function itemKey(it: TimelineItem): string {
-  return it.type === 'repost' && it.repostedBy ? `repost:${it.post.id}:${it.repostedBy.id}` : `post:${it.post.id}`;
-}
-
-/** PostView → 帖子块（顶层帖 / 回复 / 引用）。 */
 export function postToBlock(p: PostView): PostBlock {
   return { kind: 'post', key: `post:${p.id}`, entity: p.author.handle, time: p.createdAt, action: postAction(p), post: p };
 }
 
-/** TimelineItem → 时间轴块。 */
-export function itemToBlock(it: TimelineItem): TimelineBlock {
-  if (it.type === 'repost' && it.repostedBy) {
-    return { kind: 'repost', key: itemKey(it), entity: it.repostedBy.handle, time: it.activityAt, post: it.post, by: it.repostedBy };
-  }
-  return { kind: 'post', key: itemKey(it), entity: it.post.author.handle, time: it.activityAt, action: postAction(it.post), post: it.post };
+/** 互动事件去重 key（actor + 对象）。 */
+export function interactionKey(actor: string, ev: InteractionEvent): string {
+  return ev.type === 'follow' ? `follow:${actor}:${ev.target.id}` : `${ev.type}:${actor}:${ev.post.id}`;
 }
 
-/** 块上显示的文字：帖子用正文片段，转发用"转 {原作者}"。 */
+/** 互动事件 → 块；actorName 为互动者昵称（渲染时由 nameOf 解析传入）。 */
+export function interactionToBlock(actor: string, actorName: string, ev: InteractionEvent): TimelineBlock {
+  if (ev.type === 'follow') {
+    return { kind: 'follow', key: interactionKey(actor, ev), entity: actor, time: ev.at, actorName, target: ev.target };
+  }
+  return { kind: ev.type, key: interactionKey(actor, ev), entity: actor, time: ev.at, actorName, post: ev.post };
+}
+
+/** 块上显示的文字。 */
 export function blockLabel(b: TimelineBlock): string {
-  if (b.kind === 'repost') return `转 ${b.post.author.displayName}`;
-  return b.post.content?.trim() || '（无正文）';
+  switch (b.kind) {
+    case 'post': return b.post.content?.trim() || '（无正文）';
+    case 'like': return `赞 ${b.post.author.displayName}`;
+    case 'repost': return `转 ${b.post.author.displayName}`;
+    case 'follow': return `关注 ${b.target.displayName}`;
+  }
 }

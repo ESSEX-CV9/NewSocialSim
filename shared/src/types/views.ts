@@ -58,6 +58,15 @@ export interface TimelineItem {
   activityAt: number;
 }
 
+/**
+ * 某账号的互动事件（赞 / 转发 / 关注），带发生时间 `at`（模拟时间，= 互动 created_at）。
+ * 供编辑器时间轴把互动落在正确时刻；真人与 NPC 的互动同源（world.db），与模拟器无关。
+ */
+export type InteractionEvent =
+  | { type: 'like'; at: number; post: PostView }
+  | { type: 'repost'; at: number; post: PostView }
+  | { type: 'follow'; at: number; target: UserSummary };
+
 export type NotificationType = 'reply' | 'quote' | 'like' | 'repost' | 'follow' | 'mention';
 
 export interface NotificationView {

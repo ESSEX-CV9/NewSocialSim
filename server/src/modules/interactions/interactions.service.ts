@@ -1,8 +1,9 @@
-import type { Page, PostView } from '@socialsim/shared';
-import { decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
+import type { InteractionEvent, Page, PostView } from '@socialsim/shared';
+import { decodeCursor, decodeTsIdCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import type { NotificationsService } from '../notifications/notifications.service.js';
 import { clampLimit, type PostsService } from '../posts/posts.service.js';
+import type { UsersService } from '../users/users.service.js';
 import { interactionsRepo } from './interactions.repo.js';
 
 export interface InteractionResult {
@@ -10,12 +11,46 @@ export interface InteractionResult {
   count: number;
 }
 
+function decodeActivityCursor(cursor?: string): { ts: number; kind: string; ref: number } | null {
+  const parts = decodeCursor(cursor);
+  if (!parts || parts.length !== 3) return null;
+  const [ts, kind, ref] = parts;
+  if (typeof ts !== 'number' || typeof kind !== 'string' || typeof ref !== 'number') return null;
+  return { ts, kind, ref };
+}
+
 export class InteractionsService {
   constructor(
     private readonly worldManager: WorldManager,
     private readonly postsService: PostsService,
     private readonly notificationsService: NotificationsService,
+    private readonly usersService: UsersService,
   ) {}
+
+  /** 某账号的互动事件流（赞/转/关注），按互动时间倒序、游标分页——供编辑器时间轴把互动落到正确时刻。 */
+  listUserActivity(handle: string, viewerId: number | null, cursor?: string, limit?: number): Page<InteractionEvent> {
+    const profile = this.usersService.getProfileByHandle(handle);
+    const { db } = this.worldManager.current();
+    const pageSize = clampLimit(limit);
+    const rows = interactionsRepo.listUserActivity(db, profile.id, decodeActivityCursor(cursor), pageSize + 1);
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+    const items: InteractionEvent[] = [];
+    for (const r of pageRows) {
+      try {
+        if (r.kind === 'follow') {
+          const p = this.usersService.getProfileById(r.ref);
+          items.push({ type: 'follow', at: r.created_at, target: { id: p.id, handle: p.handle, displayName: p.displayName, avatarUrl: p.avatarUrl, verified: p.verified } });
+        } else {
+          items.push({ type: r.kind, at: r.created_at, post: this.postsService.getView(r.ref, viewerId) });
+        }
+      } catch {
+        // 被作用对象已不存在（硬删等），跳过该事件，不让整页崩。
+      }
+    }
+    const last = pageRows[pageRows.length - 1];
+    return { items, nextCursor: hasMore && last ? encodeCursor([last.created_at, last.kind, last.ref]) : null };
+  }
 
   like(viewerId: number, postId: number): InteractionResult {
     return this.set('likes', viewerId, postId, true);
