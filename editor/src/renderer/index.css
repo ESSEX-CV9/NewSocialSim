@@ -29,6 +29,30 @@ body {
   overflow: hidden;
 }
 
+/* 主题化滚动条（Chromium / Electron）：细、圆角、悬停高亮，替代系统默认条。 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+  /* 2px 透明边框 + padding-box 裁切，使滑块看起来更细、与轨道留白 */
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dim);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* dockview 暗色微调，贴近 X 系配色。 */
 .dockview-theme-abyss {
   --dv-background-color: var(--bg);
