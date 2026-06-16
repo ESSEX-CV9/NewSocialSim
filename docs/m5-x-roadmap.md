@@ -58,12 +58,19 @@
 - **验收**：执行 `npm run dev:editor` 弹出 Electron 窗口；窗内能从编辑器后端取到当前活动世界 id。
 - **交接提示**：旧临时编辑器整体废弃，不保留、不迁移其面板代码。编辑器后端是 renderer 的唯一数据源，renderer 不直接访问数据库、不绕过后端直连社交站 server。社交站 `server` 与 `simulator` 当前仍各自 `dev:server` / `dev:simulator` 单跑，Electron 连它们；三者整体打包进 Electron 留至 M5-6。开发期 Electron 加载 vite dev server，保留热重载。
 
-### 0.5 多窗格壳 ✅
+### 0.5 多窗格壳（Blender 式工作区）✅
 
-- **目标**：renderer 实现可拖拽 / 分割的多窗格布局与面板注册表，面板按注册表挂载，空面板占位。
-- **改动**：`editor/src/renderer/`（窗格布局组件、面板注册表、空面板占位）。
-- **验收**：Electron 窗内出现可拖拽、可上下左右分割的窗格区；面板注册表注册一个占位面板即在窗格内可选可挂。
-- **交接提示**：布局形态对标 IDE / Premiere（同屏并列多面板，如时间轴 + 轨迹详情 + 检视器）。后续每个里程碑的面板都注册进此注册表，不另起页面路由。
+- **目标**：renderer 实现 Blender 式工作区——dockview 自由拖拽/分割，每格是一个 PaneHost（顶部下拉切换本格显示哪种面板），配 X 系配色 + 顶栏 + 底部状态条 + 创作助手悬浮球；去掉 mockup 的左侧图标 rail。
+- **改动**：`editor/src/renderer/` 的 `App.tsx`（顶栏/状态条/dockview/FAB 壳）、`panels/PaneHost.tsx`（每格类型下拉）、`panels/registry.ts`（全部面板登记，console 真实其余占位 + `panelById`）、`hooks/useActiveWorld.ts`（顶栏/状态条共用的活动世界轮询+推算）、`index.css`（mockup 配色变量 + dockview 暗色微调）。
+- **验收**：Electron 窗内为深色 X 系外壳；工作区每格顶部下拉可切面板类型；可拖拽分割/合并/调宽；「+新建格」新挂一格；右下创作助手悬浮球可开合。
+- **交接提示**：配色与外壳对齐 `docs/editor-mockup.html`。后续每个里程碑的面板把 `registry` 里对应项的 component 从占位换成实现即可，不另起页面路由、不动壳。
+
+### 0.5b 预设布局 + 跟随世界存档 ⬜
+
+- **目标**：提供若干推荐布局（观察 / NPC 建设 / 内容池 / 设定），用户可保存自己的布局；布局随世界走。
+- **改动**：`editor/src/renderer/`（预设布局构建器 + 顶栏布局选择器 + 保存/恢复）；`editor/src/server/`（按活动世界读写 `data/worlds/<id>/editor-layouts.json`，需 dataDir 基础设施配置）。
+- **验收**：切换预设即换一整套窗格布局；保存当前布局后重开编辑器/切回该世界能恢复；布局文件落在该世界文件夹、复制世界即带走。
+- **交接提示**：布局即 dockview `api.toJSON()`；预设以编程方式构建（addPanel 配置）而非手写 JSON，避免脆。布局属编辑器 UI 配置、随世界文件夹（配置随世界），不进 world.db。
 
 ### 0.6 控制台·读态 ✅
 
