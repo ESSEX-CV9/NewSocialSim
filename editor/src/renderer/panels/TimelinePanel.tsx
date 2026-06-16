@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { StoredSimTraceEvent, PostView, SimTraceAction } from '@socialsim/shared';
+import type { TimelineItem } from '@socialsim/shared';
 import { useSelectedBlock, setSelectedBlock } from '../state/selection.js';
-import { ACTION_COLOR, ACTION_LABEL, formatSimTime } from './trace-meta.js';
+import { ACTION_COLOR, formatSimTime } from './trace-meta.js';
 import { Avatar } from './Avatar.js';
-import { type TimelineBlock, postAction, blockLabel } from './timeline-model.js';
+import { type TimelineBlock, itemKey, itemToBlock, blockLabel } from './timeline-model.js';
 
 /**
  * 时间轴面板（Premiere 范式，见 docs/m5-design.md）：横轴为时间、纵轴每行一个账号，
- * 块 = 世界真实内容——帖子/回复/引用来自社交站 API（真相源），互动（赞/转/关注）暂来自
- * 模拟器决策轨迹。以当前模拟时间为分界的金色播放头居中，默认跟随自动横滚、可拖动回看历史。
- * 同账号内时间相近的块纵向错行堆叠、互不遮挡，按可视范围虚拟化。
+ * 块 = 世界真实内容。数据源为社交站全站时间流 /api/timeline/global（纯读 world.db、与模拟器
+ * 无关，故模拟器未运行也可用）；含帖子/回复/引用 + 转发。向左滚动到头即按游标无限加载更老内容。
+ * 以当前模拟时间为分界的金色播放头居中、默认跟随自动横滚、可拖动回看历史，块纵向错行堆叠。
+ * 赞/关注等其余互动、跳转任意时间区间、轨迹"为什么"合并待后续服务端工作。
  */
 
 const RULER_H = 26;
@@ -26,8 +27,9 @@ const RIGHT_PAD = 300;
 const VBUF = 400;
 const POLL_WORLD_MS = 3000;
 const TICK_MS = 250;
-const POST_PAGE = 100; // 每页拉帖数
-const POST_PAGE_CAP = 15; // 每账号每类型最多翻几页（深度历史后续做按需加载）
+const FEED_LIMIT = 50; // 每页拉取条数（社交站 global 上限 50）
+const INITIAL_PAGES = 2; // 初次加载页数
+const LOAD_OLDER_AT = 400; // 滚到左侧此阈值内即加载更老
 const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
 
 interface Anchor {
@@ -59,14 +61,16 @@ function niceStepMin(pxPerMin: number): number {
   const target = 90 / pxPerMin;
   return NICE_STEPS.find((n) => n >= target) ?? NICE_STEPS[NICE_STEPS.length - 1]!;
 }
-function isActAction(a: SimTraceAction): boolean {
-  return a === 'like' || a === 'repost' || a === 'follow';
+function isActBlock(b: TimelineBlock): boolean {
+  return b.kind === 'repost'; // 转发为灰色小条（互动）
 }
 function estBlockWidth(b: TimelineBlock): number {
   return Math.min(230, blockLabel(b).length * 7 + 18);
 }
+function blockColor(b: TimelineBlock): string {
+  return b.kind === 'repost' ? ACTION_COLOR.repost : ACTION_COLOR[b.action];
+}
 
-/** 计算每条轨道内的纵向错行堆叠与各轨道高度（绝对时间坐标，与播放头 now 无关）。 */
 function computeLayout(blocks: TimelineBlock[], lanes: string[], originSim: number, pxPerMin: number): Layout {
   const ax = (t: number) => ((t - originSim) / 60_000) * pxPerMin;
   const byLane = new Map<string, TimelineBlock[]>(lanes.map((l) => [l, []]));
@@ -102,8 +106,7 @@ function computeLayout(blocks: TimelineBlock[], lanes: string[], originSim: numb
 }
 
 export function TimelinePanel(_props: IDockviewPanelProps) {
-  const [events, setEvents] = useState<StoredSimTraceEvent[]>([]);
-  const [posts, setPosts] = useState<PostView[]>([]);
+  const [items, setItems] = useState<TimelineItem[]>([]);
   const [worldId, setWorldId] = useState<string | null>(null);
   const selected = useSelectedBlock();
   const [error, setError] = useState<string | null>(null);
@@ -111,51 +114,79 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const [following, setFollowing] = useState(true);
   const [scrollX, setScrollX] = useState(0);
   const [viewW, setViewW] = useState(800);
-  const [names, setNames] = useState<Record<string, string>>({});
-  const namesRef = useRef<Record<string, string>>({});
-  const fetchedPostsRef = useRef<Set<string>>(new Set());
   const worldRef = useRef<string | null>(null);
   const anchorRef = useRef<Anchor | null>(null);
   const tlRef = useRef<HTMLDivElement | null>(null);
   const expectedLeftRef = useRef(0);
+  const keysRef = useRef<Set<string>>(new Set());
+  const oldestCursorRef = useRef<string | null>(null);
+  const loadingOlderRef = useRef(false);
+  const prevMinRef = useRef<number | null>(null);
+  const ppmRef = useRef(pxPerMin);
+  ppmRef.current = pxPerMin;
   const [, rerender] = useState(0);
 
   const backend = window.editor.backendUrl;
 
-  async function loadTrace(): Promise<void> {
+  async function fetchFeed(cursor?: string): Promise<{ items: TimelineItem[]; nextCursor: string | null }> {
+    const u = new URL(`${backend}/api/timeline/global`);
+    u.searchParams.set('limit', String(FEED_LIMIT));
+    if (cursor) u.searchParams.set('cursor', cursor);
+    const r = await fetch(u);
+    if (!r.ok) throw new Error(`backend ${r.status}`);
+    return (await r.json()) as { items: TimelineItem[]; nextCursor: string | null };
+  }
+
+  /** 合并新条目（按 key 去重）。 */
+  function addItems(incoming: TimelineItem[]): void {
+    const fresh = incoming.filter((it) => {
+      const k = itemKey(it);
+      if (keysRef.current.has(k)) return false;
+      keysRef.current.add(k);
+      return true;
+    });
+    if (fresh.length) setItems((prev) => [...prev, ...fresh]);
+  }
+
+  /** 初次加载（切世界 / 刷新）：清空后拉前几页，记录最老游标。 */
+  async function loadInitial(): Promise<void> {
+    keysRef.current = new Set();
+    oldestCursorRef.current = null;
+    prevMinRef.current = null;
+    setItems([]);
     try {
-      const res = await fetch(`${backend}/api/trace?limit=10000`);
-      if (!res.ok) throw new Error(`backend ${res.status}`);
-      const { events: rows } = (await res.json()) as { events: StoredSimTraceEvent[] };
-      setEvents(rows);
+      let cursor: string | undefined;
+      const acc: TimelineItem[] = [];
+      for (let p = 0; p < INITIAL_PAGES; p++) {
+        const r = await fetchFeed(cursor);
+        acc.push(...r.items);
+        cursor = r.nextCursor ?? undefined;
+        if (!cursor) break;
+      }
+      oldestCursorRef.current = cursor ?? null;
+      addItems(acc);
       setError(null);
     } catch (e) {
       setError(String(e));
     }
   }
 
-  /** 拉某账号的帖子 + 回复（游标分页，封顶）。 */
-  async function fetchAccountPosts(handle: string): Promise<PostView[]> {
-    const out: PostView[] = [];
-    for (const type of ['posts', 'replies'] as const) {
-      let cursor: string | undefined;
-      for (let page = 0; page < POST_PAGE_CAP; page++) {
-        const u = new URL(`${backend}/api/users/${encodeURIComponent(handle)}/posts`);
-        u.searchParams.set('type', type);
-        u.searchParams.set('limit', String(POST_PAGE));
-        if (cursor) u.searchParams.set('cursor', cursor);
-        const r = await fetch(u);
-        if (!r.ok) break;
-        const j = (await r.json()) as { items: PostView[]; nextCursor: string | null };
-        out.push(...j.items);
-        if (!j.nextCursor) break;
-        cursor = j.nextCursor;
-      }
+  /** 向左滚到头：按游标加载更老内容。 */
+  async function loadOlder(): Promise<void> {
+    if (loadingOlderRef.current || !oldestCursorRef.current) return;
+    loadingOlderRef.current = true;
+    try {
+      const r = await fetchFeed(oldestCursorRef.current);
+      addItems(r.items);
+      oldestCursorRef.current = r.nextCursor ?? null;
+    } catch {
+      /* 下次滚动再试 */
+    } finally {
+      loadingOlderRef.current = false;
     }
-    return out;
   }
 
-  // 轮询活动世界：拾取时钟锚点，切世界时重载。
+  // 轮询活动世界：拾取时钟锚点；切世界则重载，否则拉最新页做实时更新。
   useEffect(() => {
     let alive = true;
     async function pollWorld(): Promise<void> {
@@ -179,11 +210,15 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           setWorldId(id);
           setSelectedBlock(null);
           setFollowing(true);
-          namesRef.current = {};
-          setNames({});
-          fetchedPostsRef.current = new Set();
-          setPosts([]);
-          await loadTrace();
+          await loadInitial();
+        } else {
+          // 实时：拉最新页，合并新内容。
+          try {
+            const r = await fetchFeed();
+            if (alive) addItems(r.items);
+          } catch {
+            /* 忽略单次失败 */
+          }
         }
       } catch {
         /* 后端暂不可达，下个周期重试 */
@@ -200,86 +235,18 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // SSE：新轨迹即时追加（互动会即时上轴；新帖暂靠刷新/下次拉取）。
-  useEffect(() => {
-    const es = new EventSource(`${backend}/api/trace/stream`);
-    es.addEventListener('trace', (ev) => {
-      try {
-        const e = JSON.parse((ev as MessageEvent).data) as StoredSimTraceEvent;
-        setEvents((prev) => (prev.some((p) => p.id === e.id) ? prev : [...prev, e]));
-      } catch {
-        /* 丢弃坏帧 */
-      }
-    });
-    return () => es.close();
-  }, [backend]);
-
-  // 被驱动账号（已知会发帖的账号 = 决策轨迹里的实体），作为拉帖与轨道来源。
-  const accounts = useMemo(() => [...new Set(events.map((e) => e.entity))].sort(), [events]);
-
-  // 拉这些账号的真实帖子（缺的才拉）。
-  useEffect(() => {
-    const missing = accounts.filter((h) => !fetchedPostsRef.current.has(h));
-    if (missing.length === 0) return;
-    let alive = true;
-    missing.forEach((h) => fetchedPostsRef.current.add(h));
-    void (async () => {
-      for (const h of missing) {
-        const got = await fetchAccountPosts(h);
-        if (!alive) return;
-        setPosts((prev) => {
-          const seen = new Set(prev.map((p) => p.id));
-          return [...prev, ...got.filter((p) => !seen.has(p.id))];
-        });
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts, backend]);
-
-  // 拉账号昵称（缺的才拉）。
-  useEffect(() => {
-    const missing = accounts.filter((l) => !namesRef.current[l]);
-    if (missing.length === 0) return;
-    let alive = true;
-    void (async () => {
-      const got = await Promise.all(
-        missing.map(async (h): Promise<[string, string]> => {
-          try {
-            const r = await fetch(`${backend}/api/users/${encodeURIComponent(h)}`);
-            if (!r.ok) return [h, h];
-            const j = (await r.json()) as { user?: { displayName?: string } };
-            return [h, j.user?.displayName || h];
-          } catch {
-            return [h, h];
-          }
-        }),
-      );
-      if (!alive) return;
-      const merged = { ...namesRef.current, ...Object.fromEntries(got) };
-      namesRef.current = merged;
-      setNames(merged);
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [accounts, backend]);
+  // 昵称直接来自全站流（每条带 author/repostedBy 的 displayName），无需单独拉取。
+  const names = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const it of items) {
+      m[it.post.author.handle] = it.post.author.displayName;
+      if (it.repostedBy) m[it.repostedBy.handle] = it.repostedBy.displayName;
+    }
+    return m;
+  }, [items]);
   const nameOf = (h: string): string => names[h] || h;
 
-  // 组装时间轴块：帖子/回复/引用来自 API，互动来自轨迹（避免与 API 帖重复）。
-  const blocks = useMemo<TimelineBlock[]>(() => {
-    const bs: TimelineBlock[] = [];
-    for (const p of posts) {
-      bs.push({ kind: 'post', key: `p${p.id}`, entity: p.author.handle, time: p.createdAt, action: postAction(p), post: p });
-    }
-    for (const e of events) {
-      if (!isActAction(e.action)) continue;
-      bs.push({ kind: 'trace', key: `t${e.id}`, entity: e.entity, time: e.simTime, action: e.action, event: e });
-    }
-    return bs;
-  }, [posts, events]);
+  const blocks = useMemo<TimelineBlock[]>(() => items.map(itemToBlock), [items]);
 
   const { lanes, minTime, maxTime } = useMemo(() => {
     const ls = [...new Set(blocks.map((b) => b.entity))].sort();
@@ -304,6 +271,17 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const now = simNow();
   const trackWidth = Math.max(ax(maxTime), ax(now)) + RIGHT_PAD;
   const ready = blocks.length > 0;
+
+  // 加载更老内容使 minTime 减小 → 全部 x 右移；非跟随时补偿 scrollLeft，保持视图稳定。
+  useLayoutEffect(() => {
+    const el = tlRef.current;
+    const prev = prevMinRef.current;
+    if (el && prev != null && minTime < prev && !following) {
+      el.scrollLeft += ((prev - minTime) / 60_000) * ppmRef.current;
+    }
+    prevMinRef.current = minTime;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minTime]);
 
   // 视口宽度（虚拟化）。
   useEffect(() => {
@@ -343,6 +321,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     if (!el) return;
     if (Math.abs(el.scrollLeft - expectedLeftRef.current) > 3) setFollowing(false);
     setScrollX(el.scrollLeft);
+    if (el.scrollLeft < LOAD_OLDER_AT) void loadOlder();
   }
 
   const stepMin = niceStepMin(pxPerMin);
@@ -403,11 +382,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           <i className="ri-zoom-in-line" />
         </span>
         <button
-          onClick={() => {
-            fetchedPostsRef.current = new Set();
-            setPosts([]);
-            void loadTrace();
-          }}
+          onClick={() => void loadInitial()}
           className="px-1.5 py-0.5 rounded border border-(--border) bg-(--chip) cursor-pointer hover:bg-[#2a2e33]"
         >
           <i className="ri-refresh-line" /> 刷新
@@ -416,7 +391,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
 
       {error && <p className="px-3 py-2 text-(--pink) text-xs">编辑器后端不可达：{error}</p>}
       {!error && blocks.length === 0 && (
-        <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无内容。启动模拟器或建号发帖后，帖子与互动会在此按时间排布。</p>
+        <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无内容。建号发帖或启动模拟器后，帖子与转发会在此按时间排布。</p>
       )}
 
       {blocks.length > 0 && (
@@ -481,11 +456,12 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
                   const pl = layout.place.get(b.key);
                   if (!pl) return null;
                   const isSel = selected?.key === b.key;
-                  const isAct = isActAction(b.action);
+                  const isAct = isActBlock(b);
                   const isFuture = b.time > now;
                   const h = isAct ? 18 : 24;
                   const groupTop = (layout.laneHeights[pl.laneIdx]! - layout.laneRowCounts[pl.laneIdx]! * SUBROW_H) / 2;
                   const top = layout.laneTops[pl.laneIdx]! + groupTop + pl.subRow * SUBROW_H + (SUBROW_H - h) / 2;
+                  const color = blockColor(b);
                   const style: React.CSSProperties = {
                     position: 'absolute',
                     left: ax(b.time),
@@ -497,20 +473,20 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
                   };
                   if (isFuture) {
                     style.background = 'transparent';
-                    style.border = `1px dashed ${ACTION_COLOR[b.action]}`;
-                    style.color = ACTION_COLOR[b.action];
+                    style.border = `1px dashed ${color}`;
+                    style.color = color;
                   } else if (isAct) {
                     style.background = '#3a3f46';
                     style.color = '#cdd2d6';
                   } else {
-                    style.background = ACTION_COLOR[b.action];
+                    style.background = color;
                     style.color = '#fff';
                   }
                   return (
                     <button
                       key={b.key}
                       onClick={() => setSelectedBlock(b)}
-                      title={`${nameOf(b.entity)} · ${ACTION_LABEL[b.action]} · ${formatSimTime(b.time)}`}
+                      title={`${nameOf(b.entity)} · ${formatSimTime(b.time)}`}
                       style={style}
                       className="rounded-md px-2 flex items-center text-[11px] whitespace-nowrap overflow-hidden cursor-pointer hover:brightness-110 z-10"
                     >

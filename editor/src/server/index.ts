@@ -61,6 +61,24 @@ app.get<{ Params: { handle: string } }>('/api/users/:handle', async (req, reply)
   }
 });
 
+// 全站时间流：转发社交站 global feed（游标分页，免鉴权），时间轴块的主数据源——
+// 纯读 world.db、与模拟器无关，故时间轴在模拟器未运行时也可用。
+app.get<{ Querystring: { cursor?: string; limit?: string } }>('/api/timeline/global', async (req, reply) => {
+  const u = new URL(`${SOCIAL_API}/api/timeline/global`);
+  for (const k of ['cursor', 'limit'] as const) {
+    const v = req.query[k];
+    if (v != null) u.searchParams.set(k, String(v));
+  }
+  try {
+    const res = await fetch(u);
+    reply.status(res.status);
+    return await res.json();
+  } catch {
+    reply.status(502);
+    return { error: 'social server unreachable' };
+  }
+});
+
 // 账号帖子/回复：转发社交站按 handle 列帖（游标分页），供时间轴块来源（真相源）。
 app.get<{ Params: { handle: string }; Querystring: { type?: string; cursor?: string; limit?: string } }>(
   '/api/users/:handle/posts',
