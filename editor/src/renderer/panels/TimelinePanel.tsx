@@ -59,10 +59,13 @@ function formatTick(ms: number, withDate: boolean): string {
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   return withDate ? `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}` : hm;
 }
-/** 模拟时间 ms → datetime-local 输入值（本地时区）。 */
-function toInputValue(ms: number): string {
-  const d = new Date(ms);
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+/** 解析"YYYY-MM-DD HH:MM[:SS]"（即 formatSimTime 的格式）为模拟时间 ms；非法返回 null。
+ *  按本地分量构造，与 formatSimTime 用本地 getter 一致，往返不偏移；这是世界模拟时间、非系统时间。 */
+function parseSimTime(s: string): number | null {
+  const m = s.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})[ T](\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+  if (!m) return null;
+  const t = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? '0')).getTime();
+  return Number.isFinite(t) ? t : null;
 }
 function niceStepMin(pxPerMin: number): number {
   const target = 90 / pxPerMin;
@@ -373,8 +376,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   }
   function commitTimeEdit(): void {
     if (editingTime) {
-      const t = new Date(editingTime).getTime();
-      if (Number.isFinite(t)) jumpToTime(t);
+      const t = parseSimTime(editingTime);
+      if (t != null) jumpToTime(t);
     }
     setEditingTime(null);
   }
@@ -478,10 +481,10 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
         <i className="ri-time-line text-(--blue)" />
         <span className="font-semibold">时间轴</span>
         <input
-          type="datetime-local"
-          step={1}
-          value={editingTime ?? toInputValue(now)}
-          onFocus={() => setEditingTime(toInputValue(now))}
+          type="text"
+          spellCheck={false}
+          value={editingTime ?? formatSimTime(now)}
+          onFocus={() => setEditingTime(formatSimTime(now))}
           onChange={(e) => setEditingTime(e.target.value)}
           onBlur={commitTimeEdit}
           onKeyDown={(e) => {
@@ -490,9 +493,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
               e.currentTarget.blur();
             }
           }}
-          title="输入时间跳转到该时刻"
-          style={{ colorScheme: 'dark' }}
-          className="bg-(--chip) border border-(--border) rounded px-1.5 py-0.5 text-(--amber) font-mono cursor-text"
+          title="输入模拟时间跳转（格式 2026-06-17 14:30:00，世界模拟时间非系统时间）"
+          className="w-38 bg-(--chip) border border-(--border) rounded px-1.5 py-0.5 text-(--amber) font-mono tabular-nums cursor-text focus:border-(--amber) outline-none"
         />
         <span className="text-(--dim)">{worldId ?? '—'} · {blocks.length} 块</span>
         {!following && (
