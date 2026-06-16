@@ -80,8 +80,10 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
   app.post<{ Body: { prompt: string } }>(
     '/api/admin/run-agent', { preHandler: requireAdmin }, controller.runAgent);
 
-  // Simulator status (no auth required for editor polling)
+  // Simulator status (no auth — editor polls GET, simulator posts heartbeat; localhost infra)
   app.get('/api/simulator/status', controller.simulatorStatus);
+  app.post<{ Body: { boundWorldId: string | null; accountCount: number; tickNumber: number; lastFlushedWorldId: string | null; lastFlushAt: number | null } }>(
+    '/api/simulator/heartbeat', controller.simulatorHeartbeat);
 }
 
 function makeAdminKeyAuth(adminKey: string): preHandlerHookHandler {

@@ -8,6 +8,7 @@ import { config } from '../../config.js';
 import { hashPassword } from '../auth/password.js';
 import { postsRepo } from '../posts/posts.repo.js';
 import { followsRepo } from '../follows/follows.repo.js';
+import type { SimulatorHeartbeat, SimulatorStatus } from '@socialsim/shared';
 
 /** 暴露虚拟身份的命名约定——代理建号一律拒绝（见 docs/m5-real-usage-contract.md 账号模型）。
  *  取高精度模式，避免误杀 blink182 / john_k 这类拟真名；模式可在此增删。
@@ -465,19 +466,26 @@ export class AdminService {
     return runner.run(prompt);
   }
 
-  getSimulatorStatus(): {
-    running: boolean;
-    tickNumber: number;
-    entityCount: number;
-    uptime: number;
-    recentActions: Array<{ time: string; actor: string; action: string; detail: string }>;
-  } {
+  // --- 模拟器状态（心跳上报；按新鲜度判 running） ---
+
+  private simHeartbeat: (SimulatorHeartbeat & { reportedAt: number }) | null = null;
+  private readonly SIM_STALE_MS = 30_000;
+
+  recordSimulatorHeartbeat(hb: SimulatorHeartbeat): void {
+    this.simHeartbeat = { ...hb, reportedAt: Date.now() };
+  }
+
+  getSimulatorStatus(): SimulatorStatus {
+    const hb = this.simHeartbeat;
+    const running = !!hb && Date.now() - hb.reportedAt < this.SIM_STALE_MS;
     return {
-      running: false,
-      tickNumber: 0,
-      entityCount: 0,
-      uptime: 0,
-      recentActions: [],
+      running,
+      boundWorldId: hb?.boundWorldId ?? null,
+      accountCount: hb?.accountCount ?? 0,
+      tickNumber: hb?.tickNumber ?? 0,
+      lastFlushedWorldId: hb?.lastFlushedWorldId ?? null,
+      lastFlushAt: hb?.lastFlushAt ?? null,
+      reportedAt: hb?.reportedAt ?? null,
     };
   }
 }

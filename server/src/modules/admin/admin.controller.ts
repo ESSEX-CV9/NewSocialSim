@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AdminService } from './admin.service.js';
 import type { LoreService } from './lore.service.js';
 import type { NpcService, NpcProfile } from './npc.service.js';
+import type { SimulatorHeartbeat } from '@socialsim/shared';
 
 export class AdminController {
   constructor(
@@ -216,5 +217,13 @@ export class AdminController {
 
   simulatorStatus = async (_req: FastifyRequest, reply: FastifyReply) => {
     reply.send(this.service.getSimulatorStatus());
+  };
+
+  simulatorHeartbeat = async (
+    req: FastifyRequest<{ Body: SimulatorHeartbeat }>,
+    reply: FastifyReply,
+  ) => {
+    this.service.recordSimulatorHeartbeat(req.body);
+    reply.send({ ok: true });
   };
 }

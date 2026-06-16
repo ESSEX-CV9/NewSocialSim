@@ -34,6 +34,18 @@ app.get('/api/worlds/active', async (_req, reply) => {
   }
 });
 
+// 模拟器状态：转发社交站的心跳态（editor 控制台轮询）。
+app.get('/api/simulator/status', async (_req, reply) => {
+  try {
+    const res = await fetch(`${SOCIAL_API}/api/simulator/status`);
+    reply.status(res.status);
+    return await res.json();
+  } catch {
+    reply.status(502);
+    return { error: 'social server unreachable' };
+  }
+});
+
 // 时钟控制：转发到社交站（pause / resume / setScale / setTime）。
 app.post('/api/worlds/clock', async (req, reply) => {
   try {

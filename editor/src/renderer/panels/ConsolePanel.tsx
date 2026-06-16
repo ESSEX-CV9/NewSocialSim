@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
+import type { SimulatorStatus } from '@socialsim/shared';
 
 /** 活动世界时钟锚点：轮询拾取，本地按流速推算当前世界时间。 */
 interface Anchor {
@@ -29,6 +30,7 @@ function formatSimTime(ms: number): string {
  */
 export function ConsolePanel(_props: IDockviewPanelProps) {
   const anchorRef = useRef<Anchor | null>(null);
+  const simRef = useRef<SimulatorStatus | null>(null);
   const [, rerender] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +58,12 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
         setError(null);
       } catch (e) {
         if (alive) setError(String(e));
+      }
+      try {
+        const sres = await fetch(`${window.editor.backendUrl}/api/simulator/status`);
+        if (sres.ok && alive) simRef.current = (await sres.json()) as SimulatorStatus;
+      } catch {
+        /* 模拟器状态尽力而为 */
       }
     }
     void poll();
@@ -94,6 +102,7 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
   }
 
   const a = anchorRef.current;
+  const sim = simRef.current;
   const currentSim = simNow();
   const btn = 'px-2 py-1 text-xs rounded-lg bg-(--chip) border border-(--border) text-(--text) hover:bg-[#2a2e33] cursor-pointer';
   const btnActive = 'px-2 py-1 text-xs rounded-lg bg-(--blue) border border-(--blue) text-white cursor-pointer';
@@ -140,6 +149,23 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
                 </button>
               </div>
             </div>
+          </div>
+
+          <div className="bg-(--panel) border border-(--border) rounded-xl px-3.5 py-3">
+            <h4 className="flex items-center gap-1.5 text-[13px] font-semibold mb-2">
+              <i className="ri-cpu-line" /> 模拟器
+              <span
+                className="ml-auto flex items-center gap-1.5 font-normal text-xs"
+                style={{ color: sim?.running ? 'var(--green)' : 'var(--dim)' }}
+              >
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: sim?.running ? 'var(--green)' : 'var(--dim)' }} />
+                {sim?.running ? '运行中' : '未运行'}
+              </span>
+            </h4>
+            <Kv k="绑定世界" v={sim?.boundWorldId ?? '—'} />
+            <Kv k="被驱动账号" v={sim?.accountCount ?? 0} />
+            <Kv k="tick" v={`#${sim?.tickNumber ?? 0}`} />
+            <Kv k="上次 flush" v={sim?.lastFlushedWorldId ?? '—'} />
           </div>
         </div>
       )}
