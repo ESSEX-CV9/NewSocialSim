@@ -1,6 +1,6 @@
 # NewSocialSim 交接说明
 
-本地运行的社交媒体模拟器（仿 X/Twitter），全 TypeScript。两阶段计划：第一阶段是真实可用的社交网站（**已完成**，含完整媒体系统）；第二阶段以网站 HTTP API 为唯一接口构建模拟器（**M5-1 至 M5-4 已完成**：ECS tick 引擎 + 世界管理 + 话题/内容池 + LLM Agent 三厂接入；当前在 `feat-M5-X-RE` 分支重启 M5-X 行为层，先确定性后 LLM，Step 0a/0b 已落地，纲领见 `docs/m5-x-re-plan.md`），虚拟用户与真人走相同 API。用途：观察娱乐 + 小说世界观创作辅助 + 信息传播研究。
+本地运行的社交媒体模拟器（仿 X/Twitter），全 TypeScript。两阶段计划：第一阶段是真实可用的社交网站（**已完成**，含完整媒体系统）；第二阶段以网站 HTTP API 为唯一接口构建模拟器（**M5-1 至 M5-4 已完成**：ECS tick 引擎 + 世界管理 + 话题/内容池 + LLM Agent 三厂接入；当前在 `feat-M5-X-RE` 分支重启 M5-X 行为层，先确定性后 LLM，Phase 0 地基已实施至 0.8（决策轨迹落 per-world SQLite + 编辑器重建为 Electron + 控制台世界/时钟/模拟器态），纲领见 `docs/m5-x-re-plan.md`、细步见 `docs/m5-x-roadmap.md`），虚拟用户与真人走相同 API。用途：观察娱乐 + 小说世界观创作辅助 + 信息传播研究。
 
 ## 运行
 
@@ -9,7 +9,7 @@ npm install
 npm run dev:server   # Fastify 后端 http://127.0.0.1:3000（tsx watch）
 npm run dev:client   # Vite 前端 http://localhost:5173（/api 代理到 3000）
 npm run dev:simulator # 模拟引擎（ECS tick，连接后端 API）
-npm run dev:editor   # 世界编辑器 http://localhost:5174（/api 代理到 3000）
+npm run dev:editor   # 世界编辑器（Electron 桌面程序，electron-vite；内置 Fastify 后端 :5176 连社交站）
 npm run typecheck    # 五个工作区 tsc --noEmit
 ```
 
@@ -28,8 +28,8 @@ npm workspaces monorepo：
   - `src/api/` fetch 封装与全部接口；`src/auth|world|i18n|theme/` 四个全局 Context；`src/components/` 通用组件（Layout、PostCard、Composer、usePagedQuery 等）；`src/features/<页面>/` 按页面组织。
 - `simulator/` — 模拟引擎（独立进程，跟随活动世界，不持有任何特定世界数据）。
   - `src/simulator.ts` 编排器：启动只读基础设施配置，运行时查 `GET /api/admin/worlds/active` 跟随活动世界，世界变更则 flush→重登账号（login-as 票据，不存密码）→重建系统；被驱动账号 = 有 npc 档案者，驱动配置取自 npc-profiles.json。tick 在世界模拟时间下运行。`src/ecs/` Entity/Component/System 框架；`src/systems/` PostingSystem（确定性发帖：话题感知+内容池，LLM 路径已移出关键链路）、InteractionSystem（概率互动）、CascadeSystem（级联反应）；`src/llm/` LLMProvider 抽象 + 三家实现 + agentic 循环 + 工具集（暂未接入关键路径，待行为状态机阶段）。
-- `editor/` — 世界编辑器（临时 UI，端口 5174）。
-  - 六个 Tab 面板：Console（时钟控制/快照/世界管理）、Timeline（预填帖子）、Topics（话题管理）、Pools（内容池）、Lore（设定文档）、NPC Designer（人设档案）、LLM（提供商配置/Agent 触发/执行日志）。
+- `editor/` — 世界编辑器，Electron 桌面程序（electron-vite），三层 `src/main`（主进程，拉起并管编辑器后端子进程）/ `src/server`（Fastify 后端 :5176，renderer 唯一数据源，代理社交站 + 读 sim-trace.db + 布局存档）/ `src/renderer`（dockview 多窗格前端）。
+  - 工作区为 Blender 式：每格 PaneHost 顶部下拉切面板类型（注册表见 `renderer/panels/registry.ts`，控制台已实现、其余占位），停靠走 dockview 原生 Adobe 式（拖标签到边缘分屏/合并/浮动/弹出窗口）；4 套预设布局 + 布局跟随世界存 `data/worlds/<id>/editor-layouts.json`。配色对齐 `docs/editor-mockup.html`。
 - `data/worlds/<id>/` — 运行时数据（不入 git）：world.db（该世界全部数据）+ world.json（元数据与时钟状态）+ media/（该世界全部媒体文件）+ lore/（设定文档 .md）+ npc-profiles.json + content-pools.json + snapshots/（轻量快照）。
 - `data/media-search.json` — 实例级搜图配置（不入 git，含 Pixiv refresh token、HTTP 代理、各源 API key）。本机已配置代理 127.0.0.1:7897 与 Pixiv 登录态。
 - `data/llm-config.json` — LLM 多提供商配置（不入 git，含 API key）。每个提供商配置名称/来源/Base URL/Key/模型列表，High/Low-tier 全局选择。
@@ -71,7 +71,7 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 当前主线：`feat-M5-X-RE` 分支重启 M5-X 行为层，纲领见 `docs/m5-x-re-plan.md`（先确定性后 LLM、编辑器为唯一观察窗逐里程碑同步、四步阶梯）。Step 0a（代理建号）、0b（模拟器跟随活动世界 + 不存密码驱动）已完成并端到端演示（`scripts/demo-stp0.mjs`，demo 世界）；下一步 Step 0c（决策轨迹落盘 per-world JSONL）→ 0d/0e（正式编辑器重建：多窗格 IDE 壳 + 独立 Fastify 后端 + 控制台 + 最小时间轴）→ Step 1（按 ECS 内容池发顶层帖）。GM 导演层（M5-5）与 Electron 打包（M5-6）顺延至四步阶梯之后。
-- 编辑器当前为临时验证 UI（端口 5174），正式编辑器按 docs/m5-design.md "世界编辑器"章节设计重做（Premiere 式时间轴/Obsidian 式设定编辑器/Cursor 式 LLM 面板等十面板）。
+- 当前主线：`feat-M5-X-RE` 分支，细步见 `docs/m5-x-roadmap.md`（四步阶梯展开为单提交级原子步）。Phase 0 地基已完成 0.1–0.8（含 0.3b/0.5b）：代理建号 / 跟随活动世界 / 决策轨迹落 sim-trace.db / GM-Agent 日志表 / 编辑器 Electron 重建 / Blender 多窗格壳 / 预设+布局跟随世界 / 控制台读态 / 时钟控制 / 模拟器状态。**下一步 0.9–0.11 时间轴**（编辑器后端按时间区间读 sim-trace.db + SSE → 时间轴面板 账号轨道×模拟时间×轨迹块 + 模拟器轨迹实时推送）→ 0.12 端到端验收 → Phase 1 内容池 ECS（含最小 TuningService + 话题拆分 1.1b）。GM 导演层（M5-5）与 Electron 整体打包（M5-6）顺延。
+- 编辑器已从临时 UI 重建为 Electron + dockview 工作区（见结构速览）；十面板按 `docs/m5-design.md` 设计逐里程碑把注册表占位换成实现。
 - 媒体系统四期已全部完成，设计细节见 docs/design.md。虚拟用户发图帖链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 未实现的大块：GM 导演层、Electron 打包、正式编辑器 UI、自定义历法换算、生产构建流程。
