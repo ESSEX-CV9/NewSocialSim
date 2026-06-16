@@ -34,3 +34,23 @@ export interface SimTraceEvent {
   /** reply/quote/like/repost 时为被作用帖 id；其余为 null。 */
   targetPostId?: string | null;
 }
+
+/**
+ * GM/Agent 决策日志：导演层/Agent"为什么这么调度"的观测记录，与决策轨迹同属观测线，
+ * 同库（sim-trace.db）独立表存放，绝不进 world.db。
+ * 同记 at（现实时间，供追溯每次 LLM 调用在现实里何时发生）与 simTime（世界时间，供对齐时间轴）。
+ * 先确定性阶段无 LLM 运行，此结构与表先建好"家"、暂无写入，待 LLM 行为层/GM 导演层接入。
+ */
+export interface GmAgentLogEvent {
+  /** 现实时间（unix 毫秒）。 */
+  at: number;
+  /** 世界模拟时间（unix 毫秒形态）。 */
+  simTime: number;
+  kind: 'gm' | 'agent';
+  /** 任务标签（如 make-hot-thread / npc-post）。 */
+  taskLabel?: string | null;
+  /** 本轮决策摘要（GM 写回日志的连续性凭据）。 */
+  summary?: string | null;
+  /** 结构化明细（工具调用链 / 步数 / token 等），存 JSON 文本。 */
+  detail?: string | null;
+}

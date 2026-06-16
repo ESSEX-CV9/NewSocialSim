@@ -44,6 +44,17 @@ export class TraceSink {
         );
         CREATE INDEX IF NOT EXISTS idx_trace_sim_time ON trace_event(sim_time);
         CREATE INDEX IF NOT EXISTS idx_trace_entity_sim_time ON trace_event(entity, sim_time);
+
+        CREATE TABLE IF NOT EXISTS gm_agent_log (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          at INTEGER NOT NULL,
+          sim_time INTEGER NOT NULL,
+          kind TEXT NOT NULL,
+          task_label TEXT,
+          summary TEXT,
+          detail TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_gm_log_at ON gm_agent_log(at);
       `);
       if (db.pragma('user_version', { simple: true }) === 0) {
         db.pragma('user_version = 1');
