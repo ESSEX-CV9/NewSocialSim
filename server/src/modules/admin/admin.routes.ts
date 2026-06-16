@@ -76,10 +76,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
   app.post<{ Body: { source: string; apiKey: string; baseUrl?: string } }>(
     '/api/admin/llm-config/fetch-models', { preHandler: requireAdmin }, controller.fetchModels);
 
-  // Agent logs & manual trigger
-  app.get('/api/admin/agent-logs', { preHandler: requireAdmin }, controller.getAgentLogs);
-  app.post<{ Body: { taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[] } }>(
-    '/api/admin/agent-logs', { preHandler: requireAdmin }, controller.postAgentLog);
+  // Agent 手动触发（执行记录归模拟器写入 sim-trace.db，server 不留日志存储）
   app.post<{ Body: { prompt: string } }>(
     '/api/admin/run-agent', { preHandler: requireAdmin }, controller.runAgent);
 

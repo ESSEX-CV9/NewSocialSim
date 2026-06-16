@@ -202,19 +202,7 @@ export class AdminController {
     reply.send({ models });
   };
 
-  // --- Agent Logs ---
-
-  getAgentLogs = async (_req: FastifyRequest, reply: FastifyReply) => {
-    reply.send({ logs: this.service.getAgentLogs() });
-  };
-
-  postAgentLog = async (
-    req: FastifyRequest<{ Body: { taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[] } }>,
-    reply: FastifyReply,
-  ) => {
-    this.service.addAgentLog(req.body);
-    reply.send({ ok: true });
-  };
+  // --- Agent ---
 
   runAgent = async (
     req: FastifyRequest<{ Body: { prompt: string } }>,

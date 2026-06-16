@@ -44,14 +44,14 @@
 - **验收**：在 `demo` 世界跑模拟器，用 sqlite 查 `data/worlds/demo/sim-trace.db` 的 `trace_event` 表，每行含 `at` / `sim_time` / `entity` / `action` / `shape` / `pool_id` 等列，行数随发帖增长，按 `sim_time` 区间查询命中索引。
 - **交接提示**：分库原则——`sim-trace.db` 模拟器独占、绝不进 `world.db`。`better-sqlite3` 已在 monorepo（server 用），引入零新依赖。WAL 模式供编辑器后端跨进程并发只读。事件字段以 `docs/m5-x-re-plan.md`「决策轨迹」节为准（`at` 真实时间、`simTime` 模拟时间、`entity` handle、`action`、`activityState`、`intent`、`shape`、`poolId`、`entryId`、`mediaAttached`、`mediaReason`、`targetPostId`）。Step 0 阶段 `intent` / `activityState` 可填占位值（如 `earnest` / `null`），后续状态机阶段补真值。
 
-### 0.3b GM/Agent 决策日志归位 ⬜
+### 0.3b GM/Agent 决策日志归位 ✅
 
 - **目标**：决策日志的"家"从社交站 server 进程内存迁到 `sim-trace.db`，债务不留待后续阶段。
 - **改动**：`simulator/src/` 轨迹 sink 模块在 `sim-trace.db` 增 `gm_agent_log` 表（`CREATE TABLE IF NOT EXISTS`，每行同时记 `at` 现实时间 + `sim_time` 世界时间，索引 `at`）；删除 `server/src/modules/admin/admin.service.ts` 的 `agentLogs` 内存数组与 `GET/POST /api/admin/agent-logs` 的存储职责（其唯一消费方是临时编辑器 LlmPanel，与 0.4 删临时编辑器同步清理）；`shared/src/types/trace.ts` 加日志事件类型。
 - **验收**：server 不再持有任何 GM/Agent 日志内存态；日志唯一落点是 `sim-trace.db` 的 `gm_agent_log` 表，编辑器后端只读该表。
 - **交接提示**：当前确定性阶段无 LLM agent 运行，本步只把家建在正确位置 + 拆除 server 错放的债；待 LLM 行为层 / GM 导演层回归时由模拟器写入此表，届时无需再迁移。现 `agentLogs` 用 `Date.now()` / 上限 100 / 重启即丢，整体删除不保留。分库原则：日志属观测线，绝不进 `world.db`。
 
-### 0.4 编辑器 Electron 骨架 ⬜
+### 0.4 编辑器 Electron 骨架 ✅
 
 - **目标**：编辑器重建为 Electron 桌面程序三件套骨架，`npm run dev:editor` 拉起 Electron 窗口而非浏览器标签页。
 - **改动**：删除现 `editor/src/` 单窗口标签页实现（`App.tsx` + `panels/`）；新建 `editor/src/main/`（Electron 主进程：建 BrowserWindow、管编辑器后端子进程生命周期）、`editor/src/server/`（Fastify 后端：`/health` + 透传 `GET /api/admin/worlds/active` 一个只读端点）、`editor/src/renderer/`（前端入口）；改 `editor/package.json` 脚本与依赖（加 electron、electron 构建链）、`editor/vite.config.ts`。

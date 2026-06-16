@@ -1,5 +1,6 @@
 node_modules/
 dist/
+out/
 data/
 *.log
 .env
@@ -7,3 +8,4 @@ data/
 # 与本项目无关的旧项目
 image_searcher/
 参考文件/
+docs/editor-mockup.html

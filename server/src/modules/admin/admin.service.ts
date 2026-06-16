@@ -457,25 +457,12 @@ export class AdminService {
     }
   }
 
-  // --- Agent Logs (placeholder, real logs come from simulator process) ---
-
-  private agentLogs: Array<{ taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[]; timestamp: number }> = [];
-
-  addAgentLog(entry: { taskLabel: string; steps: number; tokens: { input: number; output: number }; log: any[] }): void {
-    this.agentLogs.push({ ...entry, timestamp: Date.now() });
-    if (this.agentLogs.length > 100) this.agentLogs.shift();
-  }
-
-  getAgentLogs(): typeof this.agentLogs {
-    return this.agentLogs;
-  }
+  // --- Agent（LLM 触发；执行记录归模拟器写入 per-world sim-trace.db 的 gm_agent_log 表，不在 server 留内存态） ---
 
   async runAgent(prompt: string): Promise<unknown> {
     const { AgentRunner } = await import('./agent-runner.js');
     const runner = new AgentRunner(this.worldManager);
-    const result = await runner.run(prompt);
-    this.addAgentLog({ taskLabel: result.taskLabel, steps: result.steps, tokens: result.tokens, log: result.log });
-    return result;
+    return runner.run(prompt);
   }
 
   getSimulatorStatus(): {
