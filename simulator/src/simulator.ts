@@ -5,6 +5,7 @@ import { InteractionSystem } from './systems/interaction-system.js';
 import { CascadeSystem } from './systems/cascade-system.js';
 import { TraceSink } from './trace/trace-sink.js';
 import type { System, Entity, TickContext, SimulatorConfig, DrivenAccount } from './ecs/types.js';
+import type { SimulatorHeartbeat } from '@socialsim/shared';
 import { logger } from './logger.js';
 
 /** 内置兜底语料（内容池全空时的最后一档），与世界无关，可被世界场景池覆盖。 */
@@ -44,6 +45,8 @@ export class Simulator {
   private running = false;
   private timer: ReturnType<typeof setTimeout> | null = null;
   private tickNumber = 0;
+  private lastFlushedWorldId: string | null = null;
+  private lastFlushAt: number | null = null;
 
   constructor(private config: SimulatorConfig) {
     this.api = new ApiClient({ baseUrl: config.apiBaseUrl });
@@ -118,8 +121,21 @@ export class Simulator {
     } catch (err) {
       logger.error('Loop error:', err);
     } finally {
+      this.reportStatus();
       this.scheduleNext();
     }
+  }
+
+  /** 每 loop 上报一次心跳；服务端按新鲜度判 running，编辑器控制台展示。 */
+  private reportStatus(): void {
+    const hb: SimulatorHeartbeat = {
+      boundWorldId: this.session?.worldId ?? null,
+      accountCount: this.session?.registry.count() ?? 0,
+      tickNumber: this.tickNumber,
+      lastFlushedWorldId: this.lastFlushedWorldId,
+      lastFlushAt: this.lastFlushAt,
+    };
+    void this.api.reportSimulatorStatus(hb);
   }
 
   /** 切到新活动世界：flush 旧世界、加载新世界被驱动账号（= 有 npc 档案者）、重建系统。 */
@@ -184,5 +200,7 @@ export class Simulator {
   /** flush 旧世界运行时状态。Step 0 暂无运行时态（mood/memory 等在后续里程碑加），占位日志。 */
   private flush(session: WorldSession): void {
     logger.info(`Flushed world ${session.worldId} (no runtime state in Step 0)`);
+    this.lastFlushedWorldId = session.worldId;
+    this.lastFlushAt = Date.now();
   }
 }

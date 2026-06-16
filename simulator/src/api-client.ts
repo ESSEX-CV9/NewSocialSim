@@ -1,3 +1,5 @@
+import type { SimulatorHeartbeat } from '@socialsim/shared';
+
 /**
  * HTTP API client for the simulator to interact with the social site.
  * All operations go through the same API that real users use.
@@ -151,6 +153,15 @@ export class ApiClient {
       return await this.get('/api/admin/worlds/active') as ActiveWorld;
     } catch {
       return null;
+    }
+  }
+
+  /** 上报模拟器心跳（无鉴权；失败不抛，心跳丢一两次无所谓）。 */
+  async reportSimulatorStatus(hb: SimulatorHeartbeat): Promise<void> {
+    try {
+      await this.post('/api/simulator/heartbeat', hb);
+    } catch {
+      // ignore — 心跳是尽力而为
     }
   }
 
