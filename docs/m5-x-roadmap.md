@@ -148,9 +148,9 @@
 **当前实现的取数策略**：global 流作"发现账号 + 顶层帖主轴（无限向后滚动）"，再**按账号封顶拉取**回复（`?type=replies`）与转发（`/timeline`）。因此**回复/转发只覆盖各账号近期若干页**（`EXTRA_PAGE_CAP`），深度历史与赞/关注待下列步骤补齐。
 
 ### T.1 互动事件流（赞 / 关注上轴）⬜
-- **目标**：时间轴显示**全部**互动。当前转发已从全站流取得；赞 / 关注 / 书签等无时间流来源。
-- **改动**：`server`（world.db 互动表暴露事件时间戳——可能需 migration；新增按时间分页的互动事件端点）、`editor/src/server/`（代理）、`editor/src/renderer/`（互动块）。
-- **交接提示**：赞 / 关注属真人也会有的数据 → 进 world.db、走社交站 API（分库原则），不走决策轨迹。
+- **目标**：时间轴显示**全部**互动。当前转发已从 `/api/users/:handle/timeline` 取得（带 `activityAt`）；赞 / 关注无按时间的事件流来源——`GET /api/users/:handle/likes` 只返回被赞的帖子、丢了点赞时间。
+- **改动**：`server`（新增按账号/时间分页的互动事件端点，把 `likes`/`follows` 的 `created_at` 作为 `activityAt` 返回，与 `/timeline` 暴露转发 `activityAt` 同范式）、`editor/src/server/`（代理）、`editor/src/renderer/`（赞/关注块，灰色小条类比转发）。
+- **交接提示**：**无需 migration**——`likes`/`reposts`/`follows` 三表均已有 `created_at`，只是未经 API 暴露成事件流。赞/关注属真人也会有的数据 → 进 world.db、走社交站 API（分库原则），不走决策轨迹。
 
 ### T.2 跳转任意时间区间（time-range 查询）⬜
 - **目标**：用户直接跳到某历史时间区间查看，而非只能从最新游标无限回翻。
