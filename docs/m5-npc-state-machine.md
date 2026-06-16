@@ -6,9 +6,51 @@
 
 在 playback 模型下，剧本帖与关键节拍仍由编辑器/LLM 预填，运行时 NPC 是被 playback 驱动的角色：剧本规定"何时何人发何内容"，状态机决定"用什么语气发、是否触发后续连锁、有没有人接茬"。
 
+## NPC 数据三层与存储
+
+一个 NPC 由三层构成，各自服务不同消费者、各有其家：
+
+| 层 | 服务对象 | 内容 | 存储 |
+|---|---|---|---|
+| 身份层 | 网站（所有人可见） | handle / 昵称 / 头像 / 横幅 / 简介 / 认证 / 地区 | users 表 + 媒体库，与真人账号完全一致 |
+| 数值层 | tick 引擎（零 LLM） | 下文五层（Alignment / Persona / 订阅 / Mood / 关系-记忆-注意-活动） | 见下"文件与 DB 分工" |
+| RP 资料层 | LLM（仅 LLM 介入时读） | 性格 / 背景 / 口癖 / 关系叙事 + 自由设定 | 见"RP 资料层"一节 |
+
+身份层就是账号本身，不属于"档案"——头像横幅走普通用户资料与媒体那套。
+
+### 一 NPC 一文件夹
+
+详细 NPC 内容量大，按每个 NPC 一个文件夹组织，不挤在单一全局文件里：
+
+```
+data/worlds/<id>/npcs/<handle>/
+  numbers.json     # 数值层的作者基线（事实依据）
+  rp.json          # 结构化 RP（性格/背景/口癖/关系叙事）
+  lore.md          # 自由设定（可选每次塞入 / 让 LLM 按需取）
+  pool/            # 该 NPC 的私有说话池
+  media/           # 该 NPC 的优先媒体池
+```
+
+### 文件与 DB 分工
+
+- **文件为准、DB 为副本**：作者写的静态数值（Alignment / Persona / 概率 / 活跃时段 / 关系基线 / 阶段定义）以 NPC 文件夹的文件为唯一真相源，开世界时灌进世界 DB 作运行时副本。
+- **运行时态进 DB**：模拟跑出来的动态值（Mood / 当前关系好感与熟悉度 / Memory / Activity）只活在世界 DB，高频写、可查询，重启靠 gap mitigation 恢复，不用 JSON 整文件重写。
+- **编辑器可改两处**：改"基本起始数据"写回文件（再灌 DB）；改"当前实时数据"直接写 DB（GM 式手动拨动当前情绪/关系，不动作者基线，之后按衰减自然回归）。
+
+world.db 本就随世界文件夹走，DB 化不损可移植性；文件留作可手编、可 git diff 的事实依据。
+
+## RP 资料层
+
+RP 资料是 LLM 扮演该 NPC 时读的材料，分两块：
+
+- **结构化必读**（`rp.json`）：性格 / 背景 / 口癖 / 关系叙事。扮演必看，结构化便于提示词组装，每次进上下文，属稳定前缀（缓存友好）。
+- **自由设定**（`lore.md`）：作者随意写的设定文本，不固定。配开关——"每次塞入"或"让 LLM 用工具按需取"（同设计的"索引卡常驻 + agentic 检索"，缩到单 NPC 尺度）。
+
+RP 资料层只在 LLM 介入时消费；确定性 tick 层不读它。先确定性阶段，rp.json / lore.md 由作者预写、引擎暂不消费，待行为的 LLM 阶段接入。
+
 ## 五层架构
 
-NPC 数据模型由宏观到微观分五层。每层可由上层 derive 出来，也允许作者在任意层手动覆盖。
+NPC 数据模型由宏观到微观分五层（数值层的细分）。每层可由上层 derive 出来，也允许作者在任意层手动覆盖。
 
 ```
 Layer 1：Alignment 双轴（2 数字）          作者锚定形象的入口
@@ -22,7 +64,7 @@ Layer 4：Mood（5 维 runtime）               当下情绪态
 Layer 5：Activity / Memory / Attention      当下行为态
 ```
 
-Layer 1–3 为静态人设层，落盘在 `npc-profiles.json`。Layer 4–5 为运行时状态层，落盘在 `npc-state.json`（持久化策略见后文）。
+Layer 1–3 为静态人设层，属作者基线，源在 NPC 文件夹、灌进 DB 作副本。Layer 4–5 为运行时状态层，只活在世界 DB（持久化与恢复见后文）。
 
 ## Layer 1：Alignment 双轴
 
@@ -149,6 +191,31 @@ interface Edge {
 `tag` 由 RelationshipSystem 按 affinity × salience × 互动模式派生，作为池子选择时的过滤 key（"对 rival 说的话" vs "对 friend 说的话"用不同子池）。
 
 绝大多数 NPC 互相为默认值（不入 map）。仅交互过的关系惰性建立，存储成本可控。
+
+### 关系的叙事面与阶段化
+
+关系是一条边、两张脸：上文 `Edge` 是**数值面**（运行时，存 DB）；另有作者写的**叙事面**（存 NPC 文件，喂 LLM）。二者天然挂钩——同一条 A→B 边。
+
+叙事面不是一段死文本，而是**阶段化**：作者按"好感 × 熟悉度"阈值划若干阶段，每阶段一份内容。运行时引擎读 A→B 当前数值、命中阶段、用该阶段内容。每个阶段携带：
+
+```typescript
+interface RelationshipStage {
+  condition: { affinity?: [number, number]; salience?: [number, number] };  // 命中区间
+  // 确定性偏置（本阶段先用）：默认按语气标签选片段，重要关系可指名子池覆盖
+  bias: {
+    toneTag?: 'hostile' | 'cold' | 'neutral' | 'warm' | 'intimate';  // 默认 A：偏好此语气标签的片段
+    intentBias?: Record<string, number>;                             // 把 intent 分布往某些意图偏
+    pool?: string;                                                   // 可选 B：直接指名子池/私有池
+  };
+  narrativePrompt?: string;  // 叙事面（LLM 阶段消费，先存不读）
+}
+```
+
+确定性内容选择据此对**有目标的动作**（回复 / 引用 / 掺和撕逼）生效：A 对 B 动作时，命中阶段的 `bias` 接进 ECS 池选择——优先该语气标签的片段、按 intentBias 偏移意图，与 A 自身 persona/mood 叠加。**随手发的顶层帖与具体某人无关，关系阶段不参与**，故关系阶段主要在回复里程碑发挥。
+
+阶段须设**滞回**：进某阶段与退出用不同阈值（如进"和解"好感≥50、退出须跌破 40），避免数值卡在边界来回横跳致关系精神分裂。阈值与缓冲存 `tuning.relationship`。
+
+关系弧可做**可复用模板**（对头弧 / 师徒弧 / 暗恋弧，各含多阶段），套到某对 NPC 后允许单独覆盖某阶段——颗粒度交给作者：重要关系手写，一般关系套模板。
 
 ### MemoryComponent
 
@@ -469,11 +536,11 @@ slangDensity=0.7，再抽前缀："笑死" → 最终输出 `"笑死，急了急
 
 ### 落盘策略
 
-- `npc-state.json`：mood / memory / activity / attention，debounce 批量写（默认 30 秒 或脏页超 N 条立即触发），进程退出前强制 flush
-- `npc-relationships.json`：体积大、变动频率较低，单独存
-- 写盘失败必须重试至少 3 次，仍失败需告警
+- 运行时态（mood / memory / activity / attention / 当前关系好感与熟悉度）写入世界 DB（per-NPC 行），随互动事务或按 tick 批量提交，不用 JSON 整文件重写。
+- 作者基线（静态数值 / 关系阶段定义 / RP 资料）以 NPC 文件夹文件为源，开世界灌进 DB；编辑器改基线写回文件、改实时态直接写 DB。
+- DB 写按 SQLite 事务语义处理；基线文件写失败必须重试至少 3 次，仍失败需告警。
 
-写盘频率与重试次数存 `tuning.persistence`。
+提交频率与重试次数存 `tuning.persistence`。
 
 ### 启动时 Gap Mitigation
 
