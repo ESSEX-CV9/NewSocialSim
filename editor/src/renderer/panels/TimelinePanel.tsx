@@ -1,25 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { StoredSimTraceEvent } from '@socialsim/shared';
+import type { StoredSimTraceEvent, SimTraceAction } from '@socialsim/shared';
 import { useSelectedTrace, setSelectedTrace } from '../state/selection.js';
 import { ACTION_COLOR, ACTION_LABEL, formatSimTime } from './trace-meta.js';
+import { Avatar } from './Avatar.js';
 
 /**
- * 时间轴面板（Premiere 范式，见 docs/m5-design.md）：横轴为时间、纵轴每行一个账号。
- * 以当前模拟时间为分界的金色播放头居中——左侧已发生、右侧待发生——随模拟时钟向左滚动。
- * 点选块写入全局选中态，详情由独立检视器面板展示。经 GET /api/trace 载入 + SSE 实时长块。
+ * 时间轴面板（Premiere 范式，见 docs/m5-design.md，样式对齐 editor-mockup.html）：
+ * 横轴为时间、纵轴每行一个账号，以当前模拟时间为分界的金色播放头居中——左已发生右待发生——
+ * 随模拟时钟向左滚动。左侧轨道栏列被驱动账号；点选块写入全局选中态，详情由检视器面板展示。
+ * 块上的真实帖文 / 赞转对象等需回拉数据，留待后续轮次，当前块只标动作。
  */
 
-const LANE_H = 30; // 每条账号轨道高度（px）
-const BLOCK_W = 9; // 事件块宽度（px）
-const RULER_H = 22; // 顶部时间标尺高度（px）
-const ZOOMS = [2, 6, 18, 60]; // px / 模拟分钟
+const LANE_H = 46; // 每条账号轨道高度（px）
+const RULER_H = 26; // 顶部时间标尺高度（px）
+const ROSTER_W = 160; // 左侧轨道栏宽度
+const LABEL_W = 96; // 时间轴行内 lane 标签宽度
+const LANE_DIV = '#26292e'; // 轨道分割线（比正文边框淡、比原 #15171b 明显）
+const MIN_PPM = 1;
+const MAX_PPM = 120;
 const POLL_WORLD_MS = 3000;
 const TICK_MS = 250; // 播放头随时钟推进的重绘节拍
-/** 网格步长候选（分钟），挑最接近 ~90px 间距的"整"值。 */
-const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
+const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440]; // 网格步长候选（分钟）
 
-/** 活动世界时钟锚点：轮询拾取，本地按流速推算当前模拟时间。 */
 interface Anchor {
   scale: number;
   paused: boolean;
@@ -27,10 +30,8 @@ interface Anchor {
   realAnchorMs: number;
 }
 
-function pad(n: number): string {
-  return String(n).padStart(2, '0');
-}
-/** 网格刻度短标签：HH:MM；跨日步长再带日期。 */
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const pad = (n: number) => String(n).padStart(2, '0');
 function formatTick(ms: number, withDate: boolean): string {
   const d = new Date(ms);
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -39,6 +40,10 @@ function formatTick(ms: number, withDate: boolean): string {
 function niceStepMin(pxPerMin: number): number {
   const target = 90 / pxPerMin;
   return NICE_STEPS.find((n) => n >= target) ?? NICE_STEPS[NICE_STEPS.length - 1]!;
+}
+/** 互动类动作（赞/转/关注）：mockup 里为灰色小条。 */
+function isActAction(a: SimTraceAction): boolean {
+  return a === 'like' || a === 'repost' || a === 'follow';
 }
 
 export function TimelinePanel(_props: IDockviewPanelProps) {
@@ -49,6 +54,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const [pxPerMin, setPxPerMin] = useState(6);
   const worldRef = useRef<string | null>(null);
   const anchorRef = useRef<Anchor | null>(null);
+  const tlRef = useRef<HTMLDivElement | null>(null);
   const [, rerender] = useState(0);
 
   const backend = window.editor.backendUrl;
@@ -65,7 +71,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     }
   }
 
-  // 轮询活动世界：拾取时钟锚点（流速/暂停/当前模拟时间），并在切世界时重载轨迹。
+  // 轮询活动世界：拾取时钟锚点（流速/暂停/当前模拟时间），切世界时重载轨迹。
   useEffect(() => {
     let alive = true;
     async function pollWorld(): Promise<void> {
@@ -119,6 +125,20 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return () => es.close();
   }, [backend]);
 
+  // 鼠标在时间轴内 Ctrl+滚轮缩放（围绕居中的"现在"）。
+  const ready = events.length > 0;
+  useEffect(() => {
+    const el = tlRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey) return;
+      e.preventDefault();
+      setPxPerMin((p) => clamp(+(p * (e.deltaY < 0 ? 1.12 : 1 / 1.12)).toFixed(2), MIN_PPM, MAX_PPM));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [ready]);
+
   const { lanes, maxSim } = useMemo(() => {
     const ls = [...new Set(events.map((e) => e.entity))].sort();
     let hi = 0;
@@ -127,7 +147,6 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   }, [events]);
   const laneIndex = useMemo(() => new Map(lanes.map((l, i) => [l, i])), [lanes]);
 
-  // 当前模拟时间（播放头）：有锚点按流速推算；无锚点回落到最新事件时刻。
   function simNow(): number {
     const a = anchorRef.current;
     if (!a) return maxSim;
@@ -135,15 +154,12 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   }
   const now = simNow();
 
-  // 网格刻度：以 now 为中心，每 stepMin 一条；px/分钟决定步长与覆盖范围。
   const stepMin = niceStepMin(pxPerMin);
   const stepPx = stepMin * pxPerMin;
   const gridN = Math.ceil(2500 / stepPx) + 1;
   const withDate = stepMin >= 1440;
-  // 仅渲染播放头附近一段时间窗内的块，避免一次铺上千 DOM。
   const halfMinWindow = 3000 / pxPerMin;
   const visible = events.filter((e) => Math.abs(e.simTime - now) / 60_000 <= halfMinWindow);
-
   const offPx = (simTime: number): number => ((simTime - now) / 60_000) * pxPerMin;
 
   return (
@@ -152,22 +168,24 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       <div className="flex items-center gap-2 px-3 py-2 border-b border-(--border) text-xs">
         <i className="ri-time-line text-(--blue)" />
         <span className="font-semibold">时间轴</span>
-        <span className="text-(--dim)">{worldId ?? '—'} · {events.length} 条 · {lanes.length} 账号</span>
-        <span className="ml-2 font-mono tabular-nums text-(--amber)" title="当前模拟时间（播放头）">
+        <span className="text-(--dim)">{worldId ?? '—'} · {events.length} 条</span>
+        <span className="ml-1 font-mono tabular-nums text-(--amber)" title="当前模拟时间（播放头）">
           {formatSimTime(now)}
         </span>
-        <span className="ml-auto text-(--dim)">缩放</span>
-        {ZOOMS.map((z) => (
-          <button
-            key={z}
-            onClick={() => setPxPerMin(z)}
-            className={`px-1.5 py-0.5 rounded border cursor-pointer ${
-              pxPerMin === z ? 'bg-(--blue) border-(--blue) text-white' : 'bg-(--chip) border-(--border) text-(--text)'
-            }`}
-          >
-            {z}
-          </button>
-        ))}
+        <span className="ml-auto flex items-center gap-1.5 text-(--dim)" title="缩放（也可在时间轴内 Ctrl+滚轮）">
+          <i className="ri-zoom-out-line" />
+          <input
+            type="range"
+            min={MIN_PPM}
+            max={MAX_PPM}
+            step={0.5}
+            value={pxPerMin}
+            onChange={(e) => setPxPerMin(Number(e.target.value))}
+            style={{ accentColor: 'var(--blue)' }}
+            className="w-28 cursor-pointer"
+          />
+          <i className="ri-zoom-in-line" />
+        </span>
         <button
           onClick={() => void loadTrace()}
           className="px-1.5 py-0.5 rounded border border-(--border) bg-(--chip) cursor-pointer hover:bg-[#2a2e33]"
@@ -181,84 +199,114 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
         <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无轨迹。启动模拟器后，每次写世界会在此实时长出事件块。</p>
       )}
 
-      {/* 轨道区：左账号标签列 + 右播放头视口 */}
       {events.length > 0 && (
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">
-          <div className="flex min-h-full">
-            {/* 账号标签列 */}
-            <div className="sticky left-0 z-20 bg-(--panel2) border-r border-(--border) shrink-0">
-              <div style={{ height: RULER_H }} className="border-b border-(--border)" />
-              {lanes.map((l) => (
-                <div
-                  key={l}
-                  style={{ height: LANE_H }}
-                  className="flex items-center px-3 text-xs text-(--dim) border-b border-[#15171b] whitespace-nowrap"
-                >
-                  {l}
-                </div>
-              ))}
+        <div className="flex flex-1 min-h-0">
+          {/* 左侧轨道栏：列被驱动账号 */}
+          <div className="shrink-0 border-r border-(--border) bg-(--panel2) overflow-y-auto" style={{ width: ROSTER_W }}>
+            <div className="px-3 py-2 text-xs font-semibold text-(--dim) border-b border-(--border) sticky top-0 bg-(--panel2)">
+              轨道
             </div>
+            {lanes.map((l) => (
+              <div key={l} className="flex items-center gap-2 px-3 py-2 border-b border-[#15171b] text-xs">
+                <Avatar handle={l} size={22} />
+                <span className="truncate">{l}</span>
+              </div>
+            ))}
+          </div>
 
-            {/* 播放头视口：now 居中，块按相对 now 的偏移定位（calc(50% + offset)） */}
-            <div className="relative flex-1 overflow-hidden">
-              {/* 网格竖线 + 刻度标签 */}
-              {Array.from({ length: gridN * 2 + 1 }, (_, i) => {
-                const k = i - gridN;
-                if (k === 0) return null; // 中心由金色播放头画
-                const ms = now + k * stepMin * 60_000;
-                return (
+          {/* 时间轴：lane 标签列 + 播放头视口 */}
+          <div ref={tlRef} className="flex-1 overflow-y-auto overflow-x-hidden">
+            <div className="flex min-h-full">
+              {/* lane 标签列 */}
+              <div className="sticky left-0 z-20 bg-(--panel2) border-r border-(--border) shrink-0" style={{ width: LABEL_W }}>
+                <div style={{ height: RULER_H }} className="border-b border-(--border)" />
+                {lanes.map((l) => (
                   <div
-                    key={k}
-                    className="absolute top-0 bottom-0 border-l border-[#1b1e22]"
-                    style={{ left: `calc(50% + ${k * stepPx}px)` }}
+                    key={l}
+                    style={{ height: LANE_H, borderBottom: `1px solid ${LANE_DIV}` }}
+                    className="flex items-center gap-1.5 px-2 text-xs text-(--dim) whitespace-nowrap"
                   >
-                    <span className="absolute top-0.5 left-1 text-[10px] text-(--dim) whitespace-nowrap">
-                      {formatTick(ms, withDate)}
-                    </span>
+                    <Avatar handle={l} size={18} />
+                    <span className="truncate">{l}</span>
                   </div>
-                );
-              })}
-
-              {/* 标尺底边 + 轨道横线 */}
-              <div style={{ height: RULER_H }} className="border-b border-(--border)" />
-              {lanes.map((l) => (
-                <div key={l} style={{ height: LANE_H }} className="border-b border-[#15171b]" />
-              ))}
-
-              {/* 金色播放头（当前模拟时间分界） */}
-              <div
-                className="absolute top-0 bottom-0 pointer-events-none z-10"
-                style={{ left: '50%', width: 2, background: 'var(--amber)', transform: 'translateX(-1px)' }}
-              >
-                <span className="absolute top-0 left-1 text-[10px] font-semibold text-(--amber) whitespace-nowrap">
-                  现在
-                </span>
+                ))}
               </div>
 
-              {/* 事件块（仅渲染播放头附近时间窗） */}
-              {visible.map((e) => {
-                const li = laneIndex.get(e.entity) ?? 0;
-                const isSel = selected?.id === e.id;
-                return (
-                  <button
-                    key={e.id}
-                    onClick={() => setSelectedTrace(e)}
-                    title={`${e.entity} · ${ACTION_LABEL[e.action]} · ${formatSimTime(e.simTime)}`}
-                    style={{
-                      position: 'absolute',
-                      left: `calc(50% + ${offPx(e.simTime)}px)`,
-                      top: RULER_H + li * LANE_H + 5,
-                      width: BLOCK_W,
-                      height: LANE_H - 12,
-                      transform: 'translateX(-50%)',
-                      background: ACTION_COLOR[e.action],
-                      outline: isSel ? '2px solid var(--text)' : 'none',
-                      opacity: isSel ? 1 : 0.85,
-                    }}
-                    className="rounded-sm cursor-pointer hover:opacity-100 z-10"
-                  />
-                );
-              })}
+              {/* 播放头视口：now 居中，块按相对 now 的偏移定位 */}
+              <div className="relative flex-1 overflow-hidden">
+                {/* 网格竖线 + 刻度 */}
+                {Array.from({ length: gridN * 2 + 1 }, (_, i) => {
+                  const k = i - gridN;
+                  if (k === 0) return null;
+                  const ms = now + k * stepMin * 60_000;
+                  return (
+                    <div
+                      key={k}
+                      className="absolute top-0 bottom-0 border-l border-[#1a1d22]"
+                      style={{ left: `calc(50% + ${k * stepPx}px)` }}
+                    >
+                      <span className="absolute top-0.5 left-1 text-[10px] text-(--dim) whitespace-nowrap">
+                        {formatTick(ms, withDate)}
+                      </span>
+                    </div>
+                  );
+                })}
+
+                {/* 标尺底边 + 轨道横线 */}
+                <div style={{ height: RULER_H }} className="border-b border-(--border)" />
+                {lanes.map((l) => (
+                  <div key={l} style={{ height: LANE_H, borderBottom: `1px solid ${LANE_DIV}` }} />
+                ))}
+
+                {/* 金色播放头 */}
+                <div
+                  className="absolute top-0 bottom-0 pointer-events-none z-10"
+                  style={{ left: '50%', width: 2, background: 'var(--amber)', opacity: 0.75, transform: 'translateX(-1px)' }}
+                >
+                  <span className="absolute top-0.5 left-1 text-[10px] font-semibold text-(--amber) whitespace-nowrap">现在</span>
+                </div>
+
+                {/* 事件块（mockup 圆角条；仅渲染播放头附近时间窗） */}
+                {visible.map((e) => {
+                  const li = laneIndex.get(e.entity) ?? 0;
+                  const isSel = selected?.id === e.id;
+                  const isAct = isActAction(e.action);
+                  const isFuture = e.simTime > now;
+                  const h = isAct ? 18 : 24;
+                  const top = RULER_H + li * LANE_H + (LANE_H - h) / 2;
+                  const style: React.CSSProperties = {
+                    position: 'absolute',
+                    left: `calc(50% + ${offPx(e.simTime)}px)`,
+                    top,
+                    height: h,
+                    maxWidth: 230,
+                    outline: isSel ? '2px solid #fff' : 'none',
+                    outlineOffset: 1,
+                  };
+                  if (isFuture) {
+                    style.background = 'transparent';
+                    style.border = `1px dashed ${ACTION_COLOR[e.action]}`;
+                    style.color = ACTION_COLOR[e.action];
+                  } else if (isAct) {
+                    style.background = '#3a3f46';
+                    style.color = '#cdd2d6';
+                  } else {
+                    style.background = ACTION_COLOR[e.action];
+                    style.color = '#fff';
+                  }
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => setSelectedTrace(e)}
+                      title={`${e.entity} · ${ACTION_LABEL[e.action]} · ${formatSimTime(e.simTime)}`}
+                      style={style}
+                      className="rounded-md px-2 flex items-center text-[11px] whitespace-nowrap overflow-hidden cursor-pointer hover:brightness-110 z-10"
+                    >
+                      {ACTION_LABEL[e.action]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>

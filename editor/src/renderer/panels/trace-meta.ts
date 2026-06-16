@@ -19,3 +19,11 @@ export function formatSimTime(ms: number): string {
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
 }
+
+/** 账号头像配色：按 handle 哈希取一个固定色，使每个账号有稳定可辨识的色块。 */
+const AVATAR_PALETTE = ['#1d9bf0', '#f91880', '#00ba7c', '#f5a623', '#a970ff', '#ff7a45', '#17bf63', '#e0245e'];
+export function avatarColor(handle: string): string {
+  let h = 0;
+  for (let i = 0; i < handle.length; i++) h = (h * 31 + handle.charCodeAt(i)) >>> 0;
+  return AVATAR_PALETTE[h % AVATAR_PALETTE.length]!;
+}
