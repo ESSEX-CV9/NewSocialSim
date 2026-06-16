@@ -36,6 +36,15 @@ export interface SimTraceEvent {
 }
 
 /**
+ * 已落盘的决策轨迹事件：sim-trace.db 一行，比 SimTraceEvent 多自增主键 id。
+ * 编辑器后端只读查询返回此形态，时间轴块以 id 为稳定 key。
+ */
+export interface StoredSimTraceEvent extends SimTraceEvent {
+  /** trace_event 表自增主键。 */
+  id: number;
+}
+
+/**
  * GM/Agent 决策日志：导演层/Agent"为什么这么调度"的观测记录，与决策轨迹同属观测线，
  * 同库（sim-trace.db）独立表存放，绝不进 world.db。
  * 同记 at（现实时间，供追溯每次 LLM 调用在现实里何时发生）与 simTime（世界时间，供对齐时间轴）。

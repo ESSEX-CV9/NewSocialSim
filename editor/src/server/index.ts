@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import Fastify from 'fastify';
+import { TraceReader } from './trace-reader.js';
+import { TraceSseHub } from './trace-sse.js';
 
 /** 编辑器后端：renderer 的唯一数据源，聚合/代理社交站 admin API，承载布局存档等编辑器配置。
  *  基础设施配置（端口/社交站地址/数据根目录）经 env，与具体世界无关。 */
@@ -113,6 +115,49 @@ app.put<{ Body: LayoutsDoc }>('/api/layouts', async (req, reply) => {
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, JSON.stringify(doc, null, 2), 'utf-8');
   return { ok: true };
+});
+
+// --- 决策轨迹：只读 per-world sim-trace.db（模拟器独占写、编辑器后端只读），供时间轴渲染 ---
+
+const traceReader = new TraceReader(DATA_DIR);
+const traceSse = new TraceSseHub();
+
+/** 按 sim_time 区间查活动世界的轨迹事件；世界没跑过模拟器返回空集。 */
+app.get<{ Querystring: { from?: string; to?: string; entity?: string; limit?: string } }>(
+  '/api/trace',
+  async (req, reply) => {
+    const id = await activeWorldId();
+    if (!id) {
+      reply.status(502);
+      return { error: 'no active world' };
+    }
+    const num = (v: string | undefined): number | undefined => {
+      if (v === undefined) return undefined;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : undefined;
+    };
+    const events = traceReader.query(id, {
+      from: num(req.query.from),
+      to: num(req.query.to),
+      entity: req.query.entity || undefined,
+      limit: num(req.query.limit),
+    });
+    return { events };
+  },
+);
+
+/** 轨迹实时推流（SSE）；0.9 先只接连接 + 心跳空推，0.11 接 ingest 转发。 */
+app.get('/api/trace/stream', (req, reply) => {
+  reply.raw.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+    'Access-Control-Allow-Origin': '*',
+  });
+  reply.raw.write('event: ready\ndata: {}\n\n');
+  reply.hijack();
+  const unregister = traceSse.addClient(reply.raw);
+  req.raw.on('close', unregister);
 });
 
 app
