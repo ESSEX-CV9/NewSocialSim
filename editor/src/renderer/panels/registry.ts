@@ -2,6 +2,7 @@ import type { FunctionComponent } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
 import { ConsolePanel } from './ConsolePanel.js';
 import { TimelinePanel } from './TimelinePanel.js';
+import { InspectorPanel } from './InspectorPanel.js';
 import { PlaceholderPanel } from './PlaceholderPanel.js';
 
 /**
@@ -18,7 +19,7 @@ export interface PanelDef {
 export const PANELS: PanelDef[] = [
   { id: 'console', title: '控制台', component: ConsolePanel },
   { id: 'timeline', title: '时间轴', component: TimelinePanel },
-  { id: 'inspector', title: '检视器', component: PlaceholderPanel },
+  { id: 'inspector', title: '检视器', component: InspectorPanel },
   { id: 'npc', title: 'NPC 设计器', component: PlaceholderPanel },
   { id: 'pools', title: '内容池', component: PlaceholderPanel },
   { id: 'lore', title: '设定文档', component: PlaceholderPanel },

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { StoredSimTraceEvent, SimTraceAction } from '@socialsim/shared';
+import type { StoredSimTraceEvent } from '@socialsim/shared';
+import { useSelectedTrace, setSelectedTrace } from '../state/selection.js';
+import { ACTION_COLOR, ACTION_LABEL, formatSimTime } from './trace-meta.js';
 
 /**
- * 时间轴面板（= 决策轨迹视图，同一面板）：纵轴账号轨道、横轴模拟时间，每条轨迹落为一个块，
- * 点开块展示该条决策详情。0.10 经 GET /api/trace 载入；并订阅 SSE，0.11 接 ingest 后实时长块。
+ * 时间轴面板（= 决策轨迹视图）：纵轴账号轨道、横轴模拟时间，每条轨迹落为一个块。
+ * 点选块写入全局选中态，详情由独立的检视器面板展示（可自由停靠）。
+ * 0.10 经 GET /api/trace 载入；并订阅 SSE，0.11 接 ingest 后实时长块。
  */
 
 const LANE_H = 30; // 每条账号轨道高度（px）
@@ -12,29 +15,10 @@ const BLOCK_W = 9; // 事件块宽度（px）
 const ZOOMS = [2, 6, 18, 60]; // px / 模拟分钟
 const POLL_WORLD_MS = 3000;
 
-/** 动作 → 颜色令牌，使时间轴一眼区分发帖/回复/赞等。 */
-const ACTION_COLOR: Record<SimTraceAction, string> = {
-  post: 'var(--blue)',
-  reply: 'var(--green)',
-  quote: 'var(--amber)',
-  like: 'var(--pink)',
-  repost: '#a970ff',
-  follow: 'var(--dim)',
-};
-const ACTION_LABEL: Record<SimTraceAction, string> = {
-  post: '发帖', reply: '回复', quote: '引用', like: '赞', repost: '转发', follow: '关注',
-};
-
-function formatSimTime(ms: number): string {
-  const d = new Date(ms);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-}
-
 export function TimelinePanel(_props: IDockviewPanelProps) {
   const [events, setEvents] = useState<StoredSimTraceEvent[]>([]);
   const [worldId, setWorldId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<StoredSimTraceEvent | null>(null);
+  const selected = useSelectedTrace();
   const [error, setError] = useState<string | null>(null);
   const [pxPerMin, setPxPerMin] = useState(6);
   const worldRef = useRef<string | null>(null);
@@ -66,7 +50,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
         if (!alive || id === worldRef.current) return;
         worldRef.current = id;
         setWorldId(id);
-        setSelected(null);
+        setSelectedTrace(null);
         await loadTrace();
       } catch {
         /* 后端暂不可达，下个周期重试 */
@@ -143,106 +127,63 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
         <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无轨迹。启动模拟器后，每次写世界会在此实时长出事件块。</p>
       )}
 
-      {/* 轨道区（左）+ 选中详情（右） */}
+      {/* 轨道区 */}
       {events.length > 0 && (
-        <div className="flex flex-1 min-h-0">
-          {/* 轨道区 */}
-          <div className="flex-1 overflow-auto">
-            <div className="flex">
-              {/* 账号标签列（横向滚动时固定） */}
-              <div className="sticky left-0 z-10 bg-(--panel2) border-r border-(--border) shrink-0">
-                <div style={{ height: 22 }} className="border-b border-(--border)" />
-                {lanes.map((l) => (
-                  <div
-                    key={l}
-                    style={{ height: LANE_H }}
-                    className="flex items-center px-3 text-xs text-(--dim) border-b border-[#15171b] whitespace-nowrap"
-                  >
-                    {l}
-                  </div>
-                ))}
-              </div>
-
-              {/* 轨道画布 */}
-              <div className="relative" style={{ width: trackWidth }}>
-                {/* 时间标尺（起止） */}
-                <div style={{ height: 22 }} className="relative border-b border-(--border) text-[10px] text-(--dim)">
-                  <span className="absolute left-1 top-1">{formatSimTime(minSim)}</span>
-                  <span className="absolute right-1 top-1">{formatSimTime(minSim + spanMin * 60_000)}</span>
+        <div className="flex-1 overflow-auto">
+          <div className="flex">
+            {/* 账号标签列（横向滚动时固定） */}
+            <div className="sticky left-0 z-10 bg-(--panel2) border-r border-(--border) shrink-0">
+              <div style={{ height: 22 }} className="border-b border-(--border)" />
+              {lanes.map((l) => (
+                <div
+                  key={l}
+                  style={{ height: LANE_H }}
+                  className="flex items-center px-3 text-xs text-(--dim) border-b border-[#15171b] whitespace-nowrap"
+                >
+                  {l}
                 </div>
-                {/* 轨道横线 */}
-                {lanes.map((l) => (
-                  <div key={l} style={{ height: LANE_H }} className="border-b border-[#15171b]" />
-                ))}
-                {/* 事件块 */}
-                {events.map((e) => {
-                  const li = laneIndex.get(e.entity) ?? 0;
-                  const x = ((e.simTime - minSim) / 60_000) * pxPerMin;
-                  const isSel = selected?.id === e.id;
-                  return (
-                    <button
-                      key={e.id}
-                      onClick={() => setSelected(e)}
-                      title={`${e.entity} · ${ACTION_LABEL[e.action]} · ${formatSimTime(e.simTime)}`}
-                      style={{
-                        position: 'absolute',
-                        left: x,
-                        top: 22 + li * LANE_H + 5,
-                        width: BLOCK_W,
-                        height: LANE_H - 12,
-                        background: ACTION_COLOR[e.action],
-                        outline: isSel ? '2px solid var(--text)' : 'none',
-                        opacity: isSel ? 1 : 0.85,
-                      }}
-                      className="rounded-sm cursor-pointer hover:opacity-100"
-                    />
-                  );
-                })}
+              ))}
+            </div>
+
+            {/* 轨道画布 */}
+            <div className="relative" style={{ width: trackWidth }}>
+              {/* 时间标尺（起止） */}
+              <div style={{ height: 22 }} className="relative border-b border-(--border) text-[10px] text-(--dim)">
+                <span className="absolute left-1 top-1">{formatSimTime(minSim)}</span>
+                <span className="absolute right-1 top-1">{formatSimTime(minSim + spanMin * 60_000)}</span>
               </div>
+              {/* 轨道横线 */}
+              {lanes.map((l) => (
+                <div key={l} style={{ height: LANE_H }} className="border-b border-[#15171b]" />
+              ))}
+              {/* 事件块 */}
+              {events.map((e) => {
+                const li = laneIndex.get(e.entity) ?? 0;
+                const x = ((e.simTime - minSim) / 60_000) * pxPerMin;
+                const isSel = selected?.id === e.id;
+                return (
+                  <button
+                    key={e.id}
+                    onClick={() => setSelectedTrace(e)}
+                    title={`${e.entity} · ${ACTION_LABEL[e.action]} · ${formatSimTime(e.simTime)}`}
+                    style={{
+                      position: 'absolute',
+                      left: x,
+                      top: 22 + li * LANE_H + 5,
+                      width: BLOCK_W,
+                      height: LANE_H - 12,
+                      background: ACTION_COLOR[e.action],
+                      outline: isSel ? '2px solid var(--text)' : 'none',
+                      opacity: isSel ? 1 : 0.85,
+                    }}
+                    className="rounded-sm cursor-pointer hover:opacity-100"
+                  />
+                );
+              })}
             </div>
           </div>
-
-          {/* 选中块详情（右侧栏） */}
-          {selected && (
-            <div className="w-72 shrink-0 overflow-auto border-l border-(--border) bg-(--panel) px-3 py-2.5 text-xs">
-              <div className="flex items-center gap-2 mb-2">
-                <span
-                  className="inline-block w-2.5 h-2.5 rounded-sm"
-                  style={{ background: ACTION_COLOR[selected.action] }}
-                />
-                <span className="font-semibold">{selected.entity}</span>
-                <span className="text-(--dim)">{ACTION_LABEL[selected.action]}</span>
-                <button
-                  onClick={() => setSelected(null)}
-                  className="ml-auto text-(--dim) hover:text-(--text) cursor-pointer"
-                >
-                  <i className="ri-close-line" />
-                </button>
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <Kv k="模拟时间" v={formatSimTime(selected.simTime)} />
-                <Kv k="形态 shape" v={selected.shape ?? '—'} />
-                <Kv k="意图 intent" v={selected.intent ?? '—'} />
-                <Kv k="活动态" v={selected.activityState ?? '—'} />
-                <Kv k="池 poolId" v={selected.poolId ?? '—'} />
-                <Kv k="条目 entryId" v={selected.entryId ?? '—'} />
-                <Kv k="配图" v={selected.mediaAttached ? `是 · ${selected.mediaReason ?? ''}` : '否'} />
-                <Kv k="目标帖" v={selected.targetPostId ?? '—'} />
-                <Kv k="现实时间" v={formatSimTime(selected.at)} />
-              </div>
-            </div>
-          )}
         </div>
       )}
-    </div>
-  );
-}
-
-function Kv({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div className="flex justify-between gap-2 py-0.5">
-      <span className="text-(--dim) shrink-0">{k}</span>
-      <span className="font-mono truncate">{v}</span>
     </div>
   );
 }

@@ -14,8 +14,8 @@ export interface Preset {
 }
 
 export const PRESETS: Preset[] = [
-  // 观察：倒品字形——上排控制台 + 检视器并列，下方时间轴铺满整行长方形。
-  { id: 'observe', name: '观察', panes: ['console', 'inspector', 'timeline'], build: buildObserve },
+  // 观察：控制台顶部通栏；下方时间轴(宽) | 检视器(窄)并排。
+  { id: 'observe', name: '观察', panes: ['console', 'timeline', 'inspector'], build: buildObserve },
   { id: 'npc', name: 'NPC 建设', panes: ['npc', 'inspector'] },
   { id: 'pools', name: '内容池', panes: ['pools', 'inspector'] },
   { id: 'lore', name: '设定', panes: ['lore', 'inspector'] },
@@ -50,7 +50,7 @@ export function applyPanes(api: DockviewApi, panes: string[]): void {
   });
 }
 
-/** 倒品字形：上排 控制台 | 检视器，下方时间轴铺满整行。 */
+/** 观察布局：控制台顶部通栏；下方 时间轴(宽) | 检视器(窄) 并排。 */
 function buildObserve(api: DockviewApi): void {
   const base = (id: string, type: string) => ({
     id,
@@ -60,12 +60,13 @@ function buildObserve(api: DockviewApi): void {
   });
 
   api.addPanel(base('pane-1', 'console'));
-  api.addPanel({ ...base('pane-2', 'inspector'), position: { referencePanel: 'pane-1', direction: 'right' } });
-  // 无 reference + below = 相对整个网格底部，铺满整行。
-  const timeline = api.addPanel({ ...base('pane-3', 'timeline'), position: { direction: 'below' } });
-  // 给下方时间轴一个偏矮的初始高度，呈横长方形；失败不影响布局。
+  // 时间轴在控制台正下方，撑满底部整行。
+  const timeline = api.addPanel({ ...base('pane-2', 'timeline'), position: { referencePanel: 'pane-1', direction: 'below' } });
+  // 检视器贴在时间轴右侧，较窄。
+  const inspector = api.addPanel({ ...base('pane-3', 'inspector'), position: { referencePanel: timeline.id, direction: 'right' } });
   try {
-    timeline.api.setSize({ height: 300 });
+    api.getPanel('pane-1')?.api.setSize({ height: 240 }); // 控制台顶部偏矮
+    inspector.api.setSize({ width: 300 }); // 检视器窄栏
   } catch {
     /* 容器尺寸未就绪时忽略，用默认比例 */
   }
