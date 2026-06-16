@@ -5,7 +5,11 @@ import type { StoredSimTraceEvent, SimTraceShape, SimTraceAction } from '@social
 /**
  * 决策轨迹只读器：编辑器后端按活动世界开 sim-trace.db 的只读连接，按 sim_time 区间查询。
  * 分库原则：sim-trace.db 模拟器独占写、编辑器后端只读（WAL 下可与模拟器并发）。
- * 连接按 worldId 缓存，切世界时关旧开新；世界从未跑过模拟器（库文件不存在）时返回空集，不报错。
+ *
+ * 每次查询开一个全新只读连接、读完即关——绝不缓存连接：WAL 模式下数据多在 -wal 文件，
+ * 一条长期缓存的只读连接若在 -shm 共享内存索引未就绪时（如模拟器尚未启动）打开，会退化为
+ * "只读主库文件、忽略 WAL"并一直保持该状态，导致读到的几乎为空。每次新开连接可规避此坑。
+ * 世界从未跑过模拟器（库文件不存在）时返回空集，不报错。
  */
 
 /** trace_event 表的原始行形态（snake_case，与建表一致）。 */
@@ -40,43 +44,25 @@ const DEFAULT_LIMIT = 2000;
 const MAX_LIMIT = 10000;
 
 export class TraceReader {
-  private db: Database.Database | null = null;
-  private worldId: string | null = null;
-
   constructor(private dataDir: string) {}
-
-  /** 切到某世界的轨迹库（只读）；库不存在返回 false，调用方据此返回空集。 */
-  private bind(worldId: string): boolean {
-    if (this.worldId === worldId && this.db) return true;
-    this.close();
-    const dbPath = path.join(this.dataDir, 'worlds', worldId, 'sim-trace.db');
-    try {
-      // fileMustExist：世界没跑过模拟器就没有此库，不在只读侧建表。
-      const db = new Database(dbPath, { readonly: true, fileMustExist: true });
-      this.db = db;
-      this.worldId = worldId;
-      return true;
-    } catch {
-      this.db = null;
-      this.worldId = null;
-      return false;
-    }
-  }
 
   /** 查询某世界某 sim_time 区间的轨迹，升序（sim_time, id）。世界无库时返回空数组。 */
   query(worldId: string, q: TraceQuery): StoredSimTraceEvent[] {
-    if (!this.bind(worldId)) return [];
-    const from = q.from ?? 0;
-    const to = q.to ?? Number.MAX_SAFE_INTEGER;
-    const limit = Math.min(Math.max(1, q.limit ?? DEFAULT_LIMIT), MAX_LIMIT);
-    const where = ['sim_time >= @from', 'sim_time <= @to'];
-    const params: Record<string, unknown> = { from, to, limit };
-    if (q.entity) {
-      where.push('entity = @entity');
-      params.entity = q.entity;
-    }
+    const dbPath = path.join(this.dataDir, 'worlds', worldId, 'sim-trace.db');
+    let db: Database.Database | null = null;
     try {
-      const rows = this.db!
+      // 每次新开只读连接：fileMustExist——世界没跑过模拟器就没有此库，返回空集。
+      db = new Database(dbPath, { readonly: true, fileMustExist: true });
+      const from = q.from ?? 0;
+      const to = q.to ?? Number.MAX_SAFE_INTEGER;
+      const limit = Math.min(Math.max(1, q.limit ?? DEFAULT_LIMIT), MAX_LIMIT);
+      const where = ['sim_time >= @from', 'sim_time <= @to'];
+      const params: Record<string, unknown> = { from, to, limit };
+      if (q.entity) {
+        where.push('entity = @entity');
+        params.entity = q.entity;
+      }
+      const rows = db
         .prepare(
           `SELECT id, at, sim_time, entity, action, activity_state, intent, shape,
                   pool_id, entry_id, media_attached, media_reason, target_post_id
@@ -88,17 +74,13 @@ export class TraceReader {
         .all(params) as TraceRow[];
       return rows.map(mapRow);
     } catch {
-      // 库结构异常/被占用等，降级为空集，不让查询端点崩。
+      // 库不存在/结构异常/被占用等，降级为空集，不让查询端点崩。
       return [];
+    } finally {
+      if (db) {
+        try { db.close(); } catch { /* ignore */ }
+      }
     }
-  }
-
-  close(): void {
-    if (this.db) {
-      try { this.db.close(); } catch { /* ignore */ }
-    }
-    this.db = null;
-    this.worldId = null;
   }
 }
 
