@@ -36,6 +36,8 @@ export function App() {
 
   function onReady(event: DockviewReadyEvent): void {
     apiRef.current = event.api;
+    // 立即铺默认预设，保证打开不空白；世界解析出来后 loadLayouts 再用该世界存档覆盖。
+    applyPanes(event.api, DEFAULT_PRESET.panes);
     event.api.onDidLayoutChange(() => scheduleSave());
     setApiReady(true);
   }
