@@ -109,6 +109,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const [following, setFollowing] = useState(true);
   const [scrollX, setScrollX] = useState(0);
   const [viewW, setViewW] = useState(800);
+  const [names, setNames] = useState<Record<string, string>>({});
+  const namesRef = useRef<Record<string, string>>({});
   const worldRef = useRef<string | null>(null);
   const anchorRef = useRef<Anchor | null>(null);
   const tlRef = useRef<HTMLDivElement | null>(null);
@@ -153,6 +155,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           setWorldId(id);
           setSelectedTrace(null);
           setFollowing(true);
+          namesRef.current = {}; // 换世界，昵称缓存作废
+          setNames({});
           await loadTrace();
         }
       } catch {
@@ -218,6 +222,35 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     }
     return { lanes: ls, minSim: Number.isFinite(lo) ? lo : 0, maxSim: hi };
   }, [events]);
+
+  // 拉账号昵称（缺的才拉，缓存按世界作废）。色按 handle 稳定、字用昵称首字。
+  useEffect(() => {
+    const missing = lanes.filter((l) => !namesRef.current[l]);
+    if (missing.length === 0) return;
+    let alive = true;
+    void (async () => {
+      const got = await Promise.all(
+        missing.map(async (h): Promise<[string, string]> => {
+          try {
+            const r = await fetch(`${backend}/api/users/${encodeURIComponent(h)}`);
+            if (!r.ok) return [h, h];
+            const j = (await r.json()) as { user?: { displayName?: string } };
+            return [h, j.user?.displayName || h];
+          } catch {
+            return [h, h];
+          }
+        }),
+      );
+      if (!alive) return;
+      const merged = { ...namesRef.current, ...Object.fromEntries(got) };
+      namesRef.current = merged;
+      setNames(merged);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [lanes, backend]);
+  const nameOf = (h: string): string => names[h] || h;
 
   const originSim = minSim - 2 * 60_000; // 左侧留 2 分钟
   const ax = (t: number) => ((t - originSim) / 60_000) * pxPerMin;
@@ -333,8 +366,11 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
             </div>
             {lanes.map((l) => (
               <div key={l} className="flex items-center gap-2 px-3 py-2 border-b border-[#15171b] text-xs">
-                <Avatar handle={l} size={22} />
-                <span className="truncate">{l}</span>
+                <Avatar handle={l} name={nameOf(l)} size={28} />
+                <div className="min-w-0 leading-tight">
+                  <div className="font-semibold truncate">{nameOf(l)}</div>
+                  <div className="text-(--dim) text-[11px] truncate">@{l}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -351,8 +387,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
                     style={{ height: layout.laneHeights[i], borderBottom: `1px solid ${LANE_DIV}` }}
                     className="flex items-center gap-1.5 px-2 text-xs text-(--dim) whitespace-nowrap"
                   >
-                    <Avatar handle={l} size={18} />
-                    <span className="truncate">{l}</span>
+                    <Avatar handle={l} name={nameOf(l)} size={18} />
+                    <span className="truncate">{nameOf(l)}</span>
                   </div>
                 ))}
               </div>
