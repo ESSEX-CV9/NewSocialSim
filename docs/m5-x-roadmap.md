@@ -115,13 +115,14 @@
 - **验收**：ingest→SSE 转发收到事件；sink 不可达时模拟器仍独立运行、仅本地落盘不中断写世界。
 - **交接提示**：sink 地址属基础设施配置；时间轴的块来自世界内容、其实时更新走 global 流轮询，本步推送服务于轨迹增强层而非块来源。
 
-### 0.12 Step 0 端到端验收 🟡 脚本就绪·待干净环境跑通
+### 0.12 Step 0 端到端验收 ✅
 
 - **目标**：在全新创建的世界上跑通切世界端到端场景的可观测断言（依据 `docs/m5-real-usage-contract.md` 金标准场景的 **Step-0 子集**；Step5 回复挂父帖/媒体/alignment 语气属 Phase 1-3，本步不验）。
 - **改动**：`scripts/verify-step0.mjs`（断言式：现建 W1/W2 两全新世界 → 代理建号 → 世界自包含配置 → 自起模拟器子进程 → 切世界 → 断言 → 恢复原活动世界并删测试世界；不依赖任何预置世界）。
 - **验收**：脚本断言——W1 创建并成活动世界；代理建号 3 个 `isBot=1`；`sim_/bot/npc/user01` 等命名被拒；模拟器启动参数不含 W1 数据却绑定 W1、登录 3 账号、产生帖子；激活 W2 后 `lastFlushedWorldId=W1`、绑定 W2、W2 发帖、**W2 期间 W1 帖子数不变**（直读 world.db，验无 401 空转/串写）；激活回 W1 恢复发帖。`node scripts/verify-step0.mjs` 全 PASS、退码 0。
 - **运行前提**：后端已起；**运行期间不要另开 `dev:simulator`**（脚本自起模拟器，两个会互相干扰）；测试世界用高流速 scale=120 使发帖在数秒内发生，全程约 3 分钟。
-- **交接提示**：脚本用 `node` 直接跑（非 tsx），故含中文无 tsx 动态导入预扫描 bug；断言"W2 期间不写 W1"靠 `better-sqlite3` 只读直查各世界 `world.db` 的 `posts` 计数（跨活动世界，API 只服务活动世界故不够）。状态判定走 `GET /api/simulator/status` 心跳。已 `node --check` 过语法，待在停掉 dev:simulator 的环境跑通后标 ✅。
+- **交接提示**：脚本用 `node` 直接跑（非 tsx），故含中文无 tsx 动态导入预扫描 bug；断言"W2 期间不写 W1"靠 `better-sqlite3` 只读直查各世界 `world.db` 的 `posts` 计数（跨活动世界，API 只服务活动世界故不够）。状态判定走 `GET /api/simulator/status` 心跳。
+- **结果**：2026-06-17 在 demo 环境（停 dev:simulator）跑通，**15/15 全 PASS**——实证 flush W1→绑 W2→W2 用自配置发帖→W2 期间 W1 帖数不变→切回 W1 恢复；测试世界跑完删除、活动世界复原 demo。**Phase 0 地基至此完成。**
 
 ---
 
