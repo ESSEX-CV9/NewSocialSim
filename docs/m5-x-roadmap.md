@@ -147,10 +147,11 @@
 
 **当前实现的取数策略**：global 流作"发现账号 + 顶层帖主轴（无限向后滚动）"，再**按账号封顶拉取**回复（`?type=replies`）与转发（`/timeline`）。因此**回复/转发只覆盖各账号近期若干页**（`EXTRA_PAGE_CAP`），深度历史与赞/关注待下列步骤补齐。
 
-### T.1 互动事件流（赞 / 关注上轴）⬜
-- **目标**：时间轴显示**全部**互动。当前转发已从 `/api/users/:handle/timeline` 取得（带 `activityAt`）；赞 / 关注无按时间的事件流来源——`GET /api/users/:handle/likes` 只返回被赞的帖子、丢了点赞时间。
-- **改动**：`server`（新增按账号/时间分页的互动事件端点，把 `likes`/`follows` 的 `created_at` 作为 `activityAt` 返回，与 `/timeline` 暴露转发 `activityAt` 同范式）、`editor/src/server/`（代理）、`editor/src/renderer/`（赞/关注块，灰色小条类比转发）。
-- **交接提示**：**无需 migration**——`likes`/`reposts`/`follows` 三表均已有 `created_at`，只是未经 API 暴露成事件流。赞/关注属真人也会有的数据 → 进 world.db、走社交站 API（分库原则），不走决策轨迹。
+### T.1 互动事件流（赞 / 转 / 关注上轴）✅
+- **目标**：时间轴显示**全部**互动（赞/转/关注，带发生时间）。
+- **改动**：`shared`（`InteractionEvent`）；`server`（`interactions.repo.listUserActivity` UNION likes/reposts/follows 三表、按 `created_at` 倒序、游标 `[created_at, kind, ref]`；`interactions.service.listUserActivity` 解析为事件；`GET /api/users/:handle/interactions` optionalAuth；注入 usersService）；`editor/src/server/`（代理）；`editor/src/renderer/`（`LikeBlock`/`RepostBlock`/`FollowBlock`，灰色小条，转发改由此统一端点而非 `/timeline`）。
+- **结果**：2026-06-17 实现并冒烟通过——social 与编辑器后端代理均返回赞/转事件带时间戳、游标可翻页；五工作区 typecheck + editor build 全绿。**无需 migration**（三表已有 `created_at`）。
+- **交接提示**：赞/转/关注属真人也会有的数据 → 进 world.db、走社交站 API（分库原则），不走决策轨迹。游标三段 `[created_at, kind, ref]` 避免同毫秒（模拟器同 tick 多互动）翻页死循环。检视器分流赞/转（互动者 + 原帖卡）/关注（关注者→被关注者）。
 
 ### T.2 跳转任意时间区间（time-range 查询）⬜
 - **目标**：用户直接跳到某历史时间区间查看，而非只能从最新游标无限回翻。
