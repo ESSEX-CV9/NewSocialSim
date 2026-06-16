@@ -1,0 +1,32 @@
+# M5-X 文档索引
+
+第二阶段模拟器在 `feat-M5-X-RE` 分支重启（先确定性后 LLM、编辑器为唯一观察窗、四步阶梯）。新会话按下列顺序读，可快速确认开发到哪、设计定了什么。标注 【设计】=目标设计待实现，【已实现】=代码已落地，【约束】=必须遵守，【示意】=可视参考。
+
+## 阅读顺序
+
+### 1. 起步必读
+- `CLAUDE.md` — 项目交接：结构速览、关键机制、环境注意（Windows/PS）、下一步。
+- `docs/m5-x-re-plan.md` — 本轮纲领【设计+进度】：先确定性后 LLM、四步阶梯（Step 0 地基 → 1 顶层帖 → 2 配图 → 3 回复）、三条数据线、编辑器双层、内容池 ECS 模型 + 篇幅维度 + NPC 私有池。
+- `docs/m5-real-usage-contract.md` — 模拟器真实使用契约【约束】：跟随活动世界、账号模型、形态忠实、媒体、金标准端到端验收（须在全新世界跑通）。
+
+### 2. NPC 与内容设计
+- `docs/m5-npc-state-machine.md` — 【设计】NPC 三层数据与存储（一 NPC 一文件夹 / 文件为准·DB 副本）、数值五层（Alignment/Persona/Mood/关系/Activity FSM）、RP 资料层、关系两面与阶段化、内容池 ECS（组件类型→语法→池）。
+- `docs/m5-identity-generation.md` — 【设计】昵称/ID/头像确定性生成（世界级风格分布→语法→词库；handle 不可变故往往正经、displayName 可玩 meme、二者解耦）。
+
+### 3. 接入与编辑器
+- `docs/m5-design.md` — 【设计】M5 总设计：双层架构、Agent 工具范式、GM 生命周期、世界编辑器十面板。
+- `docs/m5-mcp-integration.md` — 【设计】MCP 额外接入路（API 为主路）：tools/resources/prompts、GM 职责打包成 MCP 提示词、程序拉 headless 宿主自动化。
+- `docs/editor-mockup.html` — 【示意】编辑器多窗格静态布局（浏览器打开，十面板 + 创作助手悬浮球）。
+
+### 4. 总设计与路线
+- `docs/design.md` — 全项目设计决策、架构约束、第一阶段成果、M5 路线与待办。
+
+### 5. 进度
+- `docs/devlog/2026-06-16.md` — 最新开发日志（M5-X-RE 重启、内容池 ECS 统一、Step 0a/0b、账号模型前端对齐）。
+- `docs/devlog/2026-06-11..14*.md` — 第一阶段网站与 M5-1~4。
+
+## 代码进度速查
+- 分支 `feat-M5-X-RE`，基于 M5-4 完成态重启。
+- 【已实现】Step 0a 代理建号（is_bot、拒绝 bot 命名）；Step 0b 模拟器跟随活动世界 + login-as 票据（不存密码）+ 时间基修正 + 发帖确定性化；账号模型前端对齐（删虚拟用户徽章、isBot 从公共 API 清除）。
+- 【待实现】Step 0c 决策轨迹（per-world JSONL）→ 0d/0e 正式编辑器（按 mockup 重建：多窗格壳 + 独立 Fastify 后端 + 控制台 + 最小时间轴）→ Step 1 按 ECS 内容池发顶层帖；其后 NPC 数据架构重做 / 私有池 / 关系阶段化 / 名字生成器 / 长帖段落体 / MCP 接入；行为状态机与 GM 导演层最后。
+- `demo` 世界（3 个 is_bot 账号 林辰/悠悠/丸子）为当前活动世界与演示基准，重建脚本 `scripts/demo-stp0.mjs`。旧世界（acgn-sim 等）已弃用。
