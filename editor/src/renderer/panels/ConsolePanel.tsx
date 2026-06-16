@@ -5,6 +5,8 @@ import type { IDockviewPanelProps } from 'dockview';
 interface Anchor {
   id: string;
   name: string;
+  locale: string;
+  contentRating: string;
   scale: number;
   paused: boolean;
   simAnchorMs: number;
@@ -13,6 +15,7 @@ interface Anchor {
 
 const POLL_INTERVAL_MS = 3000;
 const TICK_INTERVAL_MS = 250;
+const SCALES = [1, 2, 5, 20, 60];
 
 function formatSimTime(ms: number): string {
   const d = new Date(ms);
@@ -21,13 +24,12 @@ function formatSimTime(ms: number): string {
 }
 
 /**
- * 控制台·读态：实时展示活动世界与时钟。
- * 轮询编辑器后端拾取切世界/暂停/调速，两次轮询间本地按流速推算世界时间使其平滑走字。
- * 时钟控制（0.7）与模拟器状态（0.8）将续长在此面板。
+ * 控制台：卡片栅格布局（对齐 docs/editor-mockup.html）。
+ * 「当前世界」卡实时展示世界 + 时钟并提供时钟控制；其余卡（模拟器/快照/世界列表等）随对应功能落地再加。
  */
 export function ConsolePanel(_props: IDockviewPanelProps) {
   const anchorRef = useRef<Anchor | null>(null);
-  const [, forceRerender] = useState(0);
+  const [, rerender] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,13 +39,15 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
         const res = await fetch(`${window.editor.backendUrl}/api/worlds/active`);
         if (!res.ok) throw new Error(`backend ${res.status}`);
         const w = (await res.json()) as {
-          meta: { id: string; name: string; clock: { scale: number; paused: boolean } };
+          meta: { id: string; name: string; locale: string; contentRating: string; clock: { scale: number; paused: boolean } };
           simTimeMs: number;
         };
         if (!alive) return;
         anchorRef.current = {
           id: w.meta.id,
           name: w.meta.name,
+          locale: w.meta.locale,
+          contentRating: w.meta.contentRating,
           scale: w.meta.clock.scale,
           paused: w.meta.clock.paused,
           simAnchorMs: w.simTimeMs,
@@ -56,7 +60,7 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
     }
     void poll();
     const pollId = setInterval(() => void poll(), POLL_INTERVAL_MS);
-    const tickId = setInterval(() => forceRerender((t) => t + 1), TICK_INTERVAL_MS);
+    const tickId = setInterval(() => rerender((t) => t + 1), TICK_INTERVAL_MS);
     return () => {
       alive = false;
       clearInterval(pollId);
@@ -81,13 +85,7 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
       const { clock } = (await res.json()) as { clock: { simTimeMs: number; scale: number; paused: boolean } };
       const prev = anchorRef.current;
       if (prev) {
-        anchorRef.current = {
-          ...prev,
-          simAnchorMs: clock.simTimeMs,
-          realAnchorMs: Date.now(),
-          scale: clock.scale,
-          paused: clock.paused,
-        };
+        anchorRef.current = { ...prev, simAnchorMs: clock.simTimeMs, realAnchorMs: Date.now(), scale: clock.scale, paused: clock.paused };
       }
       setError(null);
     } catch (e) {
@@ -96,71 +94,64 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
   }
 
   const a = anchorRef.current;
-  const currentSim = a
-    ? a.paused
-      ? a.simAnchorMs
-      : a.simAnchorMs + (Date.now() - a.realAnchorMs) * a.scale
-    : 0;
-
-  const SCALES = [1, 2, 5, 20, 60];
-  const btn = 'px-2 py-1 text-xs rounded bg-gray-800 text-gray-300 hover:bg-gray-700';
-  const btnActive = 'px-2 py-1 text-xs rounded bg-blue-600 text-white';
+  const currentSim = simNow();
+  const btn = 'px-2 py-1 text-xs rounded-lg bg-(--chip) border border-(--border) text-(--text) hover:bg-[#2a2e33] cursor-pointer';
+  const btnActive = 'px-2 py-1 text-xs rounded-lg bg-(--blue) border border-(--blue) text-white cursor-pointer';
 
   return (
-    <div className="p-4 space-y-3">
-      <h2 className="text-sm font-semibold text-gray-300">控制台</h2>
-      {error && <p className="text-red-400 text-sm">编辑器后端不可达：{error}</p>}
-      {!a && !error && <p className="text-gray-400 text-sm">连接中…</p>}
+    <div className="p-3.5">
+      {error && <p className="text-(--pink) text-sm mb-3">编辑器后端不可达：{error}</p>}
+      {!a && !error && <p className="text-(--dim) text-sm">连接中…</p>}
       {a && (
-        <div className="space-y-3">
-          <div>
-            <p className="text-gray-500 text-xs">活动世界</p>
-            <p className="text-lg font-semibold">
-              {a.name} <span className="text-gray-500 text-sm">({a.id})</span>
-            </p>
-          </div>
-          <div className="flex gap-8">
-            <div>
-              <p className="text-gray-500 text-xs">流速</p>
-              <p className="text-gray-200">×{a.scale}</p>
-            </div>
-            <div>
-              <p className="text-gray-500 text-xs">状态</p>
-              <p className={a.paused ? 'text-amber-400' : 'text-green-400'}>{a.paused ? '已暂停' : '运行中'}</p>
-            </div>
-          </div>
-          <div>
-            <p className="text-gray-500 text-xs">世界时间</p>
-            <p className="text-xl font-mono tabular-nums">{formatSimTime(currentSim)}</p>
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="bg-(--panel) border border-(--border) rounded-xl px-3.5 py-3">
+            <h4 className="flex items-center gap-1.5 text-[13px] font-semibold mb-2">
+              <i className="ri-global-line" /> 当前世界
+              <span className="ml-auto font-normal text-(--dim) text-xs">{a.id}</span>
+            </h4>
+            <Kv k="名称" v={a.name} />
+            <Kv k="语言 / 分级" v={`${a.locale} / ${a.contentRating}`} />
+            <Kv k="模拟时间" v={<span className="font-mono tabular-nums">{formatSimTime(currentSim)}</span>} />
+            <Kv k="流速" v={
+              <span style={{ color: a.paused ? 'var(--amber)' : 'var(--green)' }}>
+                ×{a.scale} · {a.paused ? '已暂停' : '运行中'}
+              </span>
+            } />
 
-          <div className="pt-2 border-t border-gray-800 space-y-2">
-            <p className="text-gray-500 text-xs">时钟控制</p>
-            <div className="flex flex-wrap items-center gap-2">
-              <button className={btn} onClick={() => void sendClock({ type: a.paused ? 'resume' : 'pause' })}>
-                {a.paused ? '▶ 恢复' : '⏸ 暂停'}
-              </button>
-              <span className="text-gray-600 text-xs">流速</span>
-              {SCALES.map((s) => (
-                <button
-                  key={s}
-                  className={a.scale === s ? btnActive : btn}
-                  onClick={() => void sendClock({ type: 'setScale', scale: s })}
-                >
-                  ×{s}
+            <div className="mt-3 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <button className={btn} onClick={() => void sendClock({ type: a.paused ? 'resume' : 'pause' })}>
+                  <i className={a.paused ? 'ri-play-line' : 'ri-pause-line'} /> {a.paused ? '恢复' : '暂停'}
                 </button>
-              ))}
-              <span className="text-gray-600 text-xs">跳转</span>
-              <button className={btn} onClick={() => void sendClock({ type: 'setTime', simTimeMs: Math.round(simNow() + 3_600_000) })}>
-                +1 时
-              </button>
-              <button className={btn} onClick={() => void sendClock({ type: 'setTime', simTimeMs: Math.round(simNow() + 86_400_000) })}>
-                +1 天
-              </button>
+                <span className="text-(--dim) text-xs">流速</span>
+                {SCALES.map((s) => (
+                  <button key={s} className={a.scale === s ? btnActive : btn} onClick={() => void sendClock({ type: 'setScale', scale: s })}>
+                    ×{s}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-(--dim) text-xs">跳转</span>
+                <button className={btn} onClick={() => void sendClock({ type: 'setTime', simTimeMs: Math.round(simNow() + 3_600_000) })}>
+                  <i className="ri-skip-forward-line" /> +1 时
+                </button>
+                <button className={btn} onClick={() => void sendClock({ type: 'setTime', simTimeMs: Math.round(simNow() + 86_400_000) })}>
+                  <i className="ri-skip-forward-line" /> +1 天
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function Kv({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div className="flex justify-between py-1 border-b border-[#15171b] text-xs">
+      <span className="text-(--dim)">{k}</span>
+      <span>{v}</span>
     </div>
   );
 }

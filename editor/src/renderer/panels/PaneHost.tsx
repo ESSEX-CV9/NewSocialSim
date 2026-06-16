@@ -20,13 +20,13 @@ export function PaneHost(props: IDockviewPanelProps<{ panelType?: string }>) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[var(--panel)] text-[var(--text)]">
-      <div className="flex items-center gap-2 px-2 h-7 shrink-0 border-b border-[var(--border)] bg-[var(--panel2)]">
-        <i className="ri-apps-2-line text-[var(--dim)] text-sm" />
+    <div className="flex flex-col h-full bg-(--panel) text-(--text)">
+      <div className="flex items-center gap-2 px-2 h-7 shrink-0 border-b border-(--border) bg-(--panel2)">
+        <i className="ri-apps-2-line text-(--dim) text-sm" />
         <select
           value={current}
           onChange={(e) => change(e.target.value)}
-          className="bg-[var(--chip)] border border-[var(--border)] rounded text-xs text-[var(--text)] px-1.5 py-0.5 outline-none cursor-pointer"
+          className="bg-(--chip) border border-(--border) rounded text-xs text-(--text) px-1.5 py-0.5 outline-none cursor-pointer"
         >
           {PANELS.map((p) => (
             <option key={p.id} value={p.id}>
