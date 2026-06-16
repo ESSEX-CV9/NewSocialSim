@@ -33,11 +33,13 @@ data/worlds/<id>/npcs/<handle>/
 
 ### 文件与 DB 分工
 
-- **文件为准、DB 为副本**：作者写的静态数值（Alignment / Persona / 概率 / 活跃时段 / 关系基线 / 阶段定义）以 NPC 文件夹的文件为唯一真相源，开世界时灌进世界 DB 作运行时副本。
-- **运行时态进 DB**：模拟跑出来的动态值（Mood / 当前关系好感与熟悉度 / Memory / Activity）只活在世界 DB，高频写、可查询，重启靠 gap mitigation 恢复，不用 JSON 整文件重写。
-- **编辑器可改两处**：改"基本起始数据"写回文件（再灌 DB）；改"当前实时数据"直接写 DB（GM 式手动拨动当前情绪/关系，不动作者基线，之后按衰减自然回归）。
+NPC 数值层与运行时态进**模拟器独占的 NPC 状态库 `data/worlds/<id>/npc-state.db`**（WAL 模式），不进社交站 `world.db`——`world.db` 只装真人也会有的数据（账号 / 帖 / 互动），mood / 关系 / memory / activity 这类操控 NPC 的内部机关不属于社交站，见 `docs/m5-x-re-plan.md`「分库原则」。
 
-world.db 本就随世界文件夹走，DB 化不损可移植性；文件留作可手编、可 git diff 的事实依据。
+- **文件为准、DB 为副本**：作者写的静态数值（Alignment / Persona / 概率 / 活跃时段 / 关系基线 / 阶段定义）以 NPC 文件夹的文件为唯一真相源，开世界时灌进 `npc-state.db` 作运行时副本。
+- **运行时态进 DB**：模拟跑出来的动态值（Mood / 当前关系好感与熟悉度 / Memory / Activity）只活在 `npc-state.db`，高频写、可查询，重启靠 gap mitigation 恢复，不用 JSON 整文件重写。
+- **编辑器可改两处**：改"基本起始数据"写回文件（再灌 `npc-state.db`）；改"当前实时数据"直接写 `npc-state.db`（GM 式手动拨动当前情绪/关系，不动作者基线，之后按衰减自然回归）。
+
+`npc-state.db` 与 `world.db` 同处世界文件夹、随之迁移，DB 化不损可移植性；文件留作可手编、可 git diff 的事实依据。
 
 ## RP 资料层
 
@@ -64,7 +66,7 @@ Layer 4：Mood（5 维 runtime）               当下情绪态
 Layer 5：Activity / Memory / Attention      当下行为态
 ```
 
-Layer 1–3 为静态人设层，属作者基线，源在 NPC 文件夹、灌进 DB 作副本。Layer 4–5 为运行时状态层，只活在世界 DB（持久化与恢复见后文）。
+Layer 1–3 为静态人设层，属作者基线，源在 NPC 文件夹、灌进 `npc-state.db` 作副本。Layer 4–5 为运行时状态层，只活在 `npc-state.db`（持久化与恢复见后文）。
 
 ## Layer 1：Alignment 双轴
 
@@ -536,8 +538,8 @@ slangDensity=0.7，再抽前缀："笑死" → 最终输出 `"笑死，急了急
 
 ### 落盘策略
 
-- 运行时态（mood / memory / activity / attention / 当前关系好感与熟悉度）写入世界 DB（per-NPC 行），随互动事务或按 tick 批量提交，不用 JSON 整文件重写。
-- 作者基线（静态数值 / 关系阶段定义 / RP 资料）以 NPC 文件夹文件为源，开世界灌进 DB；编辑器改基线写回文件、改实时态直接写 DB。
+- 运行时态（mood / memory / activity / attention / 当前关系好感与熟悉度）写入模拟器独占的 `npc-state.db`（per-NPC 行），随互动事务或按 tick 批量提交，不用 JSON 整文件重写。
+- 作者基线（静态数值 / 关系阶段定义 / RP 资料）以 NPC 文件夹文件为源，开世界灌进 `npc-state.db`；编辑器改基线写回文件、改实时态直接写 `npc-state.db`。
 - DB 写按 SQLite 事务语义处理；基线文件写失败必须重试至少 3 次，仍失败需告警。
 
 提交频率与重试次数存 `tuning.persistence`。
