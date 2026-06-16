@@ -53,6 +53,24 @@ body {
   background: transparent;
 }
 
+/* 时间轴专用：更明显的横向滚动条（更粗、有轨道边框、滑块更亮）。 */
+.tl-scroll::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+.tl-scroll::-webkit-scrollbar-track {
+  background: var(--panel2);
+  border-top: 1px solid var(--border);
+}
+.tl-scroll::-webkit-scrollbar-thumb {
+  background: #454c55;
+  border: 3px solid var(--panel2);
+  border-radius: 7px;
+}
+.tl-scroll::-webkit-scrollbar-thumb:hover {
+  background: #58616c;
+}
+
 /* dockview 暗色微调，贴近 X 系配色。 */
 .dockview-theme-abyss {
   --dv-background-color: var(--bg);

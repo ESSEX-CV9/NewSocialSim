@@ -1,17 +1,16 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { TimelineItem } from '@socialsim/shared';
+import type { TimelineItem, PostView } from '@socialsim/shared';
 import { useSelectedBlock, setSelectedBlock } from '../state/selection.js';
 import { ACTION_COLOR, formatSimTime } from './trace-meta.js';
 import { Avatar } from './Avatar.js';
-import { type TimelineBlock, itemKey, itemToBlock, blockLabel } from './timeline-model.js';
+import { type TimelineBlock, itemKey, itemToBlock, postToBlock, blockLabel } from './timeline-model.js';
 
 /**
  * 时间轴面板（Premiere 范式，见 docs/m5-design.md）：横轴为时间、纵轴每行一个账号，
- * 块 = 世界真实内容。数据源为社交站全站时间流 /api/timeline/global（纯读 world.db、与模拟器
- * 无关，故模拟器未运行也可用）；含帖子/回复/引用 + 转发。向左滚动到头即按游标无限加载更老内容。
- * 以当前模拟时间为分界的金色播放头居中、默认跟随自动横滚、可拖动回看历史，块纵向错行堆叠。
- * 赞/关注等其余互动、跳转任意时间区间、轨迹"为什么"合并待后续服务端工作。
+ * 块 = 世界真实内容、独立于模拟器。主轴为社交站全站流 /api/timeline/global（顶层帖、所有账号、
+ * 无限向后滚动）；按账号补拉回复（?type=replies）与转发（/timeline 的 type=repost）。
+ * 顶层时间为可输入的时间修改器，改时间即跳转视图。赞/关注互动、按时间区间跳转待后续服务端工作。
  */
 
 const RULER_H = 26;
@@ -27,9 +26,11 @@ const RIGHT_PAD = 300;
 const VBUF = 400;
 const POLL_WORLD_MS = 3000;
 const TICK_MS = 250;
-const FEED_LIMIT = 50; // 每页拉取条数（社交站 global 上限 50）
-const INITIAL_PAGES = 2; // 初次加载页数
-const LOAD_OLDER_AT = 400; // 滚到左侧此阈值内即加载更老
+const FEED_LIMIT = 50;
+const INITIAL_PAGES = 2;
+const EXTRA_PAGE_CAP = 4; // 每账号回复/转发拉取页数上限（深度历史待 time-range 端点）
+const LOAD_OLDER_AT = 400;
+const DAY_MS = 86_400_000;
 const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
 
 interface Anchor {
@@ -52,17 +53,23 @@ interface Layout {
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const pad = (n: number) => String(n).padStart(2, '0');
+/** 刻度标签：偏离当前时间超 24h（或步长达天级）则带日期。 */
 function formatTick(ms: number, withDate: boolean): string {
   const d = new Date(ms);
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   return withDate ? `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}` : hm;
+}
+/** 模拟时间 ms → datetime-local 输入值（本地时区）。 */
+function toInputValue(ms: number): string {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 function niceStepMin(pxPerMin: number): number {
   const target = 90 / pxPerMin;
   return NICE_STEPS.find((n) => n >= target) ?? NICE_STEPS[NICE_STEPS.length - 1]!;
 }
 function isActBlock(b: TimelineBlock): boolean {
-  return b.kind === 'repost'; // 转发为灰色小条（互动）
+  return b.kind === 'repost';
 }
 function estBlockWidth(b: TimelineBlock): number {
   return Math.min(230, blockLabel(b).length * 7 + 18);
@@ -106,7 +113,8 @@ function computeLayout(blocks: TimelineBlock[], lanes: string[], originSim: numb
 }
 
 export function TimelinePanel(_props: IDockviewPanelProps) {
-  const [items, setItems] = useState<TimelineItem[]>([]);
+  const [posts, setPosts] = useState<PostView[]>([]); // 顶层帖（global）+ 回复（per-account）
+  const [reposts, setReposts] = useState<TimelineItem[]>([]); // 转发（per-account）
   const [worldId, setWorldId] = useState<string | null>(null);
   const selected = useSelectedBlock();
   const [error, setError] = useState<string | null>(null);
@@ -114,16 +122,21 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const [following, setFollowing] = useState(true);
   const [scrollX, setScrollX] = useState(0);
   const [viewW, setViewW] = useState(800);
+  const [editingTime, setEditingTime] = useState<string | null>(null);
   const worldRef = useRef<string | null>(null);
   const anchorRef = useRef<Anchor | null>(null);
   const tlRef = useRef<HTMLDivElement | null>(null);
   const expectedLeftRef = useRef(0);
-  const keysRef = useRef<Set<string>>(new Set());
+  const postIdsRef = useRef<Set<number>>(new Set());
+  const repostKeysRef = useRef<Set<string>>(new Set());
+  const fetchedExtraRef = useRef<Set<string>>(new Set());
   const oldestCursorRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
   const prevMinRef = useRef<number | null>(null);
   const ppmRef = useRef(pxPerMin);
   ppmRef.current = pxPerMin;
+  const pendingJumpRef = useRef<number | null>(null);
+  const jumpLoadsRef = useRef(0);
   const [, rerender] = useState(0);
 
   const backend = window.editor.backendUrl;
@@ -137,23 +150,38 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return (await r.json()) as { items: TimelineItem[]; nextCursor: string | null };
   }
 
-  /** 合并新条目（按 key 去重）。 */
-  function addItems(incoming: TimelineItem[]): void {
-    const fresh = incoming.filter((it) => {
-      const k = itemKey(it);
-      if (keysRef.current.has(k)) return false;
-      keysRef.current.add(k);
+  function addPosts(views: PostView[]): void {
+    const fresh = views.filter((p) => {
+      if (postIdsRef.current.has(p.id)) return false;
+      postIdsRef.current.add(p.id);
       return true;
     });
-    if (fresh.length) setItems((prev) => [...prev, ...fresh]);
+    if (fresh.length) setPosts((prev) => [...prev, ...fresh]);
+  }
+  function addReposts(items: TimelineItem[]): void {
+    const fresh = items.filter((it) => {
+      if (it.type !== 'repost' || !it.repostedBy) return false;
+      const k = itemKey(it);
+      if (repostKeysRef.current.has(k)) return false;
+      repostKeysRef.current.add(k);
+      return true;
+    });
+    if (fresh.length) setReposts((prev) => [...prev, ...fresh]);
+  }
+  /** 把一页全站流并入：顶层帖入 posts、转发入 reposts。 */
+  function ingestFeed(items: TimelineItem[]): void {
+    addPosts(items.filter((it) => it.type === 'post').map((it) => it.post));
+    addReposts(items);
   }
 
-  /** 初次加载（切世界 / 刷新）：清空后拉前几页，记录最老游标。 */
   async function loadInitial(): Promise<void> {
-    keysRef.current = new Set();
+    postIdsRef.current = new Set();
+    repostKeysRef.current = new Set();
+    fetchedExtraRef.current = new Set();
     oldestCursorRef.current = null;
     prevMinRef.current = null;
-    setItems([]);
+    setPosts([]);
+    setReposts([]);
     try {
       let cursor: string | undefined;
       const acc: TimelineItem[] = [];
@@ -164,29 +192,71 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
         if (!cursor) break;
       }
       oldestCursorRef.current = cursor ?? null;
-      addItems(acc);
+      ingestFeed(acc);
       setError(null);
     } catch (e) {
       setError(String(e));
     }
   }
 
-  /** 向左滚到头：按游标加载更老内容。 */
   async function loadOlder(): Promise<void> {
     if (loadingOlderRef.current || !oldestCursorRef.current) return;
     loadingOlderRef.current = true;
     try {
       const r = await fetchFeed(oldestCursorRef.current);
-      addItems(r.items);
+      ingestFeed(r.items);
       oldestCursorRef.current = r.nextCursor ?? null;
     } catch {
-      /* 下次滚动再试 */
+      /* 下次再试 */
     } finally {
       loadingOlderRef.current = false;
     }
   }
 
-  // 轮询活动世界：拾取时钟锚点；切世界则重载，否则拉最新页做实时更新。
+  /** 拉某账号的回复 + 转发（封顶若干页）。 */
+  async function fetchAccountExtra(handle: string): Promise<void> {
+    // 回复
+    try {
+      let cursor: string | undefined;
+      const reps: PostView[] = [];
+      for (let p = 0; p < EXTRA_PAGE_CAP; p++) {
+        const u = new URL(`${backend}/api/users/${encodeURIComponent(handle)}/posts`);
+        u.searchParams.set('type', 'replies');
+        u.searchParams.set('limit', '50');
+        if (cursor) u.searchParams.set('cursor', cursor);
+        const r = await fetch(u);
+        if (!r.ok) break;
+        const j = (await r.json()) as { items: PostView[]; nextCursor: string | null };
+        reps.push(...j.items);
+        if (!j.nextCursor) break;
+        cursor = j.nextCursor;
+      }
+      addPosts(reps);
+    } catch {
+      /* ignore */
+    }
+    // 转发
+    try {
+      let cursor: string | undefined;
+      const rps: TimelineItem[] = [];
+      for (let p = 0; p < EXTRA_PAGE_CAP; p++) {
+        const u = new URL(`${backend}/api/users/${encodeURIComponent(handle)}/timeline`);
+        u.searchParams.set('limit', '50');
+        if (cursor) u.searchParams.set('cursor', cursor);
+        const r = await fetch(u);
+        if (!r.ok) break;
+        const j = (await r.json()) as { items: TimelineItem[]; nextCursor: string | null };
+        rps.push(...j.items);
+        if (!j.nextCursor) break;
+        cursor = j.nextCursor;
+      }
+      addReposts(rps);
+    } catch {
+      /* ignore */
+    }
+  }
+
+  // 轮询活动世界：拾取时钟锚点；切世界则重载，否则拉最新页实时更新。
   useEffect(() => {
     let alive = true;
     async function pollWorld(): Promise<void> {
@@ -212,10 +282,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           setFollowing(true);
           await loadInitial();
         } else {
-          // 实时：拉最新页，合并新内容。
           try {
             const r = await fetchFeed();
-            if (alive) addItems(r.items);
+            if (alive) ingestFeed(r.items);
           } catch {
             /* 忽略单次失败 */
           }
@@ -235,18 +304,41 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 昵称直接来自全站流（每条带 author/repostedBy 的 displayName），无需单独拉取。
+  // 账号（从顶层帖作者发现）→ 补拉其回复与转发。
+  const accounts = useMemo(() => [...new Set(posts.map((p) => p.author.handle))].sort(), [posts]);
+  useEffect(() => {
+    const missing = accounts.filter((h) => !fetchedExtraRef.current.has(h));
+    if (missing.length === 0) return;
+    let alive = true;
+    missing.forEach((h) => fetchedExtraRef.current.add(h));
+    void (async () => {
+      for (const h of missing) {
+        if (!alive) return;
+        await fetchAccountExtra(h);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, backend]);
+
+  // 昵称取自帖子 / 转发里携带的 displayName。
   const names = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const it of items) {
+    for (const p of posts) m[p.author.handle] = p.author.displayName;
+    for (const it of reposts) {
       m[it.post.author.handle] = it.post.author.displayName;
       if (it.repostedBy) m[it.repostedBy.handle] = it.repostedBy.displayName;
     }
     return m;
-  }, [items]);
+  }, [posts, reposts]);
   const nameOf = (h: string): string => names[h] || h;
 
-  const blocks = useMemo<TimelineBlock[]>(() => items.map(itemToBlock), [items]);
+  const blocks = useMemo<TimelineBlock[]>(
+    () => [...posts.map(postToBlock), ...reposts.map(itemToBlock)],
+    [posts, reposts],
+  );
 
   const { lanes, minTime, maxTime } = useMemo(() => {
     const ls = [...new Set(blocks.map((b) => b.entity))].sort();
@@ -272,18 +364,51 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const trackWidth = Math.max(ax(maxTime), ax(now)) + RIGHT_PAD;
   const ready = blocks.length > 0;
 
-  // 加载更老内容使 minTime 减小 → 全部 x 右移；非跟随时补偿 scrollLeft，保持视图稳定。
+  /** 跳转视图到某时间（停止跟随；必要时向后加载至覆盖该时间）。 */
+  function jumpToTime(t: number): void {
+    setFollowing(false);
+    jumpLoadsRef.current = 0;
+    pendingJumpRef.current = t;
+    rerender((x) => x + 1);
+  }
+  function commitTimeEdit(): void {
+    if (editingTime) {
+      const t = new Date(editingTime).getTime();
+      if (Number.isFinite(t)) jumpToTime(t);
+    }
+    setEditingTime(null);
+  }
+
+  // 处理跳转：滚到目标时间居中；若早于已加载范围则继续向后加载（封顶）。
+  useEffect(() => {
+    const t = pendingJumpRef.current;
+    if (t == null) return;
+    const el = tlRef.current;
+    if (!el) return;
+    const target = clamp(LABEL_W + ax(t) - el.clientWidth / 2, 0, Math.max(0, el.scrollWidth - el.clientWidth));
+    el.scrollLeft = target;
+    expectedLeftRef.current = target;
+    setScrollX(target);
+    if (t < minTime && oldestCursorRef.current && jumpLoadsRef.current < 40) {
+      jumpLoadsRef.current++;
+      void loadOlder();
+    } else {
+      pendingJumpRef.current = null;
+      jumpLoadsRef.current = 0;
+    }
+  });
+
+  // 加载更老使 minTime 减小 → x 右移；非跟随且非跳转中时补偿 scrollLeft。
   useLayoutEffect(() => {
     const el = tlRef.current;
     const prev = prevMinRef.current;
-    if (el && prev != null && minTime < prev && !following) {
+    if (el && prev != null && minTime < prev && !following && pendingJumpRef.current == null) {
       el.scrollLeft += ((prev - minTime) / 60_000) * ppmRef.current;
     }
     prevMinRef.current = minTime;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [minTime]);
 
-  // 视口宽度（虚拟化）。
   useEffect(() => {
     const el = tlRef.current;
     if (!el) return;
@@ -293,7 +418,6 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return () => ro.disconnect();
   }, [ready]);
 
-  // Ctrl+滚轮缩放。
   useEffect(() => {
     const el = tlRef.current;
     if (!el) return;
@@ -306,7 +430,6 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return () => el.removeEventListener('wheel', onWheel);
   }, [ready]);
 
-  // 跟随"现在"：把播放头滚到视口中央（拖动滚动条则停止跟随）。
   useEffect(() => {
     if (!following) return;
     const el = tlRef.current;
@@ -327,18 +450,18 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const stepMin = niceStepMin(pxPerMin);
   const stepPx = stepMin * pxPerMin;
   const stepMs = stepMin * 60_000;
-  const withDate = stepMin >= 1440;
   const gxMin = scrollX - LABEL_W - VBUF;
   const gxMax = scrollX - LABEL_W + viewW + VBUF;
 
-  const ticks: { x: number; ms: number }[] = [];
+  const ticks: { x: number; label: string }[] = [];
   if (ready) {
     const alignedStart = Math.ceil(originSim / stepMs) * stepMs;
     const kStart = Math.max(0, Math.floor((gxMin - ax(alignedStart)) / stepPx));
     const kEnd = Math.ceil((gxMax - ax(alignedStart)) / stepPx);
     for (let k = kStart; k <= kEnd; k++) {
       const ms = alignedStart + k * stepMs;
-      ticks.push({ x: ax(ms), ms });
+      const withDate = stepMin >= 1440 || Math.abs(ms - now) > DAY_MS;
+      ticks.push({ x: ax(ms), label: formatTick(ms, withDate) });
     }
   }
 
@@ -354,10 +477,24 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       <div className="flex items-center gap-2 px-3 py-2 border-b border-(--border) text-xs">
         <i className="ri-time-line text-(--blue)" />
         <span className="font-semibold">时间轴</span>
+        <input
+          type="datetime-local"
+          step={1}
+          value={editingTime ?? toInputValue(now)}
+          onFocus={() => setEditingTime(toInputValue(now))}
+          onChange={(e) => setEditingTime(e.target.value)}
+          onBlur={commitTimeEdit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              commitTimeEdit();
+              e.currentTarget.blur();
+            }
+          }}
+          title="输入时间跳转到该时刻"
+          style={{ colorScheme: 'dark' }}
+          className="bg-(--chip) border border-(--border) rounded px-1.5 py-0.5 text-(--amber) font-mono cursor-text"
+        />
         <span className="text-(--dim)">{worldId ?? '—'} · {blocks.length} 块</span>
-        <span className="ml-1 font-mono tabular-nums text-(--amber)" title="当前模拟时间（播放头）">
-          {formatSimTime(now)}
-        </span>
         {!following && (
           <button
             onClick={() => setFollowing(true)}
@@ -391,7 +528,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
 
       {error && <p className="px-3 py-2 text-(--pink) text-xs">编辑器后端不可达：{error}</p>}
       {!error && blocks.length === 0 && (
-        <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无内容。建号发帖或启动模拟器后，帖子与转发会在此按时间排布。</p>
+        <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无内容。建号发帖或启动模拟器后，帖子/回复/转发会在此按时间排布。</p>
       )}
 
       {blocks.length > 0 && (
@@ -413,7 +550,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           </div>
 
           {/* 时间轴：可横向滚动 */}
-          <div ref={tlRef} onScroll={onScroll} className="flex-1 overflow-auto">
+          <div ref={tlRef} onScroll={onScroll} className="tl-scroll flex-1 overflow-auto">
             <div className="flex" style={{ width: LABEL_W + trackWidth, minHeight: '100%' }}>
               {/* lane 标签列 */}
               <div className="sticky left-0 z-20 bg-(--panel2) border-r border-(--border) shrink-0" style={{ width: LABEL_W }}>
@@ -433,10 +570,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
               {/* 轨道画布（绝对时间坐标） */}
               <div className="relative shrink-0" style={{ width: trackWidth, height: layout.totalHeight }}>
                 {ticks.map((t) => (
-                  <div key={t.ms} className="absolute top-0 bottom-0 border-l border-[#1a1d22]" style={{ left: t.x }}>
-                    <span className="absolute top-0.5 left-1 text-[10px] text-(--dim) whitespace-nowrap">
-                      {formatTick(t.ms, withDate)}
-                    </span>
+                  <div key={t.x} className="absolute top-0 bottom-0 border-l border-[#1a1d22]" style={{ left: t.x }}>
+                    <span className="absolute top-0.5 left-1 text-[10px] text-(--dim) whitespace-nowrap">{t.label}</span>
                   </div>
                 ))}
 

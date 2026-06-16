@@ -79,6 +79,26 @@ app.get<{ Querystring: { cursor?: string; limit?: string } }>('/api/timeline/glo
   }
 });
 
+// 账号时间线：转发社交站按 handle 取其时间线（含本人帖 + 转发），供时间轴取转发块。
+app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: string } }>(
+  '/api/users/:handle/timeline',
+  async (req, reply) => {
+    const u = new URL(`${SOCIAL_API}/api/users/${encodeURIComponent(req.params.handle)}/timeline`);
+    for (const k of ['cursor', 'limit'] as const) {
+      const v = req.query[k];
+      if (v != null) u.searchParams.set(k, String(v));
+    }
+    try {
+      const res = await fetch(u);
+      reply.status(res.status);
+      return await res.json();
+    } catch {
+      reply.status(502);
+      return { error: 'social server unreachable' };
+    }
+  },
+);
+
 // 账号帖子/回复：转发社交站按 handle 列帖（游标分页），供时间轴块来源（真相源）。
 app.get<{ Params: { handle: string }; Querystring: { type?: string; cursor?: string; limit?: string } }>(
   '/api/users/:handle/posts',

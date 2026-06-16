@@ -37,6 +37,11 @@ export function itemKey(it: TimelineItem): string {
   return it.type === 'repost' && it.repostedBy ? `repost:${it.post.id}:${it.repostedBy.id}` : `post:${it.post.id}`;
 }
 
+/** PostView → 帖子块（顶层帖 / 回复 / 引用）。 */
+export function postToBlock(p: PostView): PostBlock {
+  return { kind: 'post', key: `post:${p.id}`, entity: p.author.handle, time: p.createdAt, action: postAction(p), post: p };
+}
+
 /** TimelineItem → 时间轴块。 */
 export function itemToBlock(it: TimelineItem): TimelineBlock {
   if (it.type === 'repost' && it.repostedBy) {
