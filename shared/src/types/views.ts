@@ -6,7 +6,6 @@ export interface UserSummary {
   id: number;
   handle: string;
   displayName: string;
-  isBot: boolean;
   /** 头像图片地址；null = 用 handle 哈希色块兜底 */
   avatarUrl: string | null;
   /** 认证标识（蓝标/金标），随用户名各显示点展示 */

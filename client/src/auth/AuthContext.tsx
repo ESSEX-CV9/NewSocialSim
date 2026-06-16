@@ -46,7 +46,6 @@ function toSummary(user: UserProfile): UserSummary {
     id: user.id,
     handle: user.handle,
     displayName: user.displayName,
-    isBot: user.isBot,
     avatarUrl: user.avatarUrl,
     verified: user.verified ?? 'none',
   };

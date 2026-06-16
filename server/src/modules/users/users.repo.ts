@@ -33,7 +33,6 @@ export function toUser(row: UserRow): User {
     handle: row.handle,
     displayName: row.display_name,
     bio: row.bio,
-    isBot: row.is_bot === 1,
     createdAt: row.created_at,
   };
 }

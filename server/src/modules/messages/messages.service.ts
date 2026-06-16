@@ -343,7 +343,6 @@ export class MessagesService {
           id: r.other_user_id,
           handle: r.other_handle,
           displayName: r.other_display_name,
-          isBot: r.other_is_bot === 1,
           avatarUrl: mediaFileUrl(r.other_avatar_media_id, worldId),
           verified: r.other_verified as VerifiedType,
         },
@@ -421,7 +420,6 @@ function senderSummary(row: MessageRow, worldId: string): UserSummary {
     id: row.sender_id,
     handle: row.sender_handle,
     displayName: row.sender_display_name,
-    isBot: row.sender_is_bot === 1,
     avatarUrl: mediaFileUrl(row.sender_avatar_media_id, worldId),
     verified: row.sender_verified as VerifiedType,
   };
@@ -435,7 +433,6 @@ function toConversationView(row: ConversationListRow, worldId: string): Conversa
       id: row.other_user_id,
       handle: row.other_handle,
       displayName: row.other_display_name,
-      isBot: row.other_is_bot === 1,
       avatarUrl: mediaFileUrl(row.other_avatar_media_id, worldId),
       verified: row.other_verified as VerifiedType,
     },

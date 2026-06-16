@@ -10,8 +10,6 @@ export interface User {
   handle: string;
   displayName: string;
   bio: string;
-  /** 是否为模拟器驱动的虚拟用户（第二阶段使用） */
-  isBot: boolean;
   /** 模拟时间（unix 毫秒形式） */
   createdAt: number;
 }

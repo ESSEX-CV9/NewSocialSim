@@ -82,7 +82,6 @@ export class TimelineService {
                 id: row.actor_id,
                 handle: row.actor_handle ?? '',
                 displayName: row.actor_display_name ?? '',
-                isBot: row.actor_is_bot === 1,
                 avatarUrl: mediaFileUrl(row.actor_avatar_media_id, worldId),
                 verified: (row.actor_verified ?? 'none') as VerifiedType,
               }

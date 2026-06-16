@@ -352,7 +352,6 @@ export function toUserSummary(row: PostRow, avatarUrl: string | null): UserSumma
     id: row.author_id,
     handle: row.author_handle,
     displayName: row.author_display_name,
-    isBot: row.author_is_bot === 1,
     avatarUrl,
     verified: row.author_verified as VerifiedType,
   };

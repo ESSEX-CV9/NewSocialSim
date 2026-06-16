@@ -68,7 +68,6 @@ export class FollowsService {
       id: r.id,
       handle: r.handle,
       displayName: r.display_name,
-      isBot: r.is_bot === 1,
       avatarUrl: mediaFileUrl(r.avatar_media_id, worldId),
       verified: r.verified as VerifiedType,
     }));
