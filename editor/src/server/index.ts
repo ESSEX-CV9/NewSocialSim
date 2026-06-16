@@ -31,6 +31,22 @@ app.get('/api/worlds/active', async (_req, reply) => {
   }
 });
 
+// 时钟控制：转发到社交站（pause / resume / setScale / setTime）。
+app.post('/api/worlds/clock', async (req, reply) => {
+  try {
+    const res = await fetch(`${SOCIAL_API}/api/admin/worlds/clock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body ?? {}),
+    });
+    reply.status(res.status);
+    return await res.json();
+  } catch {
+    reply.status(502);
+    return { error: 'social server unreachable' };
+  }
+});
+
 app
   .listen({ host: '127.0.0.1', port: PORT })
   .then(() => console.log(`Editor backend on http://127.0.0.1:${PORT} (social API ${SOCIAL_API})`))

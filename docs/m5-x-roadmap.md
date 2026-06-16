@@ -71,7 +71,7 @@
 - **改动**：`editor/src/server/`（聚合 `GET /api/admin/worlds/active` 等只读端点）、`editor/src/renderer/`（控制台面板）。
 - **验收**：控制台显示当前 `demo` 世界名与时钟；网页端切到另一世界后控制台显示随之更新。
 
-### 0.7 控制台·时钟控制 ⬜
+### 0.7 控制台·时钟控制 ✅
 
 - **目标**：控制台可暂停 / 恢复 / 调速 / 跳转世界时钟。
 - **改动**：`editor/src/server/`（透传时钟控制 admin 端点）、`editor/src/renderer/`（控制台控件）。

@@ -64,12 +64,47 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
     };
   }, []);
 
+  function simNow(): number {
+    const a = anchorRef.current;
+    if (!a) return 0;
+    return a.paused ? a.simAnchorMs : a.simAnchorMs + (Date.now() - a.realAnchorMs) * a.scale;
+  }
+
+  async function sendClock(body: Record<string, unknown>): Promise<void> {
+    try {
+      const res = await fetch(`${window.editor.backendUrl}/api/worlds/clock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`clock ${res.status}`);
+      const { clock } = (await res.json()) as { clock: { simTimeMs: number; scale: number; paused: boolean } };
+      const prev = anchorRef.current;
+      if (prev) {
+        anchorRef.current = {
+          ...prev,
+          simAnchorMs: clock.simTimeMs,
+          realAnchorMs: Date.now(),
+          scale: clock.scale,
+          paused: clock.paused,
+        };
+      }
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
   const a = anchorRef.current;
   const currentSim = a
     ? a.paused
       ? a.simAnchorMs
       : a.simAnchorMs + (Date.now() - a.realAnchorMs) * a.scale
     : 0;
+
+  const SCALES = [1, 2, 5, 20, 60];
+  const btn = 'px-2 py-1 text-xs rounded bg-gray-800 text-gray-300 hover:bg-gray-700';
+  const btnActive = 'px-2 py-1 text-xs rounded bg-blue-600 text-white';
 
   return (
     <div className="p-4 space-y-3">
@@ -97,6 +132,32 @@ export function ConsolePanel(_props: IDockviewPanelProps) {
           <div>
             <p className="text-gray-500 text-xs">世界时间</p>
             <p className="text-xl font-mono tabular-nums">{formatSimTime(currentSim)}</p>
+          </div>
+
+          <div className="pt-2 border-t border-gray-800 space-y-2">
+            <p className="text-gray-500 text-xs">时钟控制</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button className={btn} onClick={() => void sendClock({ type: a.paused ? 'resume' : 'pause' })}>
+                {a.paused ? '▶ 恢复' : '⏸ 暂停'}
+              </button>
+              <span className="text-gray-600 text-xs">流速</span>
+              {SCALES.map((s) => (
+                <button
+                  key={s}
+                  className={a.scale === s ? btnActive : btn}
+                  onClick={() => void sendClock({ type: 'setScale', scale: s })}
+                >
+                  ×{s}
+                </button>
+              ))}
+              <span className="text-gray-600 text-xs">跳转</span>
+              <button className={btn} onClick={() => void sendClock({ type: 'setTime', simTimeMs: Math.round(simNow() + 3_600_000) })}>
+                +1 时
+              </button>
+              <button className={btn} onClick={() => void sendClock({ type: 'setTime', simTimeMs: Math.round(simNow() + 86_400_000) })}>
+                +1 天
+              </button>
+            </div>
           </div>
         </div>
       )}
