@@ -58,7 +58,7 @@
 - **验收**：执行 `npm run dev:editor` 弹出 Electron 窗口；窗内能从编辑器后端取到当前活动世界 id。
 - **交接提示**：旧临时编辑器整体废弃，不保留、不迁移其面板代码。编辑器后端是 renderer 的唯一数据源，renderer 不直接访问数据库、不绕过后端直连社交站 server。社交站 `server` 与 `simulator` 当前仍各自 `dev:server` / `dev:simulator` 单跑，Electron 连它们；三者整体打包进 Electron 留至 M5-6。开发期 Electron 加载 vite dev server，保留热重载。
 
-### 0.5 多窗格壳 ⬜
+### 0.5 多窗格壳 ✅
 
 - **目标**：renderer 实现可拖拽 / 分割的多窗格布局与面板注册表，面板按注册表挂载，空面板占位。
 - **改动**：`editor/src/renderer/`（窗格布局组件、面板注册表、空面板占位）。

@@ -1,51 +1,52 @@
-import { useEffect, useState } from 'react';
-
-interface ActiveWorld {
-  meta: { id: string; name: string; clock: { simTimeMs: number; scale: number; paused: boolean } };
-  simTimeMs: number;
-}
-
-type Status =
-  | { kind: 'loading' }
-  | { kind: 'ok'; world: ActiveWorld }
-  | { kind: 'error'; message: string };
+import { useRef } from 'react';
+import { DockviewReact, themeAbyss } from 'dockview';
+import type { DockviewApi, DockviewReadyEvent } from 'dockview';
+import 'dockview/dist/styles/dockview.css';
+import { PANELS, panelComponents, type PanelDef } from './panels/registry.js';
 
 export function App() {
-  const [status, setStatus] = useState<Status>({ kind: 'loading' });
+  const apiRef = useRef<DockviewApi | null>(null);
+  const counterRef = useRef(0);
 
-  useEffect(() => {
-    const url = `${window.editor.backendUrl}/api/worlds/active`;
-    fetch(url)
-      .then(async (res) => {
-        if (!res.ok) throw new Error(`backend ${res.status}`);
-        return (await res.json()) as ActiveWorld;
-      })
-      .then((world) => setStatus({ kind: 'ok', world }))
-      .catch((err: unknown) => setStatus({ kind: 'error', message: String(err) }));
-  }, []);
+  function onReady(event: DockviewReadyEvent): void {
+    apiRef.current = event.api;
+    // 初始布局：左世界状态 + 右占位，演示同屏并列与可拖拽分割。
+    const world = event.api.addPanel({ id: 'world-status', component: 'world-status', title: '世界状态' });
+    event.api.addPanel({
+      id: 'placeholder-0',
+      component: 'placeholder',
+      title: '占位面板',
+      position: { referencePanel: world.id, direction: 'right' },
+    });
+  }
+
+  function addPanel(def: PanelDef): void {
+    const api = apiRef.current;
+    if (!api) return;
+    counterRef.current += 1;
+    api.addPanel({ id: `${def.id}-${counterRef.current}`, component: def.id, title: def.title });
+  }
 
   return (
-    <div className="min-h-screen flex flex-col">
-      <header className="flex items-center gap-4 px-6 py-3 border-b border-gray-800">
-        <h1 className="text-lg font-bold">SocialSim Studio</h1>
+    <div className="h-screen flex flex-col">
+      <header className="flex items-center gap-3 px-4 py-2 border-b border-gray-800 shrink-0">
+        <h1 className="text-base font-bold">SocialSim Studio</h1>
         <span className="text-xs text-gray-500">editor backend: {window.editor.backendUrl}</span>
+        <div className="ml-auto flex gap-1">
+          {PANELS.map((def) => (
+            <button
+              key={def.id}
+              onClick={() => addPanel(def)}
+              className="px-2 py-1 text-xs rounded bg-gray-800 text-gray-300 hover:bg-gray-700"
+            >
+              + {def.title}
+            </button>
+          ))}
+        </div>
       </header>
-      <main className="flex-1 p-6">
-        {status.kind === 'loading' && <p className="text-gray-400">连接编辑器后端…</p>}
-        {status.kind === 'error' && (
-          <p className="text-red-400">无法从编辑器后端取活动世界：{status.message}</p>
-        )}
-        {status.kind === 'ok' && (
-          <div className="space-y-1">
-            <p className="text-gray-400 text-sm">当前活动世界</p>
-            <p className="text-2xl font-semibold">{status.world.meta.name}</p>
-            <p className="text-gray-500 text-sm">
-              id <code className="text-gray-300">{status.world.meta.id}</code> · 流速 ×
-              {status.world.meta.clock.scale} · {status.world.meta.clock.paused ? '已暂停' : '运行中'}
-            </p>
-          </div>
-        )}
-      </main>
+      <div className="flex-1 min-h-0 relative">
+        <DockviewReact components={panelComponents} onReady={onReady} theme={themeAbyss} />
+      </div>
     </div>
   );
 }
