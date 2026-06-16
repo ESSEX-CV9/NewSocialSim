@@ -33,7 +33,7 @@ npm workspaces monorepo：
 - `data/worlds/<id>/` — 运行时数据（不入 git）：world.db（该世界全部数据）+ world.json（元数据与时钟状态）+ media/（该世界全部媒体文件）+ lore/（设定文档 .md）+ npc-profiles.json + content-pools.json + snapshots/（轻量快照）。
 - `data/media-search.json` — 实例级搜图配置（不入 git，含 Pixiv refresh token、HTTP 代理、各源 API key）。本机已配置代理 127.0.0.1:7897 与 Pixiv 登录态。
 - `data/llm-config.json` — LLM 多提供商配置（不入 git，含 API key）。每个提供商配置名称/来源/Base URL/Key/模型列表，High/Low-tier 全局选择。
-- 文档：**新会话先读 `docs/m5-x-index.md`（M5-X 文档索引与阅读顺序，含代码进度速查）。** `docs/design.md`（设计决策、架构约束、M5 路线与待办）、`docs/m5-design.md`（M5 模拟器设计独立副本——双层架构/Agent 工具范式/GM 生命周期/编辑器面板/实施顺序，供后续 LLM 直接阅读）、`docs/devlog/<日期>.md`（每日开发日志，新一天的工作结束后按既有格式追加一篇；当日内容多时主日志只留概要/周期一览/数据状态，细节拆到 `<日期>-<主题>.md` 子日志）、`plan.md`（最初的项目计划）。
+- 文档：**新会话先读 `docs/m5-x-index.md`（M5-X 文档索引与阅读顺序，含代码进度速查）。** `docs/design.md`（设计决策、架构约束、M5 路线与待办）、`docs/server-api.md`（**全 server HTTP API 速查**，按域分组含方法/路径/鉴权/用途）、`docs/m5-design.md`（M5 模拟器设计独立副本——双层架构/Agent 工具范式/GM 生命周期/编辑器面板/实施顺序，供后续 LLM 直接阅读）、`docs/devlog/<日期>.md`（每日开发日志，新一天的工作结束后按既有格式追加一篇；当日内容多时主日志只留概要/周期一览/数据状态，细节拆到 `<日期>-<主题>.md` 子日志）、`plan.md`（最初的项目计划）。
 - `参考文件/` — 用户提供的参考项目（Vue 版 X 克隆，借鉴样式用）与其他资料，**只读，不入 git，不要修改**。
 
 ## 关键机制（动代码前必须知道）
@@ -71,7 +71,9 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 当前主线：`feat-M5-X-RE` 分支，细步见 `docs/m5-x-roadmap.md`（四步阶梯展开为单提交级原子步）。Phase 0 地基已完成 0.1–0.8（含 0.3b/0.5b）：代理建号 / 跟随活动世界 / 决策轨迹落 sim-trace.db / GM-Agent 日志表 / 编辑器 Electron 重建 / Blender 多窗格壳 / 预设+布局跟随世界 / 控制台读态 / 时钟控制 / 模拟器状态。**下一步 0.9–0.11 时间轴**（编辑器后端按时间区间读 sim-trace.db + SSE → 时间轴面板 账号轨道×模拟时间×轨迹块 + 模拟器轨迹实时推送）→ 0.12 端到端验收 → Phase 1 内容池 ECS（含最小 TuningService + 话题拆分 1.1b）。GM 导演层（M5-5）与 Electron 整体打包（M5-6）顺延。
-- 编辑器已从临时 UI 重建为 Electron + dockview 工作区（见结构速览）；十面板按 `docs/m5-design.md` 设计逐里程碑把注册表占位换成实现。
+- 当前主线：`feat-M5-X-RE` 分支，细步见 `docs/m5-x-roadmap.md`（四步阶梯展开为单提交级原子步）。**Phase 0 地基已全部完成 0.1–0.12**：代理建号 / 跟随活动世界 / 决策轨迹落 sim-trace.db / GM-Agent 日志表 / 编辑器 Electron 重建 / Blender 多窗格壳 / 预设+布局跟随世界 / 控制台读态 / 时钟控制 / 模拟器状态 / 编辑器后端轨迹接入 / **时间轴面板** / 轨迹实时推送 / Step 0 金标准端到端验收（`scripts/verify-step0.mjs` 跑通 15/15）。路线图「时间轴完善」后续项 **T.1（赞/转/关注上轴）已完成**，余 T.2–T.6 不阻塞 Phase 1。**下一步 Phase 1 内容池 ECS**（1.0 最小 TuningService 起，含话题拆分 1.1b）。GM 导演层（M5-5）与 Electron 整体打包（M5-6）顺延。
+- **时间轴是查看世界全部帖子与互动的面板、独立于模拟器**（按 `docs/m5-design.md` Premiere 范式）：块=世界真实内容（社交站全站流 + 按账号回复/互动），非决策轨迹；决策轨迹退为点开块后的"为什么"增强层（待 postId 合并）。早期"块=轨迹条"属偏离已校正——见 memory `read-design-docs-first`。
+- 编辑器已从临时 UI 重建为 Electron + dockview 工作区（见结构速览）；十面板按 `docs/m5-design.md` 设计逐里程碑把注册表占位换成实现（控制台、时间轴、检视器已实现）。
+- **全 server HTTP API 速查见 `docs/server-api.md`**（按域分组、含方法/路径/鉴权/用途；模拟器与编辑器后端都从这里查能力）。
 - 媒体系统四期已全部完成，设计细节见 docs/design.md。虚拟用户发图帖链路已就绪：`GET /api/media-search` → `POST /api/media/from-url` → `POST /api/posts`。
 - 未实现的大块：GM 导演层、Electron 打包、正式编辑器 UI、自定义历法换算、生产构建流程。
