@@ -4,7 +4,7 @@ import type { DockviewApi, DockviewReadyEvent } from 'dockview';
 import 'dockview/dist/styles/dockview.css';
 import { PaneHost } from './panels/PaneHost.js';
 import { useActiveWorld } from './hooks/useActiveWorld.js';
-import { PRESETS, DEFAULT_PRESET, applyPanes } from './layouts/presets.js';
+import { PRESETS, DEFAULT_PRESET, applyPreset, type Preset } from './layouts/presets.js';
 
 const components = { 'pane-host': PaneHost };
 
@@ -37,7 +37,7 @@ export function App() {
   function onReady(event: DockviewReadyEvent): void {
     apiRef.current = event.api;
     // 立即铺默认预设，保证打开不空白；世界解析出来后 loadLayouts 再用该世界存档覆盖。
-    applyPanes(event.api, DEFAULT_PRESET.panes);
+    applyPreset(event.api, DEFAULT_PRESET);
     event.api.onDidLayoutChange(() => scheduleSave());
     setApiReady(true);
   }
@@ -71,7 +71,7 @@ export function App() {
         /* 损坏的布局，退回默认预设 */
       }
     }
-    applyPanes(api, DEFAULT_PRESET.panes);
+    applyPreset(api, DEFAULT_PRESET);
   }
 
   function scheduleSave(): void {
@@ -97,9 +97,9 @@ export function App() {
     }
   }
 
-  function applyPreset(panes: string[]): void {
+  function selectPreset(preset: Preset): void {
     const api = apiRef.current;
-    if (api) applyPanes(api, panes);
+    if (api) applyPreset(api, preset);
   }
 
   function applySaved(name: string): void {
@@ -169,7 +169,7 @@ export function App() {
         {/* 预设布局 */}
         <div className="flex items-center gap-1">
           {PRESETS.map((p) => (
-            <button key={p.id} className={presetBtn} onClick={() => applyPreset(p.panes)} title={`预设：${p.name}`}>
+            <button key={p.id} className={presetBtn} onClick={() => selectPreset(p)} title={`预设：${p.name}`}>
               {p.name}
             </button>
           ))}

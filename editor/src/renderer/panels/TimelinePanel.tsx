@@ -143,89 +143,95 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
         <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无轨迹。启动模拟器后，每次写世界会在此实时长出事件块。</p>
       )}
 
-      {/* 轨道区 */}
+      {/* 轨道区（左）+ 选中详情（右） */}
       {events.length > 0 && (
-        <div className="flex-1 overflow-auto">
-          <div className="flex">
-            {/* 账号标签列（横向滚动时固定） */}
-            <div className="sticky left-0 z-10 bg-(--panel2) border-r border-(--border) shrink-0">
-              <div style={{ height: 22 }} className="border-b border-(--border)" />
-              {lanes.map((l) => (
-                <div
-                  key={l}
-                  style={{ height: LANE_H }}
-                  className="flex items-center px-3 text-xs text-(--dim) border-b border-[#15171b] whitespace-nowrap"
-                >
-                  {l}
-                </div>
-              ))}
-            </div>
-
-            {/* 轨道画布 */}
-            <div className="relative" style={{ width: trackWidth }}>
-              {/* 时间标尺（起止） */}
-              <div style={{ height: 22 }} className="relative border-b border-(--border) text-[10px] text-(--dim)">
-                <span className="absolute left-1 top-1">{formatSimTime(minSim)}</span>
-                <span className="absolute right-1 top-1">{formatSimTime(minSim + spanMin * 60_000)}</span>
+        <div className="flex flex-1 min-h-0">
+          {/* 轨道区 */}
+          <div className="flex-1 overflow-auto">
+            <div className="flex">
+              {/* 账号标签列（横向滚动时固定） */}
+              <div className="sticky left-0 z-10 bg-(--panel2) border-r border-(--border) shrink-0">
+                <div style={{ height: 22 }} className="border-b border-(--border)" />
+                {lanes.map((l) => (
+                  <div
+                    key={l}
+                    style={{ height: LANE_H }}
+                    className="flex items-center px-3 text-xs text-(--dim) border-b border-[#15171b] whitespace-nowrap"
+                  >
+                    {l}
+                  </div>
+                ))}
               </div>
-              {/* 轨道横线 */}
-              {lanes.map((l) => (
-                <div key={l} style={{ height: LANE_H }} className="border-b border-[#15171b]" />
-              ))}
-              {/* 事件块 */}
-              {events.map((e) => {
-                const li = laneIndex.get(e.entity) ?? 0;
-                const x = ((e.simTime - minSim) / 60_000) * pxPerMin;
-                const isSel = selected?.id === e.id;
-                return (
-                  <button
-                    key={e.id}
-                    onClick={() => setSelected(e)}
-                    title={`${e.entity} · ${ACTION_LABEL[e.action]} · ${formatSimTime(e.simTime)}`}
-                    style={{
-                      position: 'absolute',
-                      left: x,
-                      top: 22 + li * LANE_H + 5,
-                      width: BLOCK_W,
-                      height: LANE_H - 12,
-                      background: ACTION_COLOR[e.action],
-                      outline: isSel ? '2px solid var(--text)' : 'none',
-                      opacity: isSel ? 1 : 0.85,
-                    }}
-                    className="rounded-sm cursor-pointer hover:opacity-100"
-                  />
-                );
-              })}
+
+              {/* 轨道画布 */}
+              <div className="relative" style={{ width: trackWidth }}>
+                {/* 时间标尺（起止） */}
+                <div style={{ height: 22 }} className="relative border-b border-(--border) text-[10px] text-(--dim)">
+                  <span className="absolute left-1 top-1">{formatSimTime(minSim)}</span>
+                  <span className="absolute right-1 top-1">{formatSimTime(minSim + spanMin * 60_000)}</span>
+                </div>
+                {/* 轨道横线 */}
+                {lanes.map((l) => (
+                  <div key={l} style={{ height: LANE_H }} className="border-b border-[#15171b]" />
+                ))}
+                {/* 事件块 */}
+                {events.map((e) => {
+                  const li = laneIndex.get(e.entity) ?? 0;
+                  const x = ((e.simTime - minSim) / 60_000) * pxPerMin;
+                  const isSel = selected?.id === e.id;
+                  return (
+                    <button
+                      key={e.id}
+                      onClick={() => setSelected(e)}
+                      title={`${e.entity} · ${ACTION_LABEL[e.action]} · ${formatSimTime(e.simTime)}`}
+                      style={{
+                        position: 'absolute',
+                        left: x,
+                        top: 22 + li * LANE_H + 5,
+                        width: BLOCK_W,
+                        height: LANE_H - 12,
+                        background: ACTION_COLOR[e.action],
+                        outline: isSel ? '2px solid var(--text)' : 'none',
+                        opacity: isSel ? 1 : 0.85,
+                      }}
+                      className="rounded-sm cursor-pointer hover:opacity-100"
+                    />
+                  );
+                })}
+              </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* 选中块详情 */}
-      {selected && (
-        <div className="border-t border-(--border) bg-(--panel) px-3 py-2.5 text-xs">
-          <div className="flex items-center gap-2 mb-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-sm"
-              style={{ background: ACTION_COLOR[selected.action] }}
-            />
-            <span className="font-semibold">{selected.entity}</span>
-            <span className="text-(--dim)">{ACTION_LABEL[selected.action]}</span>
-            <span className="ml-auto font-mono tabular-nums text-(--dim)">{formatSimTime(selected.simTime)}</span>
-            <button onClick={() => setSelected(null)} className="text-(--dim) hover:text-(--text) cursor-pointer">
-              <i className="ri-close-line" />
-            </button>
-          </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-            <Kv k="形态 shape" v={selected.shape ?? '—'} />
-            <Kv k="意图 intent" v={selected.intent ?? '—'} />
-            <Kv k="活动态" v={selected.activityState ?? '—'} />
-            <Kv k="池 poolId" v={selected.poolId ?? '—'} />
-            <Kv k="条目 entryId" v={selected.entryId ?? '—'} />
-            <Kv k="配图" v={selected.mediaAttached ? `是 · ${selected.mediaReason ?? ''}` : '否'} />
-            <Kv k="目标帖" v={selected.targetPostId ?? '—'} />
-            <Kv k="现实时间" v={formatSimTime(selected.at)} />
-          </div>
+          {/* 选中块详情（右侧栏） */}
+          {selected && (
+            <div className="w-72 shrink-0 overflow-auto border-l border-(--border) bg-(--panel) px-3 py-2.5 text-xs">
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className="inline-block w-2.5 h-2.5 rounded-sm"
+                  style={{ background: ACTION_COLOR[selected.action] }}
+                />
+                <span className="font-semibold">{selected.entity}</span>
+                <span className="text-(--dim)">{ACTION_LABEL[selected.action]}</span>
+                <button
+                  onClick={() => setSelected(null)}
+                  className="ml-auto text-(--dim) hover:text-(--text) cursor-pointer"
+                >
+                  <i className="ri-close-line" />
+                </button>
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <Kv k="模拟时间" v={formatSimTime(selected.simTime)} />
+                <Kv k="形态 shape" v={selected.shape ?? '—'} />
+                <Kv k="意图 intent" v={selected.intent ?? '—'} />
+                <Kv k="活动态" v={selected.activityState ?? '—'} />
+                <Kv k="池 poolId" v={selected.poolId ?? '—'} />
+                <Kv k="条目 entryId" v={selected.entryId ?? '—'} />
+                <Kv k="配图" v={selected.mediaAttached ? `是 · ${selected.mediaReason ?? ''}` : '否'} />
+                <Kv k="目标帖" v={selected.targetPostId ?? '—'} />
+                <Kv k="现实时间" v={formatSimTime(selected.at)} />
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
