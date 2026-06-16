@@ -1,6 +1,6 @@
 import type { FunctionComponent } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import { WorldStatusPanel } from './WorldStatusPanel.js';
+import { ConsolePanel } from './ConsolePanel.js';
 import { PlaceholderPanel } from './PlaceholderPanel.js';
 
 /**
@@ -15,7 +15,7 @@ export interface PanelDef {
 }
 
 export const PANELS: PanelDef[] = [
-  { id: 'world-status', title: '世界状态', component: WorldStatusPanel },
+  { id: 'console', title: '控制台', component: ConsolePanel },
   { id: 'placeholder', title: '占位面板', component: PlaceholderPanel },
 ];
 

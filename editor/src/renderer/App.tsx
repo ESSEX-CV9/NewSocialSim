@@ -10,13 +10,13 @@ export function App() {
 
   function onReady(event: DockviewReadyEvent): void {
     apiRef.current = event.api;
-    // 初始布局：左世界状态 + 右占位，演示同屏并列与可拖拽分割。
-    const world = event.api.addPanel({ id: 'world-status', component: 'world-status', title: '世界状态' });
+    // 初始布局：左控制台 + 右占位，演示同屏并列与可拖拽分割。
+    const console_ = event.api.addPanel({ id: 'console', component: 'console', title: '控制台' });
     event.api.addPanel({
       id: 'placeholder-0',
       component: 'placeholder',
       title: '占位面板',
-      position: { referencePanel: world.id, direction: 'right' },
+      position: { referencePanel: console_.id, direction: 'right' },
     });
   }
 
