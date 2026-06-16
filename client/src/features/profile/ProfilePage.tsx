@@ -469,12 +469,6 @@ export function ProfilePage() {
                 )}
               </span>
             )}
-            {u.isBot && (
-              <span className="rounded bg-x-input px-1.5 py-0.5 text-xs text-x-dim">
-                <i className="ri-robot-2-line mr-1" />
-                {t('profile.bot')}
-              </span>
-            )}
           </div>
           <div className="text-[15px] text-x-dim">@{u.handle}</div>
         </div>

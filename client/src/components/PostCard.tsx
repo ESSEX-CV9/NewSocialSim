@@ -190,11 +190,6 @@ export function PostCard({
                 </Link>
               </UserHoverCard>
               <VerifiedBadge verified={post.author.verified} />
-              {post.author.isBot && (
-                <span className="ml-0.5 rounded bg-x-input px-1 text-xs text-x-dim">
-                  {t('profile.bot')}
-                </span>
-              )}
               <span className="ml-0.5 text-x-dim">@{post.author.handle}</span>
               <span className="text-x-dim">·</span>
               <TimeAgo at={post.createdAt} />

@@ -51,12 +51,6 @@ export function FollowListPage({ direction }: { direction: 'followers' | 'follow
             </div>
             <div className="text-[14px] text-x-dim">@{u.handle}</div>
           </div>
-          {u.isBot && (
-            <span className="rounded bg-x-input px-1.5 py-0.5 text-xs text-x-dim">
-              <i className="ri-robot-2-line mr-1" />
-              {t('profile.bot')}
-            </span>
-          )}
         </Link>
       ))}
       {query.isSuccess && query.items.length === 0 && (
