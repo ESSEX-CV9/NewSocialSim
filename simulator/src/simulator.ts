@@ -3,6 +3,7 @@ import { EntityRegistry } from './ecs/entity-registry.js';
 import { PostingSystem } from './systems/posting-system.js';
 import { InteractionSystem } from './systems/interaction-system.js';
 import { CascadeSystem } from './systems/cascade-system.js';
+import { TraceSink } from './trace/trace-sink.js';
 import type { System, Entity, TickContext, SimulatorConfig, DrivenAccount } from './ecs/types.js';
 import { logger } from './logger.js';
 
@@ -37,6 +38,7 @@ interface WorldSession {
  */
 export class Simulator {
   private api: ApiClient;
+  private traceSink: TraceSink;
   private session: WorldSession | null = null;
   private clock: WorldClock | null = null;
   private running = false;
@@ -45,6 +47,7 @@ export class Simulator {
 
   constructor(private config: SimulatorConfig) {
     this.api = new ApiClient({ baseUrl: config.apiBaseUrl });
+    this.traceSink = new TraceSink(config.dataDir);
   }
 
   start(): void {
@@ -61,6 +64,7 @@ export class Simulator {
       this.timer = null;
     }
     if (this.session) this.flush(this.session);
+    this.traceSink.close();
   }
 
   private scheduleNext(): void {
@@ -128,6 +132,8 @@ export class Simulator {
       logger.info(`Binding to active world ${worldId}`);
     }
 
+    this.traceSink.setWorld(worldId);
+
     const registry = new EntityRegistry();
     let profiles: Awaited<ReturnType<ApiClient['getNpcProfiles']>>['profiles'] = [];
     try {
@@ -166,9 +172,9 @@ export class Simulator {
 
     const entityMap = new Map<string, Entity>(registry.getAll().map(e => [e.id, e]));
     const systems: System[] = [
-      new PostingSystem(this.api, [...DEFAULT_FALLBACK_POOL], this.config.adminToken),
-      new InteractionSystem(this.api),
-      new CascadeSystem(this.api, entityMap, [...REPLY_POOL]),
+      new PostingSystem(this.api, [...DEFAULT_FALLBACK_POOL], this.config.adminToken, this.traceSink),
+      new InteractionSystem(this.api, this.traceSink),
+      new CascadeSystem(this.api, entityMap, [...REPLY_POOL], this.traceSink),
     ];
 
     this.session = { worldId, registry, systems };

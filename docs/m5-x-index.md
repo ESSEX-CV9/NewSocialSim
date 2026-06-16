@@ -29,6 +29,6 @@
 ## 代码进度速查
 - 分支 `feat-M5-X-RE`，基于 M5-4 完成态重启。
 - 【已实现】Step 0a 代理建号（is_bot、拒绝 bot 命名）；Step 0b 模拟器跟随活动世界 + login-as 票据（不存密码）+ 时间基修正 + 发帖确定性化；账号模型前端对齐（删虚拟用户徽章、isBot 从公共 API 清除）。
-- 【待实现】细步见 `docs/m5-x-roadmap.md`：Phase 0 余下 0.3 决策轨迹落盘 → 0.4/0.5 编辑器 Electron 骨架与多窗格壳 → 0.6–0.8 控制台 → 0.9–0.11 时间轴与轨迹实时推送 → 0.12 验收；其后 Phase 1 内容池 ECS（含最小 TuningService）→ Phase 2 配图 → Phase 3 回复。状态机层、LLM 行为层、GM 导演层、Electron 整体打包按路线图末节顺延。
+- 【待实现】细步见 `docs/m5-x-roadmap.md`：Phase 0 已完成 0.3 决策轨迹落盘（per-world sim-trace.db），余下 0.3b GM/Agent 日志归位 → 0.4/0.5 编辑器 Electron 骨架与多窗格壳 → 0.6–0.8 控制台 → 0.9–0.11 时间轴与轨迹实时推送 → 0.12 验收；其后 Phase 1 内容池 ECS（含最小 TuningService）→ Phase 2 配图 → Phase 3 回复。状态机层、LLM 行为层、GM 导演层、Electron 整体打包按路线图末节顺延。
 - 编辑器从 Phase 0 即 Electron 桌面形态（仅编辑器走 Electron，server/sim 仍 dev 进程），旧临时编辑器（单窗口标签页）整体废弃不保留。
 - `demo` 世界（3 个 is_bot 账号 林辰/悠悠/丸子）为当前活动世界与演示基准，重建脚本 `scripts/demo-stp0.mjs`。旧世界（acgn-sim 等）已弃用。

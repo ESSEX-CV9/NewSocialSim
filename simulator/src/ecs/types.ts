@@ -72,6 +72,9 @@ export interface SimulatorConfig {
   apiBaseUrl: string;
   adminToken: string;
   tickIntervalMs: number;
+  /** 世界数据根目录（基础设施配置，与具体世界无关）。决策轨迹库写在
+   *  `${dataDir}/worlds/<id>/sim-trace.db`。默认 repoRoot/data，可经 SOCIALSIM_DATA_DIR 覆盖。 */
+  dataDir: string;
 }
 
 /** 一个被驱动账号的完整配置，来自活动世界的 npc 档案。 */

@@ -37,7 +37,7 @@
 - **改动**：`simulator/src/simulator.ts`（编排器）、`config.ts`（仅基础设施字段）、`server` admin（`POST /api/admin/login-as`）。
 - **验收**：网页端切世界后模拟器自动 flush 旧世界、重登新世界 npc、用新配置运转，全程不重启进程、无对旧世界写入。
 
-### 0.3 决策轨迹落盘 ⬜
+### 0.3 决策轨迹落盘 ✅
 
 - **目标**：定义决策轨迹事件结构，模拟器每次写世界（发帖 / 回复 / 引用 / 赞 / 转 / 关注）写一条到该世界独占的 `sim-trace.db`，作为可审计的持久真相源。
 - **改动**：`shared/src/types/trace.ts`（新增 `SimTraceEvent` 类型并在 `shared/src/index.ts` 导出）；`simulator/` 加 `better-sqlite3` 依赖；`simulator/src/` 新增轨迹 sink 模块（按当前活动世界打开 `data/worlds/<id>/sim-trace.db`，WAL，`CREATE TABLE IF NOT EXISTS trace_event` + `PRAGMA user_version`，索引 `sim_time` 与 `(entity, sim_time)`，每事件一行 insert）；切世界时关旧库连接、开新库；`PostingSystem` 等写世界处调用 sink 吐事件。

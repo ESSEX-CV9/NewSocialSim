@@ -1,5 +1,6 @@
 import type { System, Entity, TickContext } from '../ecs/types.js';
 import type { ApiClient } from '../api-client.js';
+import type { TraceSink } from '../trace/trace-sink.js';
 import { logger } from '../logger.js';
 
 interface PendingReaction {
@@ -25,6 +26,7 @@ export class CascadeSystem implements System {
     private api: ApiClient,
     private entityMap: Map<string, Entity>,
     private replyPool: string[],
+    private trace: TraceSink,
   ) {}
 
   async update(entities: Entity[], ctx: TickContext): Promise<void> {
@@ -86,6 +88,10 @@ export class CascadeSystem implements System {
         try {
           await this.api.likePost(entity.auth.token, reaction.postId);
           logger.info(`[${entity.profile.handle}] cascade-liked post ${reaction.postId} by @${reaction.postAuthorHandle}`);
+          this.trace.emit({
+            at: Date.now(), simTime: ctx.simTime, entity: entity.profile.handle,
+            action: 'like', shape: null, targetPostId: reaction.postId,
+          });
         } catch { /* already liked or error */ }
       }
 
@@ -93,6 +99,10 @@ export class CascadeSystem implements System {
         try {
           await this.api.repost(entity.auth.token, reaction.postId);
           logger.info(`[${entity.profile.handle}] cascade-reposted post ${reaction.postId}`);
+          this.trace.emit({
+            at: Date.now(), simTime: ctx.simTime, entity: entity.profile.handle,
+            action: 'repost', shape: null, targetPostId: reaction.postId,
+          });
         } catch { /* already reposted or error */ }
       }
 
@@ -102,6 +112,10 @@ export class CascadeSystem implements System {
           try {
             const reply = await this.api.createPost(entity.auth.token, replyContent, reaction.postId);
             logger.info(`[${entity.profile.handle}] cascade-replied to post ${reaction.postId}: "${replyContent.slice(0, 30)}..."`);
+            this.trace.emit({
+              at: Date.now(), simTime: ctx.simTime, entity: entity.profile.handle,
+              action: 'reply', shape: 'reply', intent: 'earnest', targetPostId: reaction.postId,
+            });
 
             this.triggerCascadeForReply(reply.id, entity, ctx, reaction.depth + 1);
           } catch (err) {

@@ -1,5 +1,6 @@
 import type { System, Entity, TickContext } from '../ecs/types.js';
 import type { ApiClient } from '../api-client.js';
+import type { TraceSink } from '../trace/trace-sink.js';
 import { logger } from '../logger.js';
 
 interface Topic {
@@ -27,6 +28,7 @@ export class PostingSystem implements System {
     private api: ApiClient,
     private fallbackPool: string[],
     private adminToken: string,
+    private trace: TraceSink,
   ) {}
 
   async update(entities: Entity[], ctx: TickContext): Promise<void> {
@@ -85,6 +87,19 @@ export class PostingSystem implements System {
     try {
       const result = await this.api.createPost(entity.auth!.token, content);
       logger.info(`[${entity.profile.handle}] posted: "${content.slice(0, 40)}" (id ${result.id})`);
+      this.trace.emit({
+        at: Date.now(),
+        simTime: ctx.simTime,
+        entity: entity.profile.handle,
+        action: 'post',
+        shape: 'standalone',
+        activityState: null,
+        intent: 'earnest',
+        poolId: null,
+        entryId: null,
+        mediaAttached: false,
+        targetPostId: null,
+      });
     } catch (err) {
       logger.error(`[${entity.profile.handle}] post failed:`, err);
     }
