@@ -63,7 +63,7 @@
 - **目标**：renderer 实现 Blender 式工作区——dockview 自由拖拽/分割，每格是一个 PaneHost（顶部下拉切换本格显示哪种面板），配 X 系配色 + 顶栏 + 底部状态条 + 创作助手悬浮球；去掉 mockup 的左侧图标 rail。
 - **改动**：`editor/src/renderer/` 的 `App.tsx`（顶栏/状态条/dockview/FAB 壳）、`panels/PaneHost.tsx`（每格类型下拉）、`panels/registry.ts`（全部面板登记，console 真实其余占位 + `panelById`）、`hooks/useActiveWorld.ts`（顶栏/状态条共用的活动世界轮询+推算）、`index.css`（mockup 配色变量 + dockview 暗色微调）。
 - **验收**：Electron 窗内为深色 X 系外壳；工作区每格顶部下拉可切面板类型；可拖拽分割/合并/调宽；「+新建格」新挂一格；右下创作助手悬浮球可开合。
-- **交接提示**：配色与外壳对齐 `docs/editor-mockup.html`。后续每个里程碑的面板把 `registry` 里对应项的 component 从占位换成实现即可，不另起页面路由、不动壳。
+- **交接提示**：配色与外壳对齐 `docs/editor-mockup.html`。后续每个里程碑的面板把 `registry` 里对应项的 component 从占位换成实现即可，不另起页面路由、不动壳。**停靠交互定为 Adobe 式**（= dockview 原生：拖面板标签到边缘分屏带预览 / 拖到标签条合并 / 拖分隔线调宽 / `addFloatingGroup` 浮动 / `addPopoutGroup` 弹出独立窗口），不自写 Blender 角落区；浮动/弹出入口与具体布局待面板补齐后再打磨。
 
 ### 0.5b 预设布局 + 跟随世界存档 ✅
 
