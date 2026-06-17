@@ -8,9 +8,10 @@ import { type TimelineBlock, interactionKey, interactionToBlock, postToBlock, bl
 
 /**
  * 时间轴面板（Premiere 范式，见 docs/m5-design.md）：横轴为时间、纵轴每行一个账号，
- * 块 = 世界真实内容、独立于模拟器。主轴为社交站全站流 /api/timeline/global（顶层帖、所有账号、
- * 无限向后滚动）；按账号补拉回复（?type=replies）与转发（/timeline 的 type=repost）。
- * 顶层时间为可输入的时间修改器，改时间即跳转视图。赞/关注互动、按时间区间跳转待后续服务端工作。
+ * 块 = 世界真实内容（帖子/回复/引用/转发/赞/关注）、**独立于模拟器**（读 world.db，模拟器关也能用）。
+ * 取数走编辑器后端单一聚合端点 GET /api/timeline（roster + 顶层帖 + 各账号回复/互动），
+ * 按**可见时间窗口**加载：初始取最新内容，向左滚/跳转/轮询各取一个时间窗（含该时段全部互动）。
+ * 顶层时间为可输入的时间修改器，改时间即跳转视图。
  */
 
 const RULER_H = 26;
@@ -499,7 +500,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
 
       {error && <p className="px-3 py-2 text-(--pink) text-xs">编辑器后端不可达：{error}</p>}
       {!error && blocks.length === 0 && (
-        <p className="px-3 py-4 text-(--dim) text-sm">该世界暂无内容。建号发帖或启动模拟器后，帖子/回复/转发会在此按时间排布。</p>
+        <p className="px-3 py-4 text-(--dim) text-sm">该世界还没有帖子或互动。任意账号发帖、回复、转发或点赞后，都会在此按时间排布。</p>
       )}
 
       {blocks.length > 0 && (
