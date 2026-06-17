@@ -5,6 +5,8 @@ import { InteractionSystem } from './systems/interaction-system.js';
 import { CascadeSystem } from './systems/cascade-system.js';
 import { TraceSink } from './trace/trace-sink.js';
 import { TuningService } from './tuning/tuning-service.js';
+import { loadPools } from './content-pool/pool-loader.js';
+import type { LoadedPools } from '@socialsim/shared';
 import type { System, Entity, TickContext, SimulatorConfig, DrivenAccount } from './ecs/types.js';
 import type { SimulatorHeartbeat } from '@socialsim/shared';
 import { logger } from './logger.js';
@@ -42,6 +44,7 @@ export class Simulator {
   private api: ApiClient;
   private traceSink: TraceSink;
   private tuning: TuningService;
+  private loadedPools: LoadedPools | null = null;
   private session: WorldSession | null = null;
   private clock: WorldClock | null = null;
   private running = false;
@@ -154,6 +157,13 @@ export class Simulator {
     this.traceSink.setWorld(worldId);
     // 直读世界文件夹的配置：全局 defaults + 世界级 tuning.json override（见 docs/m5-x-phase1-baseline.md）。
     this.tuning.load(worldId);
+    // 直读并合并三类内容池来源（全局原子 + 世界场景 + 话题）。组装与发帖接入属 1.2 / 1.4。
+    this.loadedPools = loadPools(this.config.dataDir, worldId);
+    logger.info(
+      `Content pools loaded for world ${worldId}: ` +
+        `${Object.keys(this.loadedPools.components).length} 组件类型 / ` +
+        `${Object.keys(this.loadedPools.grammars).length} 语法 / ${this.loadedPools.pools.length} 池`,
+    );
 
     const registry = new EntityRegistry();
     let profiles: Awaited<ReturnType<ApiClient['getNpcProfiles']>>['profiles'] = [];

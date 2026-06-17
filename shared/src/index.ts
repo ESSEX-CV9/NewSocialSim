@@ -6,3 +6,4 @@ export * from './types/views.js';
 export * from './types/dm.js';
 export * from './types/trace.js';
 export * from './types/simulator.js';
+export * from './types/content-pool.js';

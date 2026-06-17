@@ -1,0 +1,9 @@
+{
+  "通用水贴-短": {
+    "dimensions": { "形态": "standalone", "篇幅": "short", "模式": "灌水" },
+    "grammars": [
+      { "ref": "水贴式", "weight": 2 },
+      { "ref": "感叹水贴式", "weight": 1 }
+    ]
+  }
+}
