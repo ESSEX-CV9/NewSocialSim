@@ -85,6 +85,13 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
   const exprVarDefault = ctx.exprVarDefault ?? NEUTRAL_PROB;
   const optionalProb = ctx.optionalProb ?? NEUTRAL_PROB;
   const slotFillable = (s: GrammarSlot): boolean => s.components.some((c) => fragmentsFor(c).length > 0);
+  // 出现判定：prob 优先（数字/表达式），否则 optional 用 optionalProb，否则必出现。互斥组成员也走这套。
+  const appears = (s: GrammarSlot): boolean =>
+    s.prob !== undefined
+      ? ctx.rng() < evalProb(s.prob, ctx.vars, exprVarDefault)
+      : s.optional
+        ? ctx.rng() < optionalProb
+        : true;
 
   // 候选语法：存在于语法库、且每个必填槽可填、每个互斥组至少一个成员可填。
   const candidates = pool.grammars
@@ -97,8 +104,8 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
   if (!chosen) return null;
   const slots = chosen.grammar!.slots;
 
-  // 解互斥组：每组在可填成员里挑一个 winner（恰好出一个），其余跳过。
-  const groupWinner = resolveGroups(slots, slotFillable, ctx.rng);
+  // 解互斥组：每组在「可填 且 掷概率通过」的成员里挑一个 winner（至多出一个；成员全 100% 时即恰好一个）。
+  const groupWinner = resolveGroups(slots, slotFillable, appears, ctx.rng);
 
   const parts: string[] = [];
   const picked: string[] = [];
@@ -107,16 +114,10 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
     const skippable = slot.group !== undefined || slot.optional === true || slot.prob !== undefined;
 
     if (slot.group !== undefined) {
-      if (groupWinner.get(slot.group) !== i) continue; // 非 winner：跳过
-      // winner：组已决定出现，不再独立判定 optional/prob
-    } else {
-      const appear =
-        slot.prob !== undefined
-          ? ctx.rng() < evalProb(slot.prob, ctx.vars, exprVarDefault)
-          : slot.optional
-            ? ctx.rng() < optionalProb
-            : true;
-      if (!appear) continue;
+      if (groupWinner.get(slot.group) !== i) continue; // 非 winner（含整组都没掷过）：跳过
+      // winner：概率已在 resolveGroups 掷过，这里直接出
+    } else if (!appears(slot)) {
+      continue;
     }
 
     // 槽内多选一：在可填组件里按权重挑一个。
@@ -155,15 +156,17 @@ function grammarViable(grammar: Grammar, slotFillable: (s: GrammarSlot) => boole
   return true;
 }
 
-/** 每个互斥组在可填成员里 uniform 挑一个 winner（slot 下标）。 */
+/** 每个互斥组在「可填 且 掷概率通过」的成员里 uniform 挑一个 winner（slot 下标）；无人通过则该组不出。
+ *  成员各自的出现概率因此仍生效——全 100% 时退化为恰好出一个。 */
 function resolveGroups(
   slots: GrammarSlot[],
   slotFillable: (s: GrammarSlot) => boolean,
+  appears: (s: GrammarSlot) => boolean,
   rng: () => number,
 ): Map<string, number> {
   const byGroup = new Map<string, number[]>();
   slots.forEach((s, i) => {
-    if (s.group !== undefined && slotFillable(s)) {
+    if (s.group !== undefined && slotFillable(s) && appears(s)) {
       const arr = byGroup.get(s.group);
       if (arr) arr.push(i);
       else byGroup.set(s.group, [i]);

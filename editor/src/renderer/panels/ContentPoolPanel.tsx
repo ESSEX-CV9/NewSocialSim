@@ -307,7 +307,7 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
     setMsg(null); setEditing(null); setPicker(false);
     if (existing) {
       setName(existing.name); setGroup(existing.group);
-      setSlots(existing.slots.map((s) => ({ components: s.components, group: s.group ?? '', expr: typeof s.prob === 'string' ? s.prob : '', pct: s.group ? 100 : typeof s.prob === 'number' ? Math.round(s.prob * 100) : s.optional ? 50 : 100 })));
+      setSlots(existing.slots.map((s) => ({ components: s.components, group: s.group ?? '', expr: typeof s.prob === 'string' ? s.prob : '', pct: typeof s.prob === 'number' ? Math.round(s.prob * 100) : s.optional ? 50 : 100 })));
     } else { setName(''); setGroup(''); setSlots([]); }
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -337,7 +337,7 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
   function buildSlots(): GrammarSlot[] {
     return slots.filter((s) => s.components.length).map((s) => {
       const slot: GrammarSlot = { components: s.components };
-      if (s.group.trim()) { slot.group = s.group.trim(); return slot; }
+      if (s.group.trim()) slot.group = s.group.trim();
       if (s.expr.trim()) slot.prob = s.expr.trim();
       else if (s.pct < 100) slot.prob = Number((s.pct / 100).toFixed(3));
       return slot;
@@ -371,7 +371,7 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
       <Field label="槽位（左→右=成文顺序；从右上组件区可拖入；点卡片编辑）">
         <div className="flex flex-wrap items-stretch gap-1.5">
           {slots.map((s, i) => {
-            const badge = s.group ? '互斥' : s.expr.trim() ? '高级' : s.pct < 100 ? `${s.pct}%` : '总是';
+            const badge = [s.group ? '互斥' : '', s.expr.trim() ? '高级' : s.pct < 100 ? `${s.pct}%` : ''].filter(Boolean).join(' · ') || '总是';
             const col = s.group ? colorOf(s.group) : 'var(--dim)';
             return (
               <div key={i} className="flex items-center gap-1">
@@ -419,19 +419,26 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
           </div>
           <div className="flex items-center gap-2">
             <span className="text-(--dim) text-[11px] w-16">出现概率</span>
-            <input type="range" min={0} max={100} value={slots[editing]!.pct} disabled={!!slots[editing]!.group} onChange={(e) => setSlot(editing, { pct: Number(e.target.value) })} />
+            <input type="range" min={0} max={100} value={slots[editing]!.pct} onChange={(e) => setSlot(editing, { pct: Number(e.target.value) })} />
             <span className="text-xs w-10 text-right">{slots[editing]!.pct}%</span>
-            {slots[editing]!.group && <span className="text-(--dim) text-[11px]">（在互斥组里，出现由组决定）</span>}
+            {slots[editing]!.group && <span className="text-(--dim) text-[11px]">（互斥组里也按各自概率掷，至多出一个）</span>}
           </div>
           <div>
-            <div className="text-(--dim) text-[11px] mb-1">互斥（勾选的槽位与本槽只出现一个）</div>
-            <div className="flex flex-wrap gap-2">
-              {slots.map((s, j) => j === editing ? null : (
-                <label key={j} className="flex items-center gap-1 text-xs cursor-pointer border border-(--border) rounded px-1.5 py-0.5">
-                  <input type="checkbox" checked={!!slots[editing]!.group && slots[editing]!.group === s.group} onChange={() => toggleExclusive(editing, j)} />
-                  槽{j + 1}<span className="text-(--dim)">{s.components[0] ?? '空'}</span>
-                </label>
-              ))}
+            <div className="text-(--dim) text-[11px] mb-1">与哪些槽位互斥（同组至多出一个）</div>
+            <div className="flex flex-wrap gap-1.5">
+              {slots.map((s, j) => {
+                if (j === editing) return null;
+                const on = !!slots[editing]!.group && slots[editing]!.group === s.group;
+                return (
+                  <button
+                    key={j}
+                    onClick={() => toggleExclusive(editing, j)}
+                    className={`px-2 py-0.5 rounded-full text-xs border cursor-pointer ${on ? 'bg-(--blue) border-(--blue) text-white' : 'bg-(--chip) border-(--border) text-(--text)'}`}
+                  >
+                    槽{j + 1} {s.components[0] ?? '空'}
+                  </button>
+                );
+              })}
               {slots.length < 2 && <span className="text-(--dim) text-[11px]">至少两个槽位才能组互斥</span>}
             </div>
           </div>
