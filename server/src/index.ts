@@ -11,7 +11,7 @@ const sseHub = new SseHub();
 // 热切换后旧世界 token 全部失效，SSE 长连接同步清场（重连会被 401）
 worldManager.onActivated(() => sseHub.closeAll());
 
-const app = buildApp({ worldManager, sseHub, jwtSecret: loadOrCreateJwtSecret(config.jwtSecretFile) });
+const app = await buildApp({ worldManager, sseHub, jwtSecret: loadOrCreateJwtSecret(config.jwtSecretFile) });
 
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {

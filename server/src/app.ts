@@ -3,6 +3,7 @@ import fastifyMultipart from '@fastify/multipart';
 import Fastify, { type FastifyError, type FastifyInstance } from 'fastify';
 import { makeOptionalAuth, makeRequireAuth } from './core/auth/auth-guard.js';
 import { AppError } from './core/errors/app-error.js';
+import { registerSwagger } from './core/openapi/swagger.js';
 import type { SseHub } from './core/events/sse-hub.js';
 import type { WorldManager } from './core/world/world-manager.js';
 import { registerAuthRoutes } from './modules/auth/auth.routes.js';
@@ -50,7 +51,7 @@ export interface AppDeps {
 }
 
 /** 组装层：创建实例、挂错误处理、构建各模块 service 并注册路由 */
-export function buildApp(deps: AppDeps): FastifyInstance {
+export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: true });
 
   app.setErrorHandler((err: FastifyError | AppError, req, reply) => {
@@ -70,6 +71,9 @@ export function buildApp(deps: AppDeps): FastifyInstance {
     req.log.error(err);
     reply.status(500).send({ error: { code: 'INTERNAL', message: '服务器内部错误' } });
   });
+
+  // OpenAPI 文档生成器须在任何路由注册之前加载完，onRoute 钩子才能采集到全部路由（故 await）
+  await registerSwagger(app);
 
   app.register(fastifyJwt, { secret: deps.jwtSecret });
   // multipart 是注册期静态上限，只做宽松硬顶；真实视频限额（可配置）在 media.service 校验

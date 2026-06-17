@@ -1,0 +1,1830 @@
+openapi: 3.1.0
+info:
+  title: NewSocialSim 社交站 API
+  description: >-
+    本地社交媒体模拟器（仿 X/Twitter）的社交站后端 HTTP API。第二阶段虚拟用户与真人走相同接口——此 spec 即唯一契约面。
+
+
+    约定：时间字段均为世界**模拟时间**（unix 毫秒）；列表接口游标分页 `{ items, nextCursor }`，游标
+    base64url(JSON) 不透明；任一时刻一个活动世界，读写默认作用于活动世界。
+  version: 0.1.0
+components:
+  securitySchemes:
+    bearerJWT:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 登录用户 JWT。JWT 含 worldId，切世界后旧 token 全部 401。
+    adminKey:
+      type: http
+      scheme: bearer
+      description: 管理端 admin key（默认 dev-admin-key，env SOCIALSIM_ADMIN_KEY）。
+    sseToken:
+      type: apiKey
+      in: query
+      name: token
+      description: SSE 流凭证：EventSource 带不了 header，故 JWT 走 ?token= 查询参数。
+  schemas: {}
+paths:
+  /api/health:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - id
+                - name
+              additionalProperties: false
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 2000
+                locale:
+                  type: string
+                  enum:
+                    - zh-CN
+                    - en
+                contentRating:
+                  type: string
+                  enum:
+                    - safe
+                    - all
+                clock:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    simTimeMs:
+                      type: integer
+                    scale:
+                      type: number
+                    paused:
+                      type: boolean
+                calendar:
+                  type: object
+                  required:
+                    - label
+                  additionalProperties: false
+                  properties:
+                    label:
+                      type: string
+                      minLength: 1
+                      maxLength: 50
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/{id}/activate:
+    post:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/active:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/{id}:
+    patch:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/clock:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/{id}/copy:
+    post:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/snapshots:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/{id}/snapshots:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/{id}/snapshots/{name}/restore:
+    post:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: name
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/worlds/{id}/snapshots/{name}:
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: name
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/media/upload:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/media/from-url:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              additionalProperties: false
+              properties:
+                url:
+                  type: string
+                  minLength: 1
+                  maxLength: 2048
+                source:
+                  type: string
+                  maxLength: 50
+      responses:
+        "200":
+          description: Default Response
+  /api/media/{id}/file:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+          in: query
+          name: w
+          required: true
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          in: query
+          name: q
+          required: true
+        - schema:
+            type: string
+            maxLength: 20
+          in: query
+          name: source
+          required: false
+        - schema:
+            type: string
+            enum:
+              - safe
+              - all
+              - r18
+          in: query
+          name: rating
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/sources:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/preview:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 2048
+          in: query
+          name: url
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/config:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    patch:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                proxy:
+                  type: string
+                  maxLength: 200
+                pixiv:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    refreshToken:
+                      type: string
+                      maxLength: 200
+                    allowR18G:
+                      type: boolean
+                pinterest:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    cookies:
+                      type: string
+                      maxLength: 8192
+                pexels:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    apiKey:
+                      type: string
+                      maxLength: 200
+                danbooru:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    username:
+                      type: string
+                      maxLength: 100
+                    apiKey:
+                      type: string
+                      maxLength: 200
+                gelbooru:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    userId:
+                      type: string
+                      maxLength: 100
+                    apiKey:
+                      type: string
+                      maxLength: 200
+                tools:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    ytdlpUrl:
+                      type: string
+                      maxLength: 500
+                    ffmpegUrl:
+                      type: string
+                      maxLength: 500
+                bilibili:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    cookies:
+                      type: string
+                      maxLength: 8192
+                video:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    maxHeight:
+                      type: number
+                      minimum: 144
+                      maximum: 4320
+                    maxDownloadMb:
+                      type: number
+                      minimum: 1
+                      maximum: 4096
+                    defaultMode:
+                      type: string
+                      enum:
+                        - download
+                        - stream
+                    hlsFallback:
+                      type: string
+                      enum:
+                        - download
+                        - error
+                    siteModes:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        youtube:
+                          type: string
+                          enum:
+                            - embed
+                            - download
+                            - stream
+                        bilibili:
+                          type: string
+                          enum:
+                            - embed
+                            - download
+                            - stream
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/pixiv/login:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/pixiv/login/status:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/pixiv/code:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+              additionalProperties: false
+              properties:
+                code:
+                  type: string
+                  minLength: 1
+                  maxLength: 2048
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/bilibili/login:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/media-search/bilibili/login/status:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/tools/status:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/tools/latest:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/tools/{id}/install:
+    post:
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - yt-dlp
+              - ffmpeg
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/tools/{id}/install/status:
+    get:
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - yt-dlp
+              - ffmpeg
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/video/ingest:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - url
+              additionalProperties: false
+              properties:
+                url:
+                  type: string
+                  minLength: 1
+                  maxLength: 2048
+                mode:
+                  type: string
+                  enum:
+                    - auto
+                    - download
+                    - stream
+      responses:
+        "200":
+          description: Default Response
+  /api/video/sources:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/video/search:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          in: query
+          name: q
+          required: true
+        - schema:
+            type: string
+            maxLength: 20
+          in: query
+          name: source
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/video/tasks:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/video/tasks/{id}:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 50
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 50
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/media/{id}/stream:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          in: query
+          name: w
+          required: true
+        - schema:
+            type: integer
+            minimum: 1
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/auth/register:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - handle
+                - displayName
+                - password
+              additionalProperties: false
+              properties:
+                handle:
+                  type: string
+                displayName:
+                  type: string
+                  maxLength: 50
+                password:
+                  type: string
+                  maxLength: 200
+      responses:
+        "200":
+          description: Default Response
+  /api/auth/login:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - handle
+                - password
+              additionalProperties: false
+              properties:
+                handle:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Default Response
+  /api/auth/me:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/users/suggested:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/me:
+    patch:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                displayName:
+                  type: string
+                  maxLength: 50
+                bio:
+                  type: string
+                  maxLength: 500
+                avatarMediaId:
+                  type:
+                    - integer
+                    - "null"
+                bannerMediaId:
+                  type:
+                    - integer
+                    - "null"
+                verified:
+                  type: string
+                  enum:
+                    - none
+                    - personal
+                    - org
+                website:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 200
+                location:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 50
+                birthDate:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 10
+                profession:
+                  type:
+                    - string
+                    - "null"
+                  maxLength: 50
+      responses:
+        "200":
+          description: Default Response
+  /api/posts:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              additionalProperties: false
+              properties:
+                content:
+                  type: string
+                  maxLength: 1000
+                replyToId:
+                  type: integer
+                quoteOfId:
+                  type: integer
+                mediaIds:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 1
+                  maxItems: 20
+                  uniqueItems: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/{id}:
+    get:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/{id}/replies:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/posts:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+            enum:
+              - posts
+              - replies
+          in: query
+          name: type
+          required: false
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/likes:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/media:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/{id}/pin:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/views:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              additionalProperties: false
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                    minimum: 1
+                  minItems: 1
+                  maxItems: 100
+                  uniqueItems: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/{id}/like:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/{id}/repost:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/{id}/bookmark:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/posts/{id}/hide:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/bookmarks:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/interactions:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/follow:
+    post:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/followers:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/following:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/block:
+    post:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/notifications:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+            enum:
+              - all
+              - mentions
+          in: query
+          name: filter
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/notifications/unread-count:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/notifications/read-all:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/notifications/read:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - ids
+              additionalProperties: false
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: integer
+                  minItems: 1
+                  maxItems: 100
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - userId
+              additionalProperties: false
+              properties:
+                userId:
+                  type: integer
+      responses:
+        "200":
+          description: Default Response
+    get:
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - inbox
+              - unread
+              - requests
+              - hidden
+          in: query
+          name: filter
+          required: false
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/unread-count:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/read-all:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/search:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          in: query
+          name: q
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations/{id}:
+    get:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations/{id}/messages:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              additionalProperties: false
+              properties:
+                content:
+                  type: string
+                  maxLength: 1000
+                mediaIds:
+                  type: array
+                  items:
+                    type: integer
+                  maxItems: 4
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations/{id}/read:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                messageId:
+                  type: integer
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations/{id}/accept:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations/{id}/unread:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations/{id}/mute:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/conversations/{id}/pin:
+    post:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/{messageId}:
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: messageId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/{messageId}/reaction:
+    put:
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - emoji
+              additionalProperties: false
+              properties:
+                emoji:
+                  type: string
+                  enum:
+                    - ❤️
+                    - 👍
+                    - 👎
+                    - 😂
+                    - 😢
+                    - 🔥
+                    - 😲
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: messageId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: integer
+          in: path
+          name: messageId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/messages/stream:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: token
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/timeline/home:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+            enum:
+              - latest
+              - hot
+          in: query
+          name: sort
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/timeline/foryou:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/timeline/global:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/users/{handle}/timeline:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+        - schema:
+            type: string
+          in: path
+          name: handle
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/search/posts:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          in: query
+          name: q
+          required: true
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/search/users:
+    get:
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          in: query
+          name: q
+          required: true
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/search/trends:
+    get:
+      parameters:
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/posts:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/follows:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/posts/{id}/counts:
+    post:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/import:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/lore:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/lore/{filename}:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: filename
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    put:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: filename
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: filename
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/npc-profiles:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/npc-profiles/{userId}:
+    get:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: userId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    put:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: userId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: userId
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/topics:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/topics/{id}:
+    patch:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: id
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/content-pools:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/content-pools/{poolType}/{key}:
+    delete:
+      parameters:
+        - schema:
+            type: string
+          in: path
+          name: poolType
+          required: true
+        - schema:
+            type: string
+          in: path
+          name: key
+          required: true
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/users:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/login-as:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/llm-config:
+    get:
+      responses:
+        "200":
+          description: Default Response
+    put:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/llm-config/fetch-models:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/admin/run-agent:
+    post:
+      responses:
+        "200":
+          description: Default Response
+  /api/simulator/status:
+    get:
+      responses:
+        "200":
+          description: Default Response
+  /api/simulator/heartbeat:
+    post:
+      responses:
+        "200":
+          description: Default Response
+servers:
+  - url: http://127.0.0.1:3000
+    description: 本地开发
+tags:
+  - name: auth
+    description: 认证：注册 / 登录 / 当前用户
+  - name: users
+    description: 账号资料与推荐关注
+  - name: posts
+    description: 帖子：发帖 / 单帖 / 回复 / 账号帖流 / 置顶 / 曝光
+  - name: timeline
+    description: 时间线：关注流 / 推荐流 / 全站流 / 账号主页流
+  - name: interactions
+    description: 互动：赞 / 转 / 收藏 / 隐藏 / 互动事件流
+  - name: follows
+    description: 关注与粉丝列表
+  - name: blocks
+    description: 屏蔽
+  - name: notifications
+    description: 通知
+  - name: messages
+    description: 私信：会话 / 消息 / 已读 / 表情回应 / SSE 流
+  - name: search
+    description: 搜索：帖 / 账号 / 趋势
+  - name: media
+    description: 媒体：上传 / 外链入库 / 文件流 / 视频流
+  - name: media-search
+    description: 搜图：关键字搜图 / 图源 / 配置 / 站点引导登录
+  - name: video-search
+    description: 视频引入：搜索 / 引入任务
+  - name: tools
+    description: 工具：yt-dlp / ffmpeg 二进制管理
+  - name: worlds
+    description: 世界管理：列 / 建 / 激活 / 时钟 / 快照（当前无鉴权）
+  - name: admin
+    description: 管理端：代理建号 / 代登录 / 代发帖 / 话题 / 内容池 / LLM / NPC 档案 / 设定库
+  - name: simulator
+    description: 模拟器状态：心跳上报与状态查询（公开）
+  - name: meta
+    description: 健康检查等元端点
