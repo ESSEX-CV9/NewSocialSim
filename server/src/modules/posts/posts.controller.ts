@@ -31,7 +31,7 @@ export class PostsController {
   listByHandle = async (
     req: FastifyRequest<{
       Params: { handle: string };
-      Querystring: PageQuery & { type?: 'posts' | 'replies' };
+      Querystring: PageQuery & { type?: 'posts' | 'replies'; from?: number; to?: number };
     }>,
     reply: FastifyReply,
   ) => {
@@ -42,6 +42,7 @@ export class PostsController {
         req.query.cursor,
         req.query.limit,
         req.query.type ?? 'posts',
+        { from: req.query.from, to: req.query.to },
       ),
     );
   };

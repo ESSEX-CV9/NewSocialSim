@@ -123,19 +123,29 @@ export const postsRepo = {
     repliesOnly: boolean,
     before: { ts: number; id: number } | null,
     limit: number,
+    range?: { from?: number | undefined; to?: number | undefined },
   ): PostRow[] {
     const cursorClause = before
       ? 'AND (p.created_at < @ts OR (p.created_at = @ts AND p.id < @cid))'
       : '';
     const replyClause = repliesOnly ? 'AND p.reply_to_id IS NOT NULL' : 'AND p.reply_to_id IS NULL';
+    // 时间区间（时间轴按可见窗口取回复）
+    const rangeClause =
+      (range?.from != null ? 'AND p.created_at >= @from ' : '') + (range?.to != null ? 'AND p.created_at <= @to' : '');
     return db
       .prepare(
         `${SELECT_POST}
-         WHERE p.author_id = @authorId AND p.deleted = 0 ${replyClause} ${cursorClause}
+         WHERE p.author_id = @authorId AND p.deleted = 0 ${replyClause} ${cursorClause} ${rangeClause}
          ORDER BY p.created_at DESC, p.id DESC
          LIMIT @limit`,
       )
-      .all({ authorId, limit, ...(before ? { ts: before.ts, cid: before.id } : {}) }) as PostRow[];
+      .all({
+        authorId,
+        limit,
+        ...(before ? { ts: before.ts, cid: before.id } : {}),
+        ...(range?.from != null ? { from: range.from } : {}),
+        ...(range?.to != null ? { to: range.to } : {}),
+      }) as PostRow[];
   },
 
   /** 某用户带媒体的帖子（含回复，与 X 媒体 Tab 一致），按发布时间倒序 */

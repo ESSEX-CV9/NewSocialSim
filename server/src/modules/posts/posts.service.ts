@@ -125,6 +125,7 @@ export class PostsService {
     cursor?: string,
     limit?: number,
     type: 'posts' | 'replies' = 'posts',
+    range?: { from?: number | undefined; to?: number | undefined },
   ): Page<PostView> {
     const profile = this.usersService.getProfileByHandle(handle);
     const { db } = this.worldManager.current();
@@ -135,6 +136,7 @@ export class PostsService {
       type === 'replies',
       decodeTsIdCursor(cursor),
       pageSize + 1,
+      range,
     );
     const page = this.toPage(rows, pageSize, viewerId);
     if (type === 'replies') this.attachParents(page.items, viewerId);

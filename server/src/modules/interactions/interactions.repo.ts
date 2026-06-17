@@ -35,23 +35,34 @@ export const interactionsRepo = {
     userId: number,
     before: { ts: number; kind: string; ref: number } | null,
     limit: number,
+    range?: { from?: number | undefined; to?: number | undefined },
   ): { kind: 'like' | 'repost' | 'follow'; ref: number; created_at: number }[] {
     // 排序键：created_at DESC, kind ASC, ref DESC。游标谓词按各分支字面 kind 注入。
     const pred = (kind: string, refCol: string) =>
       before
         ? `AND (created_at < @cts OR (created_at = @cts AND '${kind}' > @ck) OR (created_at = @cts AND '${kind}' = @ck AND ${refCol} < @cref))`
         : '';
+    // 时间区间（作用于各表 created_at）；供时间轴按可见窗口取数，避免"只取最新 N 条"丢历史。
+    const rangeClause =
+      (range?.from != null ? 'AND created_at >= @from ' : '') + (range?.to != null ? 'AND created_at <= @to' : '');
+    const arm = (kind: string, refCol: string) => `${pred(kind, refCol)} ${rangeClause}`;
     const sql = `
       SELECT kind, ref, created_at FROM (
-        SELECT 'like'   AS kind, post_id     AS ref, created_at FROM likes   WHERE user_id     = @uid ${pred('like', 'post_id')}
+        SELECT 'like'   AS kind, post_id     AS ref, created_at FROM likes   WHERE user_id     = @uid ${arm('like', 'post_id')}
         UNION ALL
-        SELECT 'repost' AS kind, post_id     AS ref, created_at FROM reposts WHERE user_id     = @uid ${pred('repost', 'post_id')}
+        SELECT 'repost' AS kind, post_id     AS ref, created_at FROM reposts WHERE user_id     = @uid ${arm('repost', 'post_id')}
         UNION ALL
-        SELECT 'follow' AS kind, followee_id AS ref, created_at FROM follows WHERE follower_id = @uid ${pred('follow', 'followee_id')}
+        SELECT 'follow' AS kind, followee_id AS ref, created_at FROM follows WHERE follower_id = @uid ${arm('follow', 'followee_id')}
       )
       ORDER BY created_at DESC, kind ASC, ref DESC
       LIMIT @lim`;
-    const params = { uid: userId, lim: limit, ...(before ? { cts: before.ts, ck: before.kind, cref: before.ref } : {}) };
+    const params = {
+      uid: userId,
+      lim: limit,
+      ...(before ? { cts: before.ts, ck: before.kind, cref: before.ref } : {}),
+      ...(range?.from != null ? { from: range.from } : {}),
+      ...(range?.to != null ? { to: range.to } : {}),
+    };
     return db.prepare(sql).all(params) as { kind: 'like' | 'repost' | 'follow'; ref: number; created_at: number }[];
   },
 

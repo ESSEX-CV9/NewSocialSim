@@ -131,11 +131,15 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const expectedLeftRef = useRef(0);
   const postIdsRef = useRef<Set<number>>(new Set());
   const actKeysRef = useRef<Set<string>>(new Set());
-  const oldestCursorRef = useRef<string | null>(null);
+  // 已按时间窗口加载的覆盖区间 [coverFrom, coverTo]（模拟时间 ms）；向左滚动/轮询据此续接。
+  const coverFromRef = useRef<number | null>(null);
+  const coverToRef = useRef<number | null>(null);
   const loadingOlderRef = useRef(false);
   const prevMinRef = useRef<number | null>(null);
   const ppmRef = useRef(pxPerMin);
   ppmRef.current = pxPerMin;
+  const viewWRef = useRef(viewW); // 供 poll useEffect 的陈旧闭包里 stepMs 读到当前视宽
+  viewWRef.current = viewW;
   const pendingJumpRef = useRef<number | null>(null);
   const [, rerender] = useState(0);
 
@@ -148,19 +152,33 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     interactions: Array<{ actor: string; ev: InteractionEvent }>;
     nextCursor: string | null;
   }
-  async function fetchTimeline(opts?: {
-    cursor?: string | undefined;
-    to?: number | undefined;
-    axisOnly?: boolean;
-  }): Promise<TimelineResult> {
+  async function fetchTimeline(opts?: { from?: number | undefined; to?: number | undefined }): Promise<TimelineResult> {
     const u = new URL(`${backend}/api/timeline`);
     u.searchParams.set('limit', String(FEED_LIMIT));
-    if (opts?.cursor) u.searchParams.set('cursor', opts.cursor);
-    if (opts?.to != null) u.searchParams.set('to', String(Math.round(opts.to))); // T.2 时间区间跳转
-    if (opts?.axisOnly) u.searchParams.set('axisOnly', '1'); // 翻页/轮询只取主轴顶层帖
+    if (opts?.from != null) u.searchParams.set('from', String(Math.round(opts.from)));
+    if (opts?.to != null) u.searchParams.set('to', String(Math.round(opts.to)));
     const r = await fetch(u);
     if (!r.ok) throw new Error(`backend ${r.status}`);
     return (await r.json()) as TimelineResult;
+  }
+
+  /** 加载某时间窗口的完整内容（顶层帖 + 回复 + 互动 + roster），并入既有数据（按 id/key 去重）。 */
+  async function loadWindow(from: number, to: number): Promise<void> {
+    try {
+      const r = await fetchTimeline({ from, to });
+      if (r.accounts.length) setRoster(r.accounts.map((a) => ({ handle: a.handle, displayName: a.displayName })));
+      addPosts(r.posts);
+      ingestInteractions(r.interactions);
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  /** 一次加载的时间跨度：至少 1.5 个可见屏宽或 6 小时（缩得越远一次取越多）。 */
+  function loadStepMs(): number {
+    const visMs = (viewWRef.current / Math.max(0.1, ppmRef.current)) * 60_000;
+    return Math.max(visMs * 1.5, 6 * 3_600_000);
   }
 
   function addPosts(views: PostView[]): void {
@@ -181,40 +199,42 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     if (fresh.length) setActs((prev) => [...prev, ...fresh]);
   }
 
-  /** 初始/刷新：一次全量聚合（roster + 顶层帖 + 各账号回复/互动）。 */
+  /** 初始/刷新：加载"当前模拟时间起、向前一个 step"的窗口。 */
   async function loadInitial(): Promise<void> {
     postIdsRef.current = new Set();
     actKeysRef.current = new Set();
-    oldestCursorRef.current = null;
     prevMinRef.current = null;
     setPosts([]);
     setActs([]);
     setRoster([]);
-    try {
-      const r = await fetchTimeline();
-      setRoster(r.accounts.map((a) => ({ handle: a.handle, displayName: a.displayName })));
-      addPosts(r.posts);
-      ingestInteractions(r.interactions);
-      oldestCursorRef.current = r.nextCursor;
-      setError(null);
-    } catch (e) {
-      setError(String(e));
-    }
+    const to = simNow();
+    const from = to - loadStepMs();
+    coverFromRef.current = from;
+    coverToRef.current = to;
+    await loadWindow(from, to);
   }
 
-  /** 向后翻页：只取主轴顶层帖（axisOnly，避免重复扇出按账号数据）。 */
+  /** 向左滚到边缘：把覆盖区间往更早扩一个 step（窗口内取全，含历史回复/互动）。 */
   async function loadOlder(): Promise<void> {
-    if (loadingOlderRef.current || !oldestCursorRef.current) return;
+    if (loadingOlderRef.current || coverFromRef.current == null) return;
     loadingOlderRef.current = true;
+    const to = coverFromRef.current;
+    const from = to - loadStepMs();
+    coverFromRef.current = from;
     try {
-      const r = await fetchTimeline({ cursor: oldestCursorRef.current, axisOnly: true });
-      addPosts(r.posts);
-      oldestCursorRef.current = r.nextCursor;
-    } catch {
-      /* 下次再试 */
+      await loadWindow(from, to);
     } finally {
       loadingOlderRef.current = false;
     }
+  }
+
+  /** 轮询：把覆盖区间往"现在"扩，拉入新产生的内容。 */
+  async function loadNewer(): Promise<void> {
+    const now = simNow();
+    const from = coverToRef.current ?? now - loadStepMs();
+    if (now - from < 1000) return; // 暂停或无新内容
+    coverToRef.current = now;
+    await loadWindow(from, now);
   }
 
   // 轮询活动世界：拾取时钟锚点；切世界则重载，否则拉最新页实时更新。
@@ -243,12 +263,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           setFollowing(true);
           await loadInitial();
         } else {
-          try {
-            const r = await fetchTimeline({ axisOnly: true });
-            if (alive) addPosts(r.posts);
-          } catch {
-            /* 忽略单次失败 */
-          }
+          if (alive) await loadNewer();
         }
       } catch {
         /* 后端暂不可达，下个周期重试 */
@@ -308,19 +323,13 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const trackWidth = Math.max(ax(maxTime), ax(now)) + RIGHT_PAD;
   const ready = blocks.length > 0;
 
-  /** 跳转视图到某时间（停止跟随）。目标早于已加载最早内容时，单请求按时间区间拉取该窗口（T.2），
-   *  直接落到目标附近，而非从最新游标逐页回翻。 */
+  /** 跳转视图到某时间（停止跟随）：加载目标前后一个 step 的完整窗口（含该时段回复/互动），再滚到目标。 */
   async function jumpToTime(t: number): Promise<void> {
     setFollowing(false);
-    if (!ready || t < minTime) {
-      const halfWinMs = ((viewW / Math.max(0.1, ppmRef.current)) * 60_000) / 2;
-      try {
-        const r = await fetchTimeline({ to: t + halfWinMs, axisOnly: true });
-        addPosts(r.posts);
-      } catch {
-        /* 拉不到则停在现有范围 */
-      }
-    }
+    const s = loadStepMs();
+    await loadWindow(t - s, t + s);
+    // 把跳转窗口纳入"已覆盖最早"，使后续向左滚动从此处续接
+    if (coverFromRef.current == null || t - s < coverFromRef.current) coverFromRef.current = t - s;
     pendingJumpRef.current = t;
     rerender((x) => x + 1);
   }

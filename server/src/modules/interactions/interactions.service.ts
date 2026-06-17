@@ -28,11 +28,17 @@ export class InteractionsService {
   ) {}
 
   /** 某账号的互动事件流（赞/转/关注），按互动时间倒序、游标分页——供编辑器时间轴把互动落到正确时刻。 */
-  listUserActivity(handle: string, viewerId: number | null, cursor?: string, limit?: number): Page<InteractionEvent> {
+  listUserActivity(
+    handle: string,
+    viewerId: number | null,
+    cursor?: string,
+    limit?: number,
+    range?: { from?: number | undefined; to?: number | undefined },
+  ): Page<InteractionEvent> {
     const profile = this.usersService.getProfileByHandle(handle);
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = interactionsRepo.listUserActivity(db, profile.id, decodeActivityCursor(cursor), pageSize + 1);
+    const rows = interactionsRepo.listUserActivity(db, profile.id, decodeActivityCursor(cursor), pageSize + 1, range);
     const hasMore = rows.length > pageSize;
     const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
     const items: InteractionEvent[] = [];

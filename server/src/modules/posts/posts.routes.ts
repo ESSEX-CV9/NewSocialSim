@@ -59,6 +59,8 @@ const userPostsQuerySchema = {
     cursor: { type: 'string' },
     limit: { type: 'integer', minimum: 1, maximum: 50 },
     type: { type: 'string', enum: ['posts', 'replies'] },
+    from: { type: 'integer', description: '只取 created_at ≥ from 的帖（模拟时间 ms，时间轴按窗口取回复）' },
+    to: { type: 'integer', description: '只取 created_at ≤ to 的帖（模拟时间 ms）' },
   },
 } as const;
 
@@ -119,7 +121,7 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
   );
   app.get<{
     Params: { handle: string };
-    Querystring: { cursor?: string; limit?: number; type?: 'posts' | 'replies' };
+    Querystring: { cursor?: string; limit?: number; type?: 'posts' | 'replies'; from?: number; to?: number };
   }>(
     '/api/users/:handle/posts',
     {

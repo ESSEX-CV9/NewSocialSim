@@ -61,7 +61,7 @@
 - **GET** `/api/posts/:id/replies` · JWT? — 某帖的回复
   - query `{ cursor?, limit? }` → `200` `Page<PostView>`
 - **GET** `/api/users/:handle/posts` · JWT? — 某账号的帖
-  - query `{ type?: 'posts'|'replies'(默认 posts), cursor?, limit? }` → `200` `Page<PostView>`（posts 含引用、不含回复）
+  - query `{ type?: 'posts'|'replies'(默认 posts), cursor?, limit?, from?, to? }` → `200` `Page<PostView>`（posts 含引用、不含回复；`from`/`to` 按 `created_at` 限定区间，供时间轴按窗口取回复）
 - **GET** `/api/users/:handle/likes` · JWT? — 某账号点赞过的帖
   - query `{ cursor?, limit? }` → `200` `Page<PostView>`（⚠️ 返回帖本身，**不含点赞时间**；点赞时间见互动事件流）
 - **GET** `/api/users/:handle/media` · JWT? — 某账号的含媒体帖
@@ -92,7 +92,7 @@
 - **GET** `/api/bookmarks` · JWT — 本人收藏
   - query `{ cursor?, limit? }` → `200` `Page<PostView>`
 - **GET** `/api/users/:handle/interactions` · JWT? — **某账号互动事件流**（赞/转/关注，带发生时间）
-  - query `{ cursor?, limit? }` → `200` `Page<InteractionEvent>`
+  - query `{ cursor?, limit?, from?, to? }` → `200` `Page<InteractionEvent>`（`from`/`to` 按 `created_at` 限定区间，供时间轴按可见窗口取数、不丢历史）
 
 ## 关注 / 屏蔽 `follows` / `blocks`
 

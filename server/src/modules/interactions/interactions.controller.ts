@@ -46,9 +46,13 @@ export class InteractionsController {
   };
 
   listUserInteractions = async (
-    req: FastifyRequest<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>,
+    req: FastifyRequest<{
+      Params: { handle: string };
+      Querystring: { cursor?: string; limit?: number; from?: number; to?: number };
+    }>,
     reply: FastifyReply,
   ) => {
-    reply.send(this.service.listUserActivity(req.params.handle, req.user?.sub ?? null, req.query.cursor, req.query.limit));
+    const { cursor, limit, from, to } = req.query;
+    reply.send(this.service.listUserActivity(req.params.handle, req.user?.sub ?? null, cursor, limit, { from, to }));
   };
 }

@@ -3644,6 +3644,24 @@
           },
           {
             "schema": {
+              "type": "integer"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "description": "只取 created_at ≥ from 的帖（模拟时间 ms，时间轴按窗口取回复）"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "description": "只取 created_at ≤ to 的帖（模拟时间 ms）"
+          },
+          {
+            "schema": {
               "type": "string"
             },
             "in": "path",
@@ -4354,6 +4372,24 @@
             "in": "query",
             "name": "limit",
             "required": false
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "description": "只取 created_at ≥ from 的互动（模拟时间 ms，时间轴按窗口取数）"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "description": "只取 created_at ≤ to 的互动（模拟时间 ms）"
           },
           {
             "schema": {

@@ -103,7 +103,7 @@ export function registerInteractionsRoutes(
     controller.listBookmarks,
   );
   // 某账号的互动事件流（赞/转/关注，带时间）——供编辑器时间轴；免鉴权（匿名 viewer）。
-  app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>(
+  app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number; from?: number; to?: number } }>(
     '/api/users/:handle/interactions',
     {
       preHandler: deps.optionalAuth,
@@ -112,7 +112,7 @@ export function registerInteractionsRoutes(
         summary: '某账号互动事件流（赞/转/关注，带发生时间）',
         operationId: 'listUserInteractions',
         security: OPTIONAL_JWT,
-        querystring: bookmarksQuerySchema,
+        querystring: interactionsQuerySchema,
         response: { 200: pageOf('InteractionEvent') },
       },
     },
@@ -126,5 +126,16 @@ const bookmarksQuerySchema = {
   properties: {
     cursor: { type: 'string' },
     limit: { type: 'integer', minimum: 1, maximum: 50 },
+  },
+} as const;
+
+const interactionsQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    cursor: { type: 'string' },
+    limit: { type: 'integer', minimum: 1, maximum: 50 },
+    from: { type: 'integer', description: '只取 created_at ≥ from 的互动（模拟时间 ms，时间轴按窗口取数）' },
+    to: { type: 'integer', description: '只取 created_at ≤ to 的互动（模拟时间 ms）' },
   },
 } as const;
