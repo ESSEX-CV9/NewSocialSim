@@ -2,7 +2,9 @@
 
 社交站后端（`server/`，Fastify，默认 `http://127.0.0.1:3000`）的全部 HTTP 端点，含请求参数与响应形态。**API 优先**——模拟器、编辑器后端、验收脚本都只能经这些端点操作世界。
 
-> 真相源：路由与 schema 见 `server/src/modules/*/*.routes.ts`，数据形态见 `shared/src/types/`。复杂返回体在文末「类型附录」统一定义，端点处只写类型名 + 包裹键。新增/改动端点请同步本文件。
+> **本文件是人类速查；机器可读契约见 OpenAPI**：起后端后访问 `http://127.0.0.1:3000/docs`（交互式 Swagger UI）/ `GET /openapi.json`，或查仓库内 `docs/openapi/server.{json,yaml}`。生成与设计说明见 `docs/openapi/README.md`。改路由后跑 `npm run gen:openapi -w @socialsim/server` 刷新快照。
+>
+> 真相源：路由与 schema 见 `server/src/modules/*/*.routes.ts`，数据形态见 `shared/src/types/`。复杂返回体在文末「类型附录」统一定义，端点处只写类型名 + 包裹键。新增/改动端点请同步本文件与 OpenAPI 快照。
 
 ## 鉴权方案
 
