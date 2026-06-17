@@ -137,15 +137,15 @@
 | 内容 | 来源端点 | 现状 / 缺口 |
 |---|---|---|
 | 顶层帖（所有账号） | `GET /api/timeline/global`（免鉴权、游标分页） | ✅ 全站流，但**只含顶层帖**——不含回复、引用、转发、赞 |
-| 回复 | `GET /api/users/:handle/posts?type=replies` | ✅ 存在，但**按账号**、游标按新近、**无时间区间查询** |
-| 转发 | `GET /api/users/:handle/timeline`（其 `type=repost`） | ✅ 存在，但**按账号**、无时间区间查询 |
+| 回复 | `GET /api/users/:handle/posts?type=replies&from&to` | ✅ 已加 `from/to`（区间取数，不再只取最新若干页） |
+| 转发 | `GET /api/users/:handle/interactions`（带 `from/to`） | ✅ 改由统一互动事件流取（T.1） |
 | 引用 | 顶层帖的一种（`quoteOfId` 非空），随 global / `?type=posts` 来 | ✅ |
-| **赞 / 关注 / 书签** | —— | ❌ **无任何按时间列出互动事件的端点**；world.db 互动表的时间戳也未经 API 暴露 → 见 T.1 |
-| **按时间区间查询**（跳到任意历史时段） | `GET /api/timeline/global?from&to`（主轴顶层帖） | ✅ T.2 已加；回复/互动区间随 T.3 聚合 |
+| **赞 / 关注 / 转发** | `GET /api/users/:handle/interactions?from&to` | ✅ T.1 互动事件流 + 加 `from/to`（区间取数） |
+| **按时间区间查询**（跳到任意历史时段） | global / interactions / posts 均带 `from&to` | ✅ T.2 主轴 + 后续给互动/回复补全（消除"只取最新 N 条"丢历史） |
 | **列世界全部账号**（含从未发帖者） | `GET /api/users`（公开、游标分页、不含 isBot） | ✅ T.5 已加；轨道改从全部账号 roster ∪ 帖作者 |
 | 建历史 / 排程帖 | `POST /api/admin/posts`（带 `createdAt` / `replyToId`） | ✅ 后端已支持，供 T.6 轴上编辑 |
 
-**当前实现的取数策略**：global 流作"发现账号 + 顶层帖主轴（无限向后滚动）"，再**按账号封顶拉取**回复（`?type=replies`）与转发（`/timeline`）。因此**回复/转发只覆盖各账号近期若干页**（`EXTRA_PAGE_CAP`），深度历史与赞/关注待下列步骤补齐。
+**当前实现的取数策略**：renderer 吃编辑器后端单一聚合端点 `GET /api/timeline?from&to`（T.3：roster + 顶层帖 + 各账号回复/互动）。renderer 用**稳定横轴 + 按可见时间窗口加载 + 后台预取整条轴**——全站帖、回复、互动**均按时间区间取数**，已消除早期"按账号只取最新 `EXTRA_PAGE_CAP` 页 → 丢历史互动"的坑（详见日志 `2026-06-17-时间轴完善与取数重构.md`）。深度可扩展性（大世界）的服务端全局 by-time 端点仍可后续叠加，只动 aggregator、renderer 无感。
 
 ### T.1 互动事件流（赞 / 转 / 关注上轴）✅
 - **目标**：时间轴显示**全部**互动（赞/转/关注，带发生时间）。
@@ -164,7 +164,7 @@
 - **目标**：把"全站流 + 互动 + 轨迹增强"的合并从 renderer 移入编辑器后端，定稳定接口 `GET /api/timeline?from&to&accounts`，renderer 吃单一接口、后续服务端改进只动后端内部。
 - **改动**：`editor/src/server/timeline-aggregator.ts`（`aggregateTimeline`：拉 roster + 全站顶层帖[from/to/cursor] + 各账号回复/互动[capped] 并发扇出，合并为 `{ accounts, posts, interactions, nextCursor }`）；`editor/src/server/app.ts`（`GET /api/timeline`，含 `axisOnly` 轻量模式只取主轴）；`editor/src/renderer/`（`fetchTimeline` 取代 `fetchFeed`/`loadRoster`/`fetchAccountExtra` 三套扇出——初始/刷新走全量、翻页/轮询/跳转走 axisOnly）。
 - **结果**：2026-06-17 实现并冒烟通过——full 返回 3 账号/650 帖/600 互动/游标；axisOnly 仅 50 顶层帖（accounts/interactions=0）。editor spec 15 路径。
-- **范围说明**：聚合**内部仍用现有社交站端点**（global from/to + 按账号 capped 回复/互动），故深度历史回复/互动仍受 capped 限制——**稳定接口的意义在于：将来给社交站补全局回复/互动 by-time 端点时只改 `timeline-aggregator.ts`、renderer 不动**。`axisOnly` 避免翻页/轮询重复扇出按账号数据。
+- **范围说明 / 后续重构**：T.3 落地后又由"看不到历史互动"牵出取数重构（同日，详见日志 `2026-06-17-时间轴完善与取数重构.md`）：①给互动/回复端点补 `from/to`，聚合器窗口模式在区间内翻全 → **消除"按账号只取最新 N 条"丢历史**；②renderer 改**稳定横轴 + 按可见窗口加载**（横轴不再耦合已加载 minTime，可拖滚到任意时段）；③**后台预取整条轴**消除拖动空白 + 聚合器 roster 短 TTL 缓存。**稳定接口的意义验证**：以上 ①②③ 全程未改 renderer 与 aggregator 的对外契约，将来再给社交站补全局 by-time 端点提升大世界扩展性时同样只动 aggregator 内部。
 - **交接提示**：符合「API 优先 + 编辑器后端是 renderer 唯一数据源 / 负责聚合」。renderer 不再直接调 `/api/timeline/global` / `/api/users/:h/*`（那些代理保留供调试）。聚合每次全量调用重做 roster + 按账号扇出，roster 大时较重——后续可在 aggregator 内加缓存或换全局端点，renderer 无感。
 
 ### T.4 帖子↔决策轨迹"为什么"合并 ⬜

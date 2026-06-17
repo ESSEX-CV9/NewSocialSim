@@ -74,7 +74,7 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 当前主线：`feat-M5-X-RE` 分支，细步见 `docs/m5-x-roadmap.md`（四步阶梯展开为单提交级原子步）。**Phase 0 地基已全部完成 0.1–0.12**：代理建号 / 跟随活动世界 / 决策轨迹落 sim-trace.db / GM-Agent 日志表 / 编辑器 Electron 重建 / Blender 多窗格壳 / 预设+布局跟随世界 / 控制台读态 / 时钟控制 / 模拟器状态 / 编辑器后端轨迹接入 / **时间轴面板** / 轨迹实时推送 / Step 0 金标准端到端验收（`scripts/verify-step0.mjs` 跑通 15/15）。路线图「时间轴完善」后续项 **T.1（赞/转/关注上轴）已完成**，余 T.2–T.6 不阻塞 Phase 1。**下一步 Phase 1 内容池 ECS**（1.0 最小 TuningService 起，含话题拆分 1.1b）。GM 导演层（M5-5）与 Electron 整体打包（M5-6）顺延。
+- 当前主线：`feat-M5-X-RE` 分支，细步见 `docs/m5-x-roadmap.md`（四步阶梯展开为单提交级原子步）。**Phase 0 地基已全部完成 0.1–0.12**：代理建号 / 跟随活动世界 / 决策轨迹落 sim-trace.db / GM-Agent 日志表 / 编辑器 Electron 重建 / Blender 多窗格壳 / 预设+布局跟随世界 / 控制台读态 / 时钟控制 / 模拟器状态 / 编辑器后端轨迹接入 / **时间轴面板** / 轨迹实时推送 / Step 0 金标准端到端验收（`scripts/verify-step0.mjs` 跑通 15/15）。路线图「时间轴完善」**T.1 互动事件流 / T.5 列全部账号 / T.2 时间区间跳转 / T.3 后端聚合端点已完成**，余 **T.4（轨迹 postId 合并）/ T.6（轴上编辑与轴维度切换）**，不阻塞 Phase 1。时间轴取数已重构为：编辑器后端单一聚合端点 `GET /api/timeline`（roster + 帖 + 回复 + 互动，按 from/to 区间）+ renderer 稳定横轴 + 按可见窗口加载 + 后台预取整条轴（详见日志 `2026-06-17-时间轴完善与取数重构.md`）。另：三端 HTTP API 已 **OpenAPI 3.1 规范化**（社交站 `:3000/docs`、编辑器后端 `:5176/docs`，spec 与说明见 `docs/openapi/`）。**下一步 Phase 1 内容池 ECS**（1.0 最小 TuningService 起，含话题拆分 1.1b）。GM 导演层（M5-5）与 Electron 整体打包（M5-6）顺延。
 - **时间轴是查看世界全部帖子与互动的面板、独立于模拟器**（按 `docs/m5-design.md` Premiere 范式）：块=世界真实内容（社交站全站流 + 按账号回复/互动），非决策轨迹；决策轨迹退为点开块后的"为什么"增强层（待 postId 合并）。早期"块=轨迹条"属偏离已校正——见 memory `read-design-docs-first`。
 - 编辑器已从临时 UI 重建为 Electron + dockview 工作区（见结构速览）；十面板按 `docs/m5-design.md` 设计逐里程碑把注册表占位换成实现（控制台、时间轴、检视器已实现）。
 - **全 server HTTP API 速查见 `docs/server-api.md`**（按域分组、含方法/路径/鉴权/用途；模拟器与编辑器后端都从这里查能力）。
