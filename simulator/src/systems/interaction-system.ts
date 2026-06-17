@@ -1,6 +1,7 @@
 import type { System, Entity, TickContext } from '../ecs/types.js';
 import type { ApiClient } from '../api-client.js';
 import type { TraceSink } from '../trace/trace-sink.js';
+import { idStr } from '../ids.js';
 import { logger } from '../logger.js';
 
 export class InteractionSystem implements System {
@@ -39,21 +40,23 @@ export class InteractionSystem implements System {
         if (post.author.id === entity.profile.userId) continue;
         if (post.likedByViewer) continue;
 
+        const pid = idStr(post.id);
+
         if (Math.random() < entity.behavior.likeProbability * 0.3) {
-          await this.api.likePost(entity.auth!.token, post.id);
-          logger.info(`[${entity.profile.handle}] liked post ${post.id} by @${post.author.handle}`);
+          await this.api.likePost(entity.auth!.token, pid);
+          logger.info(`[${entity.profile.handle}] liked post ${pid} by @${post.author.handle}`);
           this.trace.emit({
             at: Date.now(), simTime: ctx.simTime, entity: entity.profile.handle,
-            action: 'like', shape: null, targetPostId: String(post.id),
+            action: 'like', shape: null, targetPostId: pid,
           });
         }
 
         if (Math.random() < entity.behavior.repostProbability * 0.3) {
-          await this.api.repost(entity.auth!.token, post.id);
-          logger.info(`[${entity.profile.handle}] reposted post ${post.id} by @${post.author.handle}`);
+          await this.api.repost(entity.auth!.token, pid);
+          logger.info(`[${entity.profile.handle}] reposted post ${pid} by @${post.author.handle}`);
           this.trace.emit({
             at: Date.now(), simTime: ctx.simTime, entity: entity.profile.handle,
-            action: 'repost', shape: null, targetPostId: String(post.id),
+            action: 'repost', shape: null, targetPostId: pid,
           });
           break;
         }

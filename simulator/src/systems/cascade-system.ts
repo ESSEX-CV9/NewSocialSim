@@ -1,6 +1,7 @@
 import type { System, Entity, TickContext } from '../ecs/types.js';
 import type { ApiClient } from '../api-client.js';
 import type { TraceSink } from '../trace/trace-sink.js';
+import { idStr } from '../ids.js';
 import { logger } from '../logger.js';
 
 interface PendingReaction {
@@ -48,7 +49,8 @@ export class CascadeSystem implements System {
           const post = item.post ?? item;
           if (!post.author) continue;
 
-          const postKey = `${entity.id}:${post.id}`;
+          const pid = idStr(post.id);
+          const postKey = `${entity.id}:${pid}`;
           if (this.processedPosts.has(postKey)) continue;
           this.processedPosts.add(postKey);
 
@@ -57,7 +59,7 @@ export class CascadeSystem implements System {
           const delay = (30 + Math.random() * 120) * 1000;
           this.pending.push({
             entityId: entity.id,
-            postId: post.id,
+            postId: pid,
             postAuthorHandle: post.author.handle,
             triggerAt: ctx.simTime + delay,
             depth: 0,
@@ -111,13 +113,14 @@ export class CascadeSystem implements System {
         if (replyContent) {
           try {
             const reply = await this.api.createPost(entity.auth.token, replyContent, reaction.postId);
+            const replyId = idStr(reply.id);
             logger.info(`[${entity.profile.handle}] cascade-replied to post ${reaction.postId}: "${replyContent.slice(0, 30)}..."`);
             this.trace.emit({
               at: Date.now(), simTime: ctx.simTime, entity: entity.profile.handle,
-              action: 'reply', shape: 'reply', intent: 'earnest', targetPostId: reaction.postId, postId: reply.id,
+              action: 'reply', shape: 'reply', intent: 'earnest', targetPostId: reaction.postId, postId: replyId,
             });
 
-            this.triggerCascadeForReply(reply.id, entity, ctx, reaction.depth + 1);
+            this.triggerCascadeForReply(replyId, entity, ctx, reaction.depth + 1);
           } catch (err) {
             logger.error(`[${entity.profile.handle}] cascade-reply failed:`, err);
           }
