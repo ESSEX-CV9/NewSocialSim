@@ -1,0 +1,279 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "NewSocialSim 编辑器后端 API",
+    "description": "Electron 世界编辑器的本地后端（:5176），renderer 的唯一数据源。多为社交站 admin API 的代理，另含布局存档与决策轨迹（只读 per-world sim-trace.db）接入。无鉴权——仅 localhost、随编辑器进程。",
+    "version": "0.1.0"
+  },
+  "components": {
+    "schemas": {}
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health",
+        "summary": "健康检查",
+        "tags": [
+          "meta"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/worlds/active": {
+      "get": {
+        "operationId": "getActiveWorld",
+        "summary": "活动世界（代理社交站）",
+        "tags": [
+          "world"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/simulator/status": {
+      "get": {
+        "operationId": "getSimulatorStatus",
+        "summary": "模拟器状态（代理社交站）",
+        "tags": [
+          "simulator"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/users/{handle}": {
+      "get": {
+        "operationId": "getUser",
+        "summary": "账号资料（代理）",
+        "tags": [
+          "timeline"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "handle",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/timeline/global": {
+      "get": {
+        "operationId": "getGlobalTimeline",
+        "summary": "全站流（时间轴主轴，代理）",
+        "tags": [
+          "timeline"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/users/{handle}/interactions": {
+      "get": {
+        "operationId": "getUserInteractions",
+        "summary": "账号互动事件流（代理）",
+        "tags": [
+          "timeline"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "handle",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/users/{handle}/timeline": {
+      "get": {
+        "operationId": "getUserTimeline",
+        "summary": "账号主页流（代理）",
+        "tags": [
+          "timeline"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "handle",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/users/{handle}/posts": {
+      "get": {
+        "operationId": "getUserPosts",
+        "summary": "账号帖/回复（代理）",
+        "tags": [
+          "timeline"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "handle",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/worlds/clock": {
+      "post": {
+        "operationId": "controlClock",
+        "summary": "时钟控制（代理）",
+        "tags": [
+          "world"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/layouts": {
+      "get": {
+        "operationId": "getLayouts",
+        "summary": "读当前世界编辑器布局",
+        "tags": [
+          "layouts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "put": {
+        "operationId": "saveLayouts",
+        "summary": "写当前世界编辑器布局",
+        "tags": [
+          "layouts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/trace": {
+      "get": {
+        "operationId": "getTrace",
+        "summary": "按模拟时间区间查决策轨迹",
+        "tags": [
+          "trace"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/trace/stream": {
+      "get": {
+        "operationId": "streamTrace",
+        "summary": "决策轨迹实时推流（SSE）",
+        "tags": [
+          "trace"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/trace/ingest": {
+      "post": {
+        "operationId": "ingestTrace",
+        "summary": "模拟器推送轨迹入口（转发 SSE）",
+        "tags": [
+          "trace"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5176",
+      "description": "编辑器后端（本地）"
+    }
+  ],
+  "tags": [
+    {
+      "name": "world",
+      "description": "活动世界与时钟（代理社交站）"
+    },
+    {
+      "name": "simulator",
+      "description": "模拟器状态（代理社交站）"
+    },
+    {
+      "name": "timeline",
+      "description": "时间轴取数（代理社交站全站流 / 账号帖流 / 互动）"
+    },
+    {
+      "name": "layouts",
+      "description": "编辑器布局存档（随活动世界文件夹）"
+    },
+    {
+      "name": "trace",
+      "description": "决策轨迹：只读 sim-trace.db + SSE 推流"
+    },
+    {
+      "name": "meta",
+      "description": "健康检查"
+    }
+  ]
+}
