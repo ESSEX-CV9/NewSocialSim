@@ -4,6 +4,7 @@ import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
 import type { StoredSimTraceEvent } from '@socialsim/shared';
+import { aggregateTimeline } from './timeline-aggregator.js';
 import { TraceReader } from './trace-reader.js';
 import { TraceSseHub } from './trace-sse.js';
 
@@ -165,6 +166,34 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
     '/api/timeline/global',
     { schema: { tags: ['timeline'], summary: '全站流（时间轴主轴，代理）', operationId: 'getGlobalTimeline' } },
     (req, reply) => proxyGet('/api/timeline/global', req.query, ['cursor', 'limit', 'from', 'to'], reply),
+  );
+
+  // 时间轴聚合（T.3）：renderer 的单一取数接口——合并 roster + 顶层帖 + 各账号回复/互动。
+  app.get<{
+    Querystring: { cursor?: string; limit?: string; from?: string; to?: string; accounts?: string; axisOnly?: string };
+  }>(
+    '/api/timeline',
+    { schema: { tags: ['timeline'], summary: '时间轴聚合（roster + 帖 + 回复 + 互动）', operationId: 'getTimeline' } },
+    async (req, reply) => {
+      const num = (v: string | undefined): number | undefined => {
+        if (v == null || v === '') return undefined;
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      };
+      try {
+        return await aggregateTimeline(SOCIAL_API, {
+          cursor: req.query.cursor,
+          limit: num(req.query.limit),
+          from: num(req.query.from),
+          to: num(req.query.to),
+          accounts: req.query.accounts ? req.query.accounts.split(',').filter(Boolean) : undefined,
+          axisOnly: req.query.axisOnly === '1',
+        });
+      } catch {
+        reply.status(502);
+        return { error: 'social server unreachable' };
+      }
+    },
   );
 
   // 账号互动事件流：赞/转/关注（带时间），供时间轴互动块。

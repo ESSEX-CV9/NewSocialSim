@@ -160,10 +160,12 @@
 - **范围说明**：本步只给**主轴顶层帖**做区间跳转（时间跳转的核心）。回复/互动的深度历史仍按账号封顶（EXTRA_PAGE_CAP），其区间取数随 **T.3 后端聚合**一并解决；跳转窗口与最近段之间的空隙由向后滚动渐进填补（块按时间绝对定位、postId 去重，无需连续）。
 - **交接提示**：全站流是"按新近游标"，跳到很老时间需翻多页；time-range 端点是干净解法。`exactOptionalPropertyTypes` 下区间参数类型须含 `| undefined`。
 
-### T.3 编辑器后端时间轴聚合端点 ⬜
+### T.3 编辑器后端时间轴聚合端点 ✅
 - **目标**：把"全站流 + 互动 + 轨迹增强"的合并从 renderer 移入编辑器后端，定稳定接口 `GET /api/timeline?from&to&accounts`，renderer 吃单一接口、后续服务端改进只动后端内部。
-- **改动**：`editor/src/server/`（聚合端点）、`editor/src/renderer/`（改吃聚合接口）。
-- **交接提示**：符合「API 优先 + 编辑器后端是 renderer 唯一数据源 / 负责聚合」。T.1/T.2 落地后内部接它们。
+- **改动**：`editor/src/server/timeline-aggregator.ts`（`aggregateTimeline`：拉 roster + 全站顶层帖[from/to/cursor] + 各账号回复/互动[capped] 并发扇出，合并为 `{ accounts, posts, interactions, nextCursor }`）；`editor/src/server/app.ts`（`GET /api/timeline`，含 `axisOnly` 轻量模式只取主轴）；`editor/src/renderer/`（`fetchTimeline` 取代 `fetchFeed`/`loadRoster`/`fetchAccountExtra` 三套扇出——初始/刷新走全量、翻页/轮询/跳转走 axisOnly）。
+- **结果**：2026-06-17 实现并冒烟通过——full 返回 3 账号/650 帖/600 互动/游标；axisOnly 仅 50 顶层帖（accounts/interactions=0）。editor spec 15 路径。
+- **范围说明**：聚合**内部仍用现有社交站端点**（global from/to + 按账号 capped 回复/互动），故深度历史回复/互动仍受 capped 限制——**稳定接口的意义在于：将来给社交站补全局回复/互动 by-time 端点时只改 `timeline-aggregator.ts`、renderer 不动**。`axisOnly` 避免翻页/轮询重复扇出按账号数据。
+- **交接提示**：符合「API 优先 + 编辑器后端是 renderer 唯一数据源 / 负责聚合」。renderer 不再直接调 `/api/timeline/global` / `/api/users/:h/*`（那些代理保留供调试）。聚合每次全量调用重做 roster + 按账号扇出，roster 大时较重——后续可在 aggregator 内加缓存或换全局端点，renderer 无感。
 
 ### T.4 帖子↔决策轨迹"为什么"合并 ⬜
 - **目标**：点开帖子块，检视器在帖子预览下附该动作的决策轨迹（模拟器发的帖才有）。

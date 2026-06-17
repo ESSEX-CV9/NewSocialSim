@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { TimelineItem, PostView, InteractionEvent, UserSummary } from '@socialsim/shared';
+import type { PostView, InteractionEvent, UserSummary } from '@socialsim/shared';
 import { useSelectedBlock, setSelectedBlock } from '../state/selection.js';
 import { ACTION_COLOR, formatSimTime } from './trace-meta.js';
 import { Avatar } from './Avatar.js';
@@ -27,8 +27,6 @@ const VBUF = 400;
 const POLL_WORLD_MS = 3000;
 const TICK_MS = 250;
 const FEED_LIMIT = 50;
-const INITIAL_PAGES = 2;
-const EXTRA_PAGE_CAP = 4; // 每账号回复/转发拉取页数上限（深度历史待 time-range 端点）
 const LOAD_OLDER_AT = 400;
 const DAY_MS = 86_400_000;
 const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
@@ -133,7 +131,6 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const expectedLeftRef = useRef(0);
   const postIdsRef = useRef<Set<number>>(new Set());
   const actKeysRef = useRef<Set<string>>(new Set());
-  const fetchedExtraRef = useRef<Set<string>>(new Set());
   const oldestCursorRef = useRef<string | null>(null);
   const loadingOlderRef = useRef(false);
   const prevMinRef = useRef<number | null>(null);
@@ -144,16 +141,26 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
 
   const backend = window.editor.backendUrl;
 
-  async function fetchFeed(
-    opts?: { cursor?: string | undefined; to?: number | undefined },
-  ): Promise<{ items: TimelineItem[]; nextCursor: string | null }> {
-    const u = new URL(`${backend}/api/timeline/global`);
+  // T.3：renderer 的单一取数接口——编辑器后端聚合 roster + 顶层帖 + 各账号回复/互动。
+  interface TimelineResult {
+    accounts: UserSummary[];
+    posts: PostView[];
+    interactions: Array<{ actor: string; ev: InteractionEvent }>;
+    nextCursor: string | null;
+  }
+  async function fetchTimeline(opts?: {
+    cursor?: string | undefined;
+    to?: number | undefined;
+    axisOnly?: boolean;
+  }): Promise<TimelineResult> {
+    const u = new URL(`${backend}/api/timeline`);
     u.searchParams.set('limit', String(FEED_LIMIT));
     if (opts?.cursor) u.searchParams.set('cursor', opts.cursor);
     if (opts?.to != null) u.searchParams.set('to', String(Math.round(opts.to))); // T.2 时间区间跳转
+    if (opts?.axisOnly) u.searchParams.set('axisOnly', '1'); // 翻页/轮询只取主轴顶层帖
     const r = await fetch(u);
     if (!r.ok) throw new Error(`backend ${r.status}`);
-    return (await r.json()) as { items: TimelineItem[]; nextCursor: string | null };
+    return (await r.json()) as TimelineResult;
   }
 
   function addPosts(views: PostView[]): void {
@@ -164,123 +171,49 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     });
     if (fresh.length) setPosts((prev) => [...prev, ...fresh]);
   }
-  function addActs(actor: string, events: InteractionEvent[]): void {
-    const fresh = events.filter((ev) => {
+  function ingestInteractions(list: Array<{ actor: string; ev: InteractionEvent }>): void {
+    const fresh = list.filter(({ actor, ev }) => {
       const k = interactionKey(actor, ev);
       if (actKeysRef.current.has(k)) return false;
       actKeysRef.current.add(k);
       return true;
     });
-    if (fresh.length) setActs((prev) => [...prev, ...fresh.map((ev) => ({ actor, ev }))]);
-  }
-  /** 把一页全站流并入：取顶层帖（转发等互动改由 per-account /interactions 取）。 */
-  function ingestFeed(items: TimelineItem[]): void {
-    addPosts(items.filter((it) => it.type === 'post').map((it) => it.post));
+    if (fresh.length) setActs((prev) => [...prev, ...fresh]);
   }
 
-  /** 列全部账号（分页拉全）→ 轨道列全，含从未发帖者。 */
-  async function loadRoster(): Promise<void> {
-    try {
-      const all: Array<{ handle: string; displayName: string }> = [];
-      let cursor: string | undefined;
-      for (let p = 0; p < 20; p++) {
-        const u = new URL(`${backend}/api/users`);
-        u.searchParams.set('limit', '50');
-        if (cursor) u.searchParams.set('cursor', cursor);
-        const r = await fetch(u);
-        if (!r.ok) break;
-        const j = (await r.json()) as { items: UserSummary[]; nextCursor: string | null };
-        all.push(...j.items.map((x) => ({ handle: x.handle, displayName: x.displayName })));
-        if (!j.nextCursor) break;
-        cursor = j.nextCursor;
-      }
-      setRoster(all);
-    } catch {
-      /* 拉不到则退回从内容发现账号 */
-    }
-  }
-
+  /** 初始/刷新：一次全量聚合（roster + 顶层帖 + 各账号回复/互动）。 */
   async function loadInitial(): Promise<void> {
     postIdsRef.current = new Set();
     actKeysRef.current = new Set();
-    fetchedExtraRef.current = new Set();
     oldestCursorRef.current = null;
     prevMinRef.current = null;
     setPosts([]);
     setActs([]);
     setRoster([]);
-    void loadRoster();
     try {
-      let cursor: string | undefined;
-      const acc: TimelineItem[] = [];
-      for (let p = 0; p < INITIAL_PAGES; p++) {
-        const r = await fetchFeed({ cursor });
-        acc.push(...r.items);
-        cursor = r.nextCursor ?? undefined;
-        if (!cursor) break;
-      }
-      oldestCursorRef.current = cursor ?? null;
-      ingestFeed(acc);
+      const r = await fetchTimeline();
+      setRoster(r.accounts.map((a) => ({ handle: a.handle, displayName: a.displayName })));
+      addPosts(r.posts);
+      ingestInteractions(r.interactions);
+      oldestCursorRef.current = r.nextCursor;
       setError(null);
     } catch (e) {
       setError(String(e));
     }
   }
 
+  /** 向后翻页：只取主轴顶层帖（axisOnly，避免重复扇出按账号数据）。 */
   async function loadOlder(): Promise<void> {
     if (loadingOlderRef.current || !oldestCursorRef.current) return;
     loadingOlderRef.current = true;
     try {
-      const r = await fetchFeed({ cursor: oldestCursorRef.current });
-      ingestFeed(r.items);
-      oldestCursorRef.current = r.nextCursor ?? null;
+      const r = await fetchTimeline({ cursor: oldestCursorRef.current, axisOnly: true });
+      addPosts(r.posts);
+      oldestCursorRef.current = r.nextCursor;
     } catch {
       /* 下次再试 */
     } finally {
       loadingOlderRef.current = false;
-    }
-  }
-
-  /** 拉某账号的回复 + 转发（封顶若干页）。 */
-  async function fetchAccountExtra(handle: string): Promise<void> {
-    // 回复
-    try {
-      let cursor: string | undefined;
-      const reps: PostView[] = [];
-      for (let p = 0; p < EXTRA_PAGE_CAP; p++) {
-        const u = new URL(`${backend}/api/users/${encodeURIComponent(handle)}/posts`);
-        u.searchParams.set('type', 'replies');
-        u.searchParams.set('limit', '50');
-        if (cursor) u.searchParams.set('cursor', cursor);
-        const r = await fetch(u);
-        if (!r.ok) break;
-        const j = (await r.json()) as { items: PostView[]; nextCursor: string | null };
-        reps.push(...j.items);
-        if (!j.nextCursor) break;
-        cursor = j.nextCursor;
-      }
-      addPosts(reps);
-    } catch {
-      /* ignore */
-    }
-    // 互动（赞/转/关注）
-    try {
-      let cursor: string | undefined;
-      const evs: InteractionEvent[] = [];
-      for (let p = 0; p < EXTRA_PAGE_CAP; p++) {
-        const u = new URL(`${backend}/api/users/${encodeURIComponent(handle)}/interactions`);
-        u.searchParams.set('limit', '50');
-        if (cursor) u.searchParams.set('cursor', cursor);
-        const r = await fetch(u);
-        if (!r.ok) break;
-        const j = (await r.json()) as { items: InteractionEvent[]; nextCursor: string | null };
-        evs.push(...j.items);
-        if (!j.nextCursor) break;
-        cursor = j.nextCursor;
-      }
-      addActs(handle, evs);
-    } catch {
-      /* ignore */
     }
   }
 
@@ -311,8 +244,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           await loadInitial();
         } else {
           try {
-            const r = await fetchFeed();
-            if (alive) ingestFeed(r.items);
+            const r = await fetchTimeline({ axisOnly: true });
+            if (alive) addPosts(r.posts);
           } catch {
             /* 忽略单次失败 */
           }
@@ -331,28 +264,6 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // 账号 = 全部账号 roster ∪ 顶层帖作者（roster 拉不到时退回作者发现）→ 补拉各自回复与互动。
-  const accounts = useMemo(
-    () => [...new Set([...roster.map((r) => r.handle), ...posts.map((p) => p.author.handle)])].sort(),
-    [roster, posts],
-  );
-  useEffect(() => {
-    const missing = accounts.filter((h) => !fetchedExtraRef.current.has(h));
-    if (missing.length === 0) return;
-    let alive = true;
-    missing.forEach((h) => fetchedExtraRef.current.add(h));
-    void (async () => {
-      for (const h of missing) {
-        if (!alive) return;
-        await fetchAccountExtra(h);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts, backend]);
 
   // 昵称取自 roster + 帖子 / 互动里携带的 displayName。
   const names = useMemo(() => {
@@ -404,8 +315,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     if (!ready || t < minTime) {
       const halfWinMs = ((viewW / Math.max(0.1, ppmRef.current)) * 60_000) / 2;
       try {
-        const r = await fetchFeed({ to: t + halfWinMs });
-        ingestFeed(r.items);
+        const r = await fetchTimeline({ to: t + halfWinMs, axisOnly: true });
+        addPosts(r.posts);
       } catch {
         /* 拉不到则停在现有范围 */
       }

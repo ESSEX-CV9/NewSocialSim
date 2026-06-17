@@ -232,8 +232,9 @@
 - **GET** `/api/simulator/status` — 转发模拟器状态
 - **POST** `/api/worlds/clock` — 转发时钟控制
 - **GET/PUT** `/api/layouts` — 读/写该世界编辑器布局（`data/worlds/<id>/editor-layouts.json`）
-- **GET** `/api/users/:handle` · `/posts` · `/timeline` · `/interactions` — 转发社交站对应端点（时间轴取数）
-- **GET** `/api/timeline/global` — 转发全站流（时间轴主轴）
+- **GET** `/api/timeline?from&to&cursor&limit&accounts&axisOnly` — **时间轴聚合（T.3，renderer 唯一取数口）**：合并 roster + 顶层帖 + 各账号回复/互动 → `{ accounts: UserSummary[], posts: PostView[], interactions: {actor,ev}[], nextCursor }`；`axisOnly=1` 只取主轴顶层帖（翻页/轮询用）
+- **GET** `/api/users` · `/api/users/:handle` · `/posts` · `/timeline` · `/interactions` — 转发社交站对应端点（保留供调试；时间轴主路径已改走 `/api/timeline`）
+- **GET** `/api/timeline/global` — 转发全站流（保留供调试）
 - **GET** `/api/trace?from&to&entity&limit` — 只读活动世界 `sim-trace.db` 决策轨迹 → `{ events: StoredSimTraceEvent[] }`
 - **GET** `/api/trace/stream` — 决策轨迹 SSE
 - **POST** `/api/trace/ingest` — 模拟器推轨迹入口 → 转发 SSE

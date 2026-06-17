@@ -103,6 +103,20 @@
         }
       }
     },
+    "/api/timeline": {
+      "get": {
+        "operationId": "getTimeline",
+        "summary": "时间轴聚合（roster + 帖 + 回复 + 互动）",
+        "tags": [
+          "timeline"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/users/{handle}/interactions": {
       "get": {
         "operationId": "getUserInteractions",
