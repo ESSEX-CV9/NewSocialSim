@@ -64,6 +64,7 @@ npm workspaces monorepo：
 - 多部分上传验证用 `curl.exe -F`（`Invoke-RestMethod -Form` 是 PS6+ 才有）；流式接口的断言必须含 body 字节数。
 - PS 5.1 不支持三元运算符与 `&&`；`Invoke-RestMethod` 直接发含中文的 JSON body 会乱码（验证脚本避免中文 body 或改用临时文件）。
 - Node fetch 不走系统代理；外网访问（pixiv/pinterest 等）依赖 data/media-search.json 的 proxy 字段（undici 全局 ProxyAgent）。
+- **原生模块（better-sqlite3）ABI**：dev 下 server/simulator 走 tsx（系统 node），编辑器后端由 Electron 主进程经 `child_process.fork` + 系统 node 拉起（**不用 utilityProcess**），三进程统一系统 node ABI，免 electron-rebuild。若改回 Electron 内置 node 跑后端，会因 `NODE_MODULE_VERSION` 不匹配读 sim-trace.db 失败。打包（M5-6）再改为「为 Electron 重建原生模块 + utilityProcess」。
 
 ## 工作惯例
 
@@ -74,7 +75,9 @@ npm workspaces monorepo：
 
 ## 下一步
 
-- 当前主线：`feat-M5-X-RE` 分支，细步见 `docs/m5-x-roadmap.md`（四步阶梯展开为单提交级原子步）。**Phase 0 地基已全部完成 0.1–0.12**：代理建号 / 跟随活动世界 / 决策轨迹落 sim-trace.db / GM-Agent 日志表 / 编辑器 Electron 重建 / Blender 多窗格壳 / 预设+布局跟随世界 / 控制台读态 / 时钟控制 / 模拟器状态 / 编辑器后端轨迹接入 / **时间轴面板** / 轨迹实时推送 / Step 0 金标准端到端验收（`scripts/verify-step0.mjs` 跑通 15/15）。路线图「时间轴完善」**T.1 互动事件流 / T.5 列全部账号 / T.2 时间区间跳转 / T.3 后端聚合端点已完成**，余 **T.4（轨迹 postId 合并）/ T.6（轴上编辑与轴维度切换）**，不阻塞 Phase 1。时间轴取数已重构为：编辑器后端单一聚合端点 `GET /api/timeline`（roster + 帖 + 回复 + 互动，按 from/to 区间）+ renderer 稳定横轴 + 按可见窗口加载 + 后台预取整条轴（详见日志 `2026-06-17-时间轴完善与取数重构.md`）。另：三端 HTTP API 已 **OpenAPI 3.1 规范化**（社交站 `:3000/docs`、编辑器后端 `:5176/docs`，spec 与说明见 `docs/openapi/`）。**下一步 Phase 1 内容池 ECS**（1.0 最小 TuningService 起，含话题拆分 1.1b）。GM 导演层（M5-5）与 Electron 整体打包（M5-6）顺延。
+- 当前主线：`feat-M5-X-RE` 分支，细步见 `docs/m5-x-roadmap.md`（四步阶梯展开为单提交级原子步）。**Phase 0 地基已全部完成 0.1–0.12**；时间轴完善 T.1/T.2/T.3/T.5 完成，**T.4（决策轨迹「为什么」postId 合并）已完成**、**T.6 部分完成（仅「选中账号只看其轨道」）**，余轴上编辑/轴维度切换押后。
+- **Phase 1 顶层帖（内容池 ECS）已完成 1.0–1.4**（详见日志 `2026-06-18.md`）：1.0 TuningService（直读文件）/ 1.1 内容池三层 schema 与加载 / 1.2 组装引擎（混合式取片段 + 占位符 + 种子复现）/ 1.3 shape 过滤 / 1.4 PostingSystem 接组装（按 poolAffinities 选池→组装→发 standalone→轨迹带池·语法·模块）。**1.1b 话题拆分经勘察重新定性为「不拆不迁移、押后」**（topics 表非用户可见，详见 `docs/m5-x-phase1-baseline.md`「话题表定性」）。**下一步 1.5 氛围号水贴 → 1.6 内容池面板 / 1.7 NPC 设计器 / 1.8 块详情增强（编辑器面板）→ 1.9 端到端验收。** 状态机层、LLM 行为层、GM 导演层（M5-5）、Electron 整体打包（M5-6）顺延。
+- **配置范式（Phase 1 起，见 `docs/m5-x-phase1-baseline.md`）**：模拟器用 `dataDir` 直读世界文件夹的配置文件（`data/global-config/defaults.json` + 全局原子池 `data/global-pools/` + 世界 `tuning.json` / `scene-pools` / `topic-pools`），social server **不经手**模拟器域配置；编辑器面板改配置经编辑器后端直接读写文件。`data/global-config` 与 `data/global-pools` 入 git，其余 `data/` 仍忽略。
 - **时间轴是查看世界全部帖子与互动的面板、独立于模拟器**（按 `docs/m5-design.md` Premiere 范式）：块=世界真实内容（社交站全站流 + 按账号回复/互动），非决策轨迹；决策轨迹退为点开块后的"为什么"增强层（待 postId 合并）。早期"块=轨迹条"属偏离已校正——见 memory `read-design-docs-first`。
 - 编辑器已从临时 UI 重建为 Electron + dockview 工作区（见结构速览）；十面板按 `docs/m5-design.md` 设计逐里程碑把注册表占位换成实现（控制台、时间轴、检视器已实现）。
 - **全 server HTTP API 速查见 `docs/server-api.md`**（按域分组、含方法/路径/鉴权/用途；模拟器与编辑器后端都从这里查能力）。
