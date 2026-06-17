@@ -93,13 +93,18 @@ export function loadPools(dataDir: string, worldId: string): LoadedPools {
   return { components, grammars, pools };
 }
 
-/** 列目录下所有 .json 并逐个解析（BOM 容忍，单文件失败降级告警不中断）。 */
+/** 递归列目录（含子文件夹=分组）下所有 .json 并逐个解析（BOM 容忍，单文件失败降级告警不中断）。
+ *  分组只是文件夹组织，加载拍平——语法仍按组件/语法名字引用，名字全局唯一。 */
 function readJsonFilesInDir<T>(dir: string): T[] {
   if (!existsSync(dir)) return [];
   const out: T[] = [];
-  for (const name of readdirSync(dir)) {
-    if (!name.toLowerCase().endsWith('.json')) continue;
-    const filePath = path.join(dir, name);
+  for (const ent of readdirSync(dir, { withFileTypes: true })) {
+    if (ent.isDirectory()) {
+      out.push(...readJsonFilesInDir<T>(path.join(dir, ent.name)));
+      continue;
+    }
+    if (!ent.name.toLowerCase().endsWith('.json')) continue;
+    const filePath = path.join(dir, ent.name);
     try {
       const raw = readFileSync(filePath, 'utf-8').replace(/^﻿/, '');
       out.push(JSON.parse(raw) as T);
