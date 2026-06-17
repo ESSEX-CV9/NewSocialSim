@@ -28,8 +28,10 @@ const VBUF = 400;
 const POLL_WORLD_MS = 3000;
 const TICK_MS = 250;
 const FEED_LIMIT = 50;
-const LOAD_OLDER_AT = 400;
 const DAY_MS = 86_400_000;
+const INITIAL_AXIS_SPAN = 7 * DAY_MS; // 初始横轴左界 = 最新内容前 7 天（可自由拖滚到此范围）
+const AXIS_EXTEND = 3 * DAY_MS; // 拖到左边缘时再往更早扩 3 天
+const AXIS_EDGE_PX = 600; // 距左边缘多少像素内触发扩展
 const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
 
 interface Anchor {
@@ -126,20 +128,25 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const [scrollX, setScrollX] = useState(0);
   const [viewW, setViewW] = useState(800);
   const [editingTime, setEditingTime] = useState<string | null>(null);
+  // 横轴左界（模拟时间）：稳定、独立于已加载内容，使可拖滚到任意时段、内容按需加载。
+  const [axisFrom, setAxisFrom] = useState<number | null>(null);
   const worldRef = useRef<string | null>(null);
   const anchorRef = useRef<Anchor | null>(null);
   const tlRef = useRef<HTMLDivElement | null>(null);
   const expectedLeftRef = useRef(0);
   const postIdsRef = useRef<Set<number>>(new Set());
   const actKeysRef = useRef<Set<string>>(new Set());
-  // 已按时间窗口加载的覆盖区间 [coverFrom, coverTo]（模拟时间 ms）；向左滚动/轮询据此续接。
-  const coverFromRef = useRef<number | null>(null);
-  const coverToRef = useRef<number | null>(null);
-  const loadingOlderRef = useRef(false);
-  const prevMinRef = useRef<number | null>(null);
+  const coverToRef = useRef<number | null>(null); // 已加载到的最新时间（轮询据此向"现在"续接）
+  const loadingRef = useRef(false); // loadWindow 互斥，避免并发
+  // 最近一次按可见窗口加载的区间；可见窗口落在其内则跳过重复加载。
+  const lastLoadFromRef = useRef(Infinity);
+  const lastLoadToRef = useRef(-Infinity);
+  const originSimRef = useRef(0); // 当前 originSim（时间↔x 映射），供滚动时由像素反推可见时间
+  const scrollLoadTimerRef = useRef<number | null>(null);
+  const prevAxisFromRef = useRef<number | null>(null); // axisFrom 减小（左扩）时补偿 scrollLeft
   const ppmRef = useRef(pxPerMin);
   ppmRef.current = pxPerMin;
-  const viewWRef = useRef(viewW); // 供 poll useEffect 的陈旧闭包里 stepMs 读到当前视宽
+  const viewWRef = useRef(viewW); // 供 poll useEffect 的陈旧闭包里读到当前视宽
   viewWRef.current = viewW;
   const pendingJumpRef = useRef<number | null>(null);
   const [, rerender] = useState(0);
@@ -165,6 +172,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
 
   /** 加载某时间窗口的完整内容（顶层帖 + 回复 + 互动 + roster），并入既有数据（按 id/key 去重）。 */
   async function loadWindow(from: number, to: number): Promise<void> {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       const r = await fetchTimeline({ from, to });
       if (r.accounts.length) setRoster(r.accounts.map((a) => ({ handle: a.handle, displayName: a.displayName })));
@@ -173,6 +182,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       setError(null);
     } catch (e) {
       setError(String(e));
+    } finally {
+      loadingRef.current = false;
     }
   }
 
@@ -205,7 +216,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   async function loadInitial(): Promise<void> {
     postIdsRef.current = new Set();
     actKeysRef.current = new Set();
-    prevMinRef.current = null;
+    prevAxisFromRef.current = null;
+    lastLoadFromRef.current = Infinity;
+    lastLoadToRef.current = -Infinity;
     setPosts([]);
     setActs([]);
     setRoster([]);
@@ -218,8 +231,10 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       const times = r.posts.map((p) => p.createdAt);
       const latest = times.length ? Math.max(...times) : now;
       const oldest = times.length ? Math.min(...times) : now;
-      coverFromRef.current = oldest; // 向左滚动从已加载最早内容续接
-      coverToRef.current = now;
+      lastLoadFromRef.current = oldest; // 初始非窗口取回的内容时间跨度
+      lastLoadToRef.current = now;
+      coverToRef.current = now; // 轮询从 now 续接新内容
+      setAxisFrom(latest - INITIAL_AXIS_SPAN); // 稳定横轴左界（可拖滚回最新内容前 7 天）
       if (now - latest > 30 * 60_000) {
         // 时钟领先内容超 30 分钟（模拟器空闲）：落到最新内容、停跟随，否则播放头在空白处
         setFollowing(false);
@@ -231,18 +246,29 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     }
   }
 
-  /** 向左滚到边缘：把覆盖区间往更早扩一个 step（窗口内取全，含历史回复/互动）。 */
-  async function loadOlder(): Promise<void> {
-    if (loadingOlderRef.current || coverFromRef.current == null) return;
-    loadingOlderRef.current = true;
-    const to = coverFromRef.current;
-    const from = to - loadStepMs();
-    coverFromRef.current = from;
-    try {
-      await loadWindow(from, to);
-    } finally {
-      loadingOlderRef.current = false;
-    }
+  /** 按当前可见时间窗口加载（滚动/拖动滚动条到任意位置后调用）：由滚动像素反推可见时间，
+   *  加载该窗口前后各一个 step 的完整内容（含历史回复/互动）。可见窗口落在上次加载区间内则跳过。 */
+  function loadVisibleWindow(): void {
+    const el = tlRef.current;
+    if (!el) return;
+    const ppm = Math.max(0.1, ppmRef.current);
+    const origin = originSimRef.current;
+    const xLeft = el.scrollLeft - LABEL_W;
+    const vFrom = origin + (xLeft / ppm) * 60_000;
+    const vTo = origin + ((xLeft + viewWRef.current) / ppm) * 60_000;
+    const half = Math.max(loadStepMs(), vTo - vFrom); // 至少一个 step 或一屏，作半宽
+    const from = (vFrom + vTo) / 2 - half;
+    const to = (vFrom + vTo) / 2 + half;
+    if (from >= lastLoadFromRef.current && to <= lastLoadToRef.current) return; // 已在上次加载窗口内
+    lastLoadFromRef.current = from;
+    lastLoadToRef.current = to;
+    void loadWindow(from, to);
+  }
+
+  /** 滚动停下后（防抖）按可见窗口加载。 */
+  function scheduleVisibleLoad(): void {
+    if (scrollLoadTimerRef.current != null) window.clearTimeout(scrollLoadTimerRef.current);
+    scrollLoadTimerRef.current = window.setTimeout(() => loadVisibleWindow(), 200);
   }
 
   /** 轮询：把覆盖区间往"现在"扩，拉入新产生的内容。 */
@@ -327,7 +353,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return { lanes: ls, minTime: Number.isFinite(lo) ? lo : 0, maxTime: hi };
   }, [blocks, roster]);
 
-  const originSim = minTime - 2 * 60_000;
+  // 横轴起点用稳定的 axisFrom（独立于已加载内容），故可拖滚到任意时段；未就绪前回退到 minTime。
+  const originSim = (axisFrom ?? minTime) - 2 * 60_000;
+  originSimRef.current = originSim; // 供滚动时由像素反推可见时间
   const ax = (t: number) => ((t - originSim) / 60_000) * pxPerMin;
   const layout = useMemo(() => computeLayout(blocks, lanes, originSim, pxPerMin), [blocks, lanes, originSim, pxPerMin]);
 
@@ -338,15 +366,15 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   }
   const now = simNow();
   const trackWidth = Math.max(ax(maxTime), ax(now)) + RIGHT_PAD;
-  const ready = blocks.length > 0;
+  const ready = lanes.length > 0; // 有轨道（账号）即铺轴；内容按可见窗口加载，空时段显空轨道
 
   /** 跳转视图到某时间（停止跟随）：加载目标前后一个 step 的完整窗口（含该时段回复/互动），再滚到目标。 */
   async function jumpToTime(t: number): Promise<void> {
     setFollowing(false);
     const s = loadStepMs();
+    lastLoadFromRef.current = t - s; // 记为已加载窗口，避免落定后又重复加载
+    lastLoadToRef.current = t + s;
     await loadWindow(t - s, t + s);
-    // 把跳转窗口纳入"已覆盖最早"，使后续向左滚动从此处续接
-    if (coverFromRef.current == null || t - s < coverFromRef.current) coverFromRef.current = t - s;
     pendingJumpRef.current = t;
     rerender((x) => x + 1);
   }
@@ -371,16 +399,16 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     pendingJumpRef.current = null;
   });
 
-  // 加载更老使 minTime 减小 → x 右移；非跟随且非跳转中时补偿 scrollLeft。
+  // axisFrom 左扩（减小）→ 所有 x 右移；非跟随且非跳转中时补偿 scrollLeft 保持视图不跳。
   useLayoutEffect(() => {
     const el = tlRef.current;
-    const prev = prevMinRef.current;
-    if (el && prev != null && minTime < prev && !following && pendingJumpRef.current == null) {
-      el.scrollLeft += ((prev - minTime) / 60_000) * ppmRef.current;
+    const prev = prevAxisFromRef.current;
+    if (el && prev != null && axisFrom != null && axisFrom < prev && !following && pendingJumpRef.current == null) {
+      el.scrollLeft += ((prev - axisFrom) / 60_000) * ppmRef.current;
     }
-    prevMinRef.current = minTime;
+    prevAxisFromRef.current = axisFrom;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minTime]);
+  }, [axisFrom]);
 
   useEffect(() => {
     const el = tlRef.current;
@@ -415,9 +443,15 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   function onScroll(): void {
     const el = tlRef.current;
     if (!el) return;
-    if (Math.abs(el.scrollLeft - expectedLeftRef.current) > 3) setFollowing(false);
+    const userScrolled = Math.abs(el.scrollLeft - expectedLeftRef.current) > 3;
+    if (userScrolled) setFollowing(false);
     setScrollX(el.scrollLeft);
-    if (el.scrollLeft < LOAD_OLDER_AT) void loadOlder();
+    // 用户滚动/拖动滚动条到任意位置后，按可见窗口取数（含该时段历史互动）。程序性滚动不触发。
+    if (userScrolled) {
+      scheduleVisibleLoad();
+      // 拖到左边缘：把横轴左界再往更早扩，使能继续向更早拖滚。
+      if (el.scrollLeft < AXIS_EDGE_PX) setAxisFrom((a) => (a == null ? a : a - AXIS_EXTEND));
+    }
   }
 
   const stepMin = niceStepMin(pxPerMin);
@@ -499,11 +533,11 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       </div>
 
       {error && <p className="px-3 py-2 text-(--pink) text-xs">编辑器后端不可达：{error}</p>}
-      {!error && blocks.length === 0 && (
-        <p className="px-3 py-4 text-(--dim) text-sm">该世界还没有帖子或互动。任意账号发帖、回复、转发或点赞后，都会在此按时间排布。</p>
+      {!error && !ready && (
+        <p className="px-3 py-4 text-(--dim) text-sm">该世界还没有账号。建号后，其帖子与互动会在此按时间排布。</p>
       )}
 
-      {blocks.length > 0 && (
+      {ready && (
         <div className="flex flex-1 min-h-0">
           {/* 左侧轨道栏 */}
           <div className="shrink-0 border-r border-(--border) bg-(--panel2) overflow-y-auto" style={{ width: ROSTER_W }}>
