@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { existsSync } from 'node:fs';
 import Database from 'better-sqlite3';
 import type { StoredSimTraceEvent, SimTraceShape, SimTraceAction } from '@socialsim/shared';
 
@@ -56,9 +57,11 @@ export class TraceReader {
   /** 查询某世界某 sim_time 区间的轨迹，升序（sim_time, id）。世界无库时返回空数组。 */
   query(worldId: string, q: TraceQuery): StoredSimTraceEvent[] {
     const dbPath = path.join(this.dataDir, 'worlds', worldId, 'sim-trace.db');
+    // 世界没跑过模拟器就没有此库，返回空集（正常，不告警）。
+    if (!existsSync(dbPath)) return [];
     let db: Database.Database | null = null;
     try {
-      // 每次新开只读连接：fileMustExist——世界没跑过模拟器就没有此库，返回空集。
+      // 每次新开只读连接（WAL 坑见类注释）。
       db = new Database(dbPath, { readonly: true, fileMustExist: true });
       const from = q.from ?? 0;
       const to = q.to ?? Number.MAX_SAFE_INTEGER;
@@ -92,8 +95,10 @@ export class TraceReader {
         )
         .all(params) as TraceRow[];
       return rows.map(mapRow);
-    } catch {
-      // 库不存在/结构异常/被占用等，降级为空集，不让查询端点崩。
+    } catch (err) {
+      // 库存在却读失败（结构异常 / 原生模块 ABI 不匹配 / 被占用等）：降级空集不崩，但**打日志**——
+      // 曾因静默吞错把 better-sqlite3 ABI 不匹配藏了很久，难排查。
+      console.error(`[trace-reader] 读 ${dbPath} 失败:`, err instanceof Error ? err.message : err);
       return [];
     } finally {
       if (db) {

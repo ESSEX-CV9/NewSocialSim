@@ -1,11 +1,12 @@
 import { join } from 'node:path';
 import { watch, type FSWatcher } from 'node:fs';
-import { app, BrowserWindow, utilityProcess, type UtilityProcess } from 'electron';
+import { fork, type ChildProcess } from 'node:child_process';
+import { app, BrowserWindow } from 'electron';
 
 /** 编辑器后端端口（基础设施配置，与具体世界无关）。 */
 const EDITOR_BACKEND_PORT = Number(process.env.EDITOR_BACKEND_PORT ?? 5176);
 
-let backend: UtilityProcess | null = null;
+let backend: ChildProcess | null = null;
 let backendWatcher: FSWatcher | null = null;
 /** 标记主动重启，避免 kill 触发的 exit 被当成异常退出告警。 */
 let restarting = false;
@@ -13,7 +14,14 @@ let restarting = false;
 /** main 进程拉起编辑器后端为子进程，并管其生命周期；后端是 renderer 的唯一数据源。 */
 function startBackend(): void {
   const entry = join(__dirname, 'server.js');
-  backend = utilityProcess.fork(entry, [], {
+  // 用系统 node（非 Electron 内置 node）拉起后端：编辑器后端用原生模块 better-sqlite3（只读 sim-trace.db），
+  // 须与 server / simulator（tsx 走系统 node）同一 ABI。Electron utilityProcess 的 node ABI 不同，
+  // 加载为系统 node 编译的 .node 会报 NODE_MODULE_VERSION 不匹配、读轨迹永远落空。
+  // 打包（M5-6）时再改为「为 Electron 重建原生模块 + utilityProcess」。
+  const execPath = process.env.npm_node_execpath || process.env.NODE || 'node';
+  backend = fork(entry, [], {
+    execPath,
+    stdio: 'inherit',
     env: { ...process.env, EDITOR_BACKEND_PORT: String(EDITOR_BACKEND_PORT) },
   });
   backend.on('exit', (code) => {
