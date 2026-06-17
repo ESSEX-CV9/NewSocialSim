@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "tsx src/index.ts",
-    "gen:openapi": "tsx scripts/gen-openapi.ts",
+    "gen:schemas": "tsx scripts/gen-schemas.ts",
+    "gen:openapi": "tsx scripts/gen-schemas.ts && tsx scripts/gen-openapi.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.0",
+    "ts-json-schema-generator": "^2.9.0",
     "tsx": "^4.19.0",
     "typescript": "^5.5.0"
   }

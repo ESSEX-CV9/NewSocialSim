@@ -1,6 +1,13 @@
+import { readFileSync } from 'node:fs';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import type { FastifyInstance } from 'fastify';
+
+/** 从 shared 类型生成的响应组件 schema（gen:schemas 产物，$id→schema，内部 $ref 已为 `X#` 形态）。
+ *  随 registerSwagger 逐个 addSchema，供路由 response 引用并入 OpenAPI components/schemas。 */
+const COMPONENT_SCHEMAS = JSON.parse(
+  readFileSync(new URL('./components.generated.json', import.meta.url), 'utf-8'),
+) as Record<string, Record<string, unknown>>;
 
 /** 社交站 OpenAPI 文档基座：info / servers / 鉴权方案 / 按域分组的 tag 表。
  *  路由侧只在各自 schema 里挂 tags / summary / security，引用此处定义的 securityScheme 名。 */
@@ -24,6 +31,24 @@ export const REQUIRE_ADMIN = [{ [SEC.admin]: [] }];
 export const REQUIRE_SSE = [{ [SEC.sse]: [] }];
 /** 可选登录（optionalAuth）：不带凭证也可读，带 JWT 有观察者态（likedByViewer 等）。 */
 export const OPTIONAL_JWT = [{}, { [SEC.jwt]: [] }];
+
+/** $ref 到一个组件 schema（组件名 = shared 类型名）。 */
+export const ref = (id: string) => ({ $ref: `${id}#` });
+
+/** 包裹体 `{ <key>: <Component> }`（如 `{ post: PostView }`、`{ user: UserProfile }`）。 */
+export const envelope = (key: string, id: string) =>
+  ({ type: 'object', additionalProperties: true, properties: { [key]: ref(id) } }) as const;
+
+/** 游标分页 `Page<Component>` = `{ items: Component[], nextCursor: string|null }`。 */
+export const pageOf = (id: string) =>
+  ({
+    type: 'object',
+    additionalProperties: true,
+    properties: {
+      items: { type: 'array', items: ref(id) },
+      nextCursor: { type: ['string', 'null'] },
+    },
+  }) as const;
 
 /** 按模块分组的 tag 表；顺序即 Swagger UI 中的展示顺序。 */
 export const TAGS = [
@@ -85,7 +110,25 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
       },
       tags: TAGS.map((t) => ({ name: t.name, description: t.description })),
     },
+    // 用 addSchema 的 $id 作为 components/schemas 里的名字（否则默认 def-0/def-1…）
+    refResolver: {
+      buildLocalReference(json, _baseUri, _fragment, i) {
+        return (json.$id as string) || `def-${i}`;
+      },
+    },
   });
+
+  // 组件 schema 须在路由注册前 addSchema（路由 response 的 $ref 才能解析），故置于此。
+  for (const [id, schema] of Object.entries(COMPONENT_SCHEMAS)) {
+    app.addSchema({ $id: id, ...schema });
+  }
+
+  // 响应 schema 仅用于「文档」，不用于「序列化」：
+  // 自定义序列化器一律走 JSON.stringify、忽略 response schema——这样
+  //   1) 递归类型（PostView.quoted→PostView）不会让 fast-json-stringify 编译时栈溢出；
+  //   2) 绝不按 schema 过滤字段，响应负载与挂 response 之前**完全一致**（本就无 response、默认即 JSON.stringify）。
+  // 请求体/参数校验仍走 Ajv（不受影响）。
+  app.setSerializerCompiler(() => (data) => JSON.stringify(data));
 
   await app.register(fastifySwaggerUi, {
     routePrefix: '/docs',

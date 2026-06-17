@@ -1,6 +1,6 @@
 import type { CreatePostRequest } from '@socialsim/shared';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { OPTIONAL_JWT, REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { OPTIONAL_JWT, REQUIRE_JWT, envelope, pageOf } from '../../core/openapi/swagger.js';
 import { PostsController } from './posts.controller.js';
 import type { PostsService } from './posts.service.js';
 
@@ -81,6 +81,7 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
         operationId: 'createPost',
         security: REQUIRE_JWT,
         body: createPostBodySchema,
+        response: { 201: envelope('post', 'PostView') },
       },
     },
     controller.create,
@@ -95,6 +96,7 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
         operationId: 'getPostById',
         security: OPTIONAL_JWT,
         params: idParamsSchema,
+        response: { 200: envelope('post', 'PostView') },
       },
     },
     controller.getById,
@@ -110,6 +112,7 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
         security: OPTIONAL_JWT,
         params: idParamsSchema,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('PostView') },
       },
     },
     controller.listReplies,
@@ -127,6 +130,7 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
         operationId: 'listUserPosts',
         security: OPTIONAL_JWT,
         querystring: userPostsQuerySchema,
+        response: { 200: pageOf('PostView') },
       },
     },
     controller.listByHandle,
@@ -141,6 +145,7 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
         operationId: 'listUserLikes',
         security: OPTIONAL_JWT,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('PostView') },
       },
     },
     controller.listLikedByHandle,
@@ -155,6 +160,7 @@ export function registerPostsRoutes(app: FastifyInstance, deps: PostsRoutesDeps)
         operationId: 'listUserMedia',
         security: OPTIONAL_JWT,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('PostView') },
       },
     },
     controller.listMediaByHandle,

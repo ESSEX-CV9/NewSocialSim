@@ -25,7 +25,1595 @@
         "description": "SSE 流凭证：EventSource 带不了 header，故 JWT 走 ?token= 查询参数。"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "PostView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "authorId": {
+            "type": "number"
+          },
+          "content": {
+            "type": "string"
+          },
+          "replyToId": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "若为回复，指向被回复的帖子"
+          },
+          "quoteOfId": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "若为引用转发，指向被引用的帖子"
+          },
+          "createdAt": {
+            "type": "number",
+            "description": "模拟时间（unix 毫秒形式）"
+          },
+          "likeCount": {
+            "type": "number"
+          },
+          "repostCount": {
+            "type": "number"
+          },
+          "quoteCount": {
+            "type": "number",
+            "description": "被引用次数（前端与转发数合并显示）"
+          },
+          "replyCount": {
+            "type": "number"
+          },
+          "viewCount": {
+            "type": "number",
+            "description": "浏览量：曝光计数（卡片进入视口由客户端批量上报；模拟器层可经同一 API 或管理端注入）"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "软删除：保留占位以维持对话串完整（\"此帖已删除\"）"
+          },
+          "author": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "likedByViewer": {
+            "type": "boolean"
+          },
+          "repostedByViewer": {
+            "type": "boolean"
+          },
+          "bookmarkedByViewer": {
+            "type": "boolean",
+            "description": "观察者是否已收藏（书签私密，不提供计数）"
+          },
+          "quoted": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PostView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "被引用的帖子（只嵌一层；被删除时为墓碑视图）"
+          },
+          "authorFollowedByViewer": {
+            "type": "boolean",
+            "description": "观察者是否已关注作者（本人帖与匿名时为 false；供帖子菜单的关注快捷项）"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaView"
+            },
+            "description": "附加媒体（最多 20 个，图/视频可混排），按 position 排序；墓碑帖为空数组"
+          },
+          "linkCard": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LinkCardView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "正文首个 URL 的链接卡片；有媒体时不显示（X 行为），抓取失败为 null"
+          },
+          "inReplyTo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PostView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "被回复帖的一层嵌入（仅个人主页\"回复\"Tab 填充）；观察者不可见（已删/被屏蔽/被隐藏）时为 null"
+          },
+          "replyToHandle": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "被回复帖作者 handle（仅\"回复\"Tab 填充）；嵌入不可见时前端降级显示\"回复"
+          }
+        },
+        "required": [
+          "author",
+          "authorFollowedByViewer",
+          "authorId",
+          "bookmarkedByViewer",
+          "content",
+          "createdAt",
+          "deleted",
+          "id",
+          "likeCount",
+          "likedByViewer",
+          "linkCard",
+          "media",
+          "quoteCount",
+          "quoteOfId",
+          "quoted",
+          "replyCount",
+          "replyToId",
+          "repostCount",
+          "repostedByViewer",
+          "viewCount"
+        ],
+        "additionalProperties": false,
+        "description": "面向展示的帖子：实体 + 作者 + 观察者状态 + 一层引用嵌入"
+      },
+      "UserSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "头像图片地址；null = 用 handle 哈希色块兜底"
+          },
+          "verified": {
+            "$ref": "#/components/schemas/VerifiedType"
+          }
+        },
+        "required": [
+          "id",
+          "handle",
+          "displayName",
+          "avatarUrl",
+          "verified"
+        ],
+        "additionalProperties": false,
+        "description": "嵌入在帖子/通知里的轻量用户信息"
+      },
+      "VerifiedType": {
+        "type": "string",
+        "enum": [
+          "none",
+          "personal",
+          "org"
+        ],
+        "description": "认证类型：none=无 / personal=个人（蓝标）/ org=组织（金标）"
+      },
+      "MediaView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "image",
+              "video"
+            ]
+          },
+          "url": {
+            "type": "string",
+            "description": "/api/media/<id>/file?w=<worldId>，公开可访问（流式引用视频为 /stream 端点）"
+          },
+          "width": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "height": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "durationMs": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "视频时长（毫秒）；图片或未知为不出现/null"
+          },
+          "posterUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "视频海报图地址（外站引入时随片下载）；无海报为 null"
+          },
+          "storage": {
+            "type": "string",
+            "enum": [
+              "library",
+              "stream"
+            ],
+            "description": "视频存储形态：'library' 文件入库 / 'stream' 流式引用（源失效则不可播）"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "url",
+          "width",
+          "height"
+        ],
+        "additionalProperties": false,
+        "description": "媒体资源视图（文件本体经 url 流式获取）"
+      },
+      "LinkCardView": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "imageUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "缩略图已下载入库的本地地址"
+          },
+          "siteName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "embedUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "可嵌入播放器地址（YouTube/B 站等已知站点由 url 现算）；不支持的站点为 null"
+          }
+        },
+        "required": [
+          "url",
+          "title",
+          "description",
+          "imageUrl",
+          "siteName",
+          "embedUrl"
+        ],
+        "additionalProperties": false,
+        "description": "正文首个 URL 的 OG 链接预览卡片（抓取失败/有媒体时为 null）"
+      },
+      "TimelineItem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "post",
+              "repost"
+            ]
+          },
+          "post": {
+            "$ref": "#/components/schemas/PostView"
+          },
+          "repostedBy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "type 为 repost 时：是谁转发进时间线的"
+          },
+          "activityAt": {
+            "type": "number",
+            "description": "排序时间：原帖为发布时间，转发为转发时间（模拟时间）"
+          }
+        },
+        "required": [
+          "type",
+          "post",
+          "repostedBy",
+          "activityAt"
+        ],
+        "additionalProperties": false
+      },
+      "InteractionEvent": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "like"
+                ]
+              },
+              "at": {
+                "type": "number"
+              },
+              "post": {
+                "$ref": "#/components/schemas/PostView"
+              }
+            },
+            "required": [
+              "type",
+              "at",
+              "post"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "repost"
+                ]
+              },
+              "at": {
+                "type": "number"
+              },
+              "post": {
+                "$ref": "#/components/schemas/PostView"
+              }
+            },
+            "required": [
+              "type",
+              "at",
+              "post"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "follow"
+                ]
+              },
+              "at": {
+                "type": "number"
+              },
+              "target": {
+                "$ref": "#/components/schemas/UserSummary"
+              }
+            },
+            "required": [
+              "type",
+              "at",
+              "target"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "某账号的互动事件（赞 / 转发 / 关注），带发生时间 `at`（模拟时间，= 互动 created_at）。 供编辑器时间轴把互动落在正确时刻；真人与 NPC 的互动同源（world.db），与模拟器无关。"
+      },
+      "NotificationView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "type": {
+            "$ref": "#/components/schemas/NotificationType"
+          },
+          "actor": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "actorFollowerCount": {
+            "type": "number",
+            "description": "actor 的粉丝数与\"是否被通知所有者关注\"——前端聚合时用于挑选最重要的头像"
+          },
+          "actorFollowedByViewer": {
+            "type": "boolean"
+          },
+          "postId": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "postExcerpt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "相关帖子的内容预览（前 100 字符）；无帖子或帖子已删除时为 null"
+          },
+          "postMedia": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "video"
+                    ]
+                  },
+                  "url": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "type",
+                  "url"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "相关帖子的首个媒体（通知卡缩略图）；无媒体或帖子已删除时为 null"
+          },
+          "read": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "actor",
+          "actorFollowerCount",
+          "actorFollowedByViewer",
+          "postId",
+          "postExcerpt",
+          "postMedia",
+          "read",
+          "createdAt"
+        ],
+        "additionalProperties": false
+      },
+      "NotificationType": {
+        "type": "string",
+        "enum": [
+          "reply",
+          "quote",
+          "like",
+          "repost",
+          "follow",
+          "mention"
+        ]
+      },
+      "TrendItem": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "description": "含 # 前缀，保留首次出现的原始大小写"
+          },
+          "postCount": {
+            "type": "number",
+            "description": "近期提及该话题的帖子数（同帖同话题只计一次）"
+          }
+        },
+        "required": [
+          "tag",
+          "postCount"
+        ],
+        "additionalProperties": false,
+        "description": "趋势条目：近期被讨论的 #话题（右边栏\"有什么新鲜事\"）"
+      },
+      "Post": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "authorId": {
+            "type": "number"
+          },
+          "content": {
+            "type": "string"
+          },
+          "replyToId": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "若为回复，指向被回复的帖子"
+          },
+          "quoteOfId": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "若为引用转发，指向被引用的帖子"
+          },
+          "createdAt": {
+            "type": "number",
+            "description": "模拟时间（unix 毫秒形式）"
+          },
+          "likeCount": {
+            "type": "number"
+          },
+          "repostCount": {
+            "type": "number"
+          },
+          "quoteCount": {
+            "type": "number",
+            "description": "被引用次数（前端与转发数合并显示）"
+          },
+          "replyCount": {
+            "type": "number"
+          },
+          "viewCount": {
+            "type": "number",
+            "description": "浏览量：曝光计数（卡片进入视口由客户端批量上报；模拟器层可经同一 API 或管理端注入）"
+          },
+          "deleted": {
+            "type": "boolean",
+            "description": "软删除：保留占位以维持对话串完整（\"此帖已删除\"）"
+          }
+        },
+        "required": [
+          "id",
+          "authorId",
+          "content",
+          "replyToId",
+          "quoteOfId",
+          "createdAt",
+          "likeCount",
+          "repostCount",
+          "quoteCount",
+          "replyCount",
+          "viewCount",
+          "deleted"
+        ],
+        "additionalProperties": false,
+        "description": "帖子实体（贫血模型：纯数据，无行为）"
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "number",
+            "description": "模拟时间（unix 毫秒形式）"
+          }
+        },
+        "required": [
+          "id",
+          "handle",
+          "displayName",
+          "bio",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "description": "用户实体（贫血模型：纯数据，无行为）"
+      },
+      "UserProfile": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "bio": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "number",
+            "description": "模拟时间（unix 毫秒形式）"
+          },
+          "followerCount": {
+            "type": "number"
+          },
+          "followingCount": {
+            "type": "number"
+          },
+          "postCount": {
+            "type": "number"
+          },
+          "followedByViewer": {
+            "type": "boolean",
+            "description": "当前观察者是否已关注此人（匿名时为 false）"
+          },
+          "blockedByViewer": {
+            "type": "boolean",
+            "description": "当前观察者是否已屏蔽此人（匿名时为 false）"
+          },
+          "pinnedPostId": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "本人的置顶帖 id（每用户最多一条）"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "头像图片地址；null = 用 handle 哈希色块兜底"
+          },
+          "bannerUrl": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "主页横幅图片地址；null = 纯色占位"
+          },
+          "avatarMediaId": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "bannerMediaId": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "verified": {
+            "$ref": "#/components/schemas/VerifiedType"
+          },
+          "verifiedAt": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "通过认证的模拟时间（unix 毫秒）；未认证或 v10 前设定的为 null"
+          },
+          "website": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "简介下方展示的个人链接；null = 未设置"
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "位置（自由文本地名，可为虚构世界地点）；null = 未设置"
+          },
+          "birthDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "出生日期（YYYY-MM-DD）；null = 未设置"
+          },
+          "profession": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "专业类别 key（前端 i18n 映射展示）；null = 未设置"
+          },
+          "knownFollowers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserSummary"
+            },
+            "description": "观察者关注的人里也关注此人的（最多 3 个，匿名或本人页为空数组）"
+          },
+          "knownFollowerCount": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "avatarMediaId",
+          "avatarUrl",
+          "bannerMediaId",
+          "bannerUrl",
+          "bio",
+          "birthDate",
+          "blockedByViewer",
+          "createdAt",
+          "displayName",
+          "followedByViewer",
+          "followerCount",
+          "followingCount",
+          "handle",
+          "id",
+          "knownFollowerCount",
+          "knownFollowers",
+          "location",
+          "pinnedPostId",
+          "postCount",
+          "profession",
+          "verified",
+          "verifiedAt",
+          "website"
+        ],
+        "additionalProperties": false,
+        "description": "对外公开的用户信息（带统计数字与观察者状态）"
+      },
+      "AuthResponse": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserProfile"
+          }
+        },
+        "required": [
+          "token",
+          "user"
+        ],
+        "additionalProperties": false
+      },
+      "WorldMeta": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "zh-CN",
+              "en"
+            ],
+            "description": "该世界默认界面语言"
+          },
+          "clock": {
+            "$ref": "#/components/schemas/ClockState"
+          },
+          "calendar": {
+            "$ref": "#/components/schemas/CalendarConfig"
+          },
+          "contentRating": {
+            "$ref": "#/components/schemas/ContentRating"
+          },
+          "createdAtRealMs": {
+            "type": "number",
+            "description": "创建时的真实时间（unix 毫秒），仅作管理信息，与模拟时间无关"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "locale",
+          "clock",
+          "calendar",
+          "contentRating",
+          "createdAtRealMs"
+        ],
+        "additionalProperties": false,
+        "description": "一个世界的元数据，对应 data/worlds/<id>/world.json"
+      },
+      "ClockState": {
+        "type": "object",
+        "properties": {
+          "simTimeMs": {
+            "type": "number",
+            "description": "保存那一刻的模拟时间（unix 毫秒形式）"
+          },
+          "scale": {
+            "type": "number",
+            "description": "流速：1 = 与现实同速，60 = 现实 1 秒过模拟 1 分钟，0 不合法（用 paused 表达暂停）"
+          },
+          "paused": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "simTimeMs",
+          "scale",
+          "paused"
+        ],
+        "additionalProperties": false,
+        "description": "世界时钟的持久化状态（存于 world.json，加载时恢复为运行中的 SimClock）"
+      },
+      "CalendarConfig": {
+        "type": "object",
+        "properties": {
+          "label": {
+            "type": "string",
+            "description": "历法名称，如 \"公历\" / \"天元历\""
+          }
+        },
+        "required": [
+          "label"
+        ],
+        "additionalProperties": false,
+        "description": "仅用于展示的历法配置，如修真世界的\"天元历\""
+      },
+      "ContentRating": {
+        "type": "string",
+        "enum": [
+          "safe",
+          "all"
+        ],
+        "description": "世界级内容分级默认值：safe = 仅全年龄；all = 不过滤（R-18G 由实例配置单独把门）"
+      },
+      "WorldSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "zh-CN",
+              "en"
+            ],
+            "description": "该世界默认界面语言"
+          },
+          "active": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "locale",
+          "active"
+        ],
+        "additionalProperties": false,
+        "description": "世界列表项（含是否为当前活动世界）"
+      },
+      "ActiveWorldInfo": {
+        "type": "object",
+        "properties": {
+          "meta": {
+            "$ref": "#/components/schemas/WorldMeta"
+          },
+          "simTimeMs": {
+            "type": "number",
+            "description": "此刻的模拟时间（unix 毫秒形式）"
+          }
+        },
+        "required": [
+          "meta",
+          "simTimeMs"
+        ],
+        "additionalProperties": false,
+        "description": "GET /api/admin/worlds/active 的响应"
+      },
+      "SimulatorStatus": {
+        "type": "object",
+        "properties": {
+          "boundWorldId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "当前绑定的活动世界 id；未绑定为 null。"
+          },
+          "accountCount": {
+            "type": "number",
+            "description": "被驱动账号数。"
+          },
+          "tickNumber": {
+            "type": "number"
+          },
+          "lastFlushedWorldId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "上次 flush 掉的世界 id（切世界时记）。"
+          },
+          "lastFlushAt": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "上次 flush 的现实时间（unix 毫秒）。"
+          },
+          "running": {
+            "type": "boolean",
+            "description": "由服务端按心跳新鲜度判定（超时未上报即视为未运行）。"
+          },
+          "reportedAt": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "上次心跳的现实时间；从未上报为 null。"
+          }
+        },
+        "required": [
+          "accountCount",
+          "boundWorldId",
+          "lastFlushAt",
+          "lastFlushedWorldId",
+          "reportedAt",
+          "running",
+          "tickNumber"
+        ],
+        "additionalProperties": false
+      },
+      "SimulatorHeartbeat": {
+        "type": "object",
+        "properties": {
+          "boundWorldId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "当前绑定的活动世界 id；未绑定为 null。"
+          },
+          "accountCount": {
+            "type": "number",
+            "description": "被驱动账号数。"
+          },
+          "tickNumber": {
+            "type": "number"
+          },
+          "lastFlushedWorldId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "上次 flush 掉的世界 id（切世界时记）。"
+          },
+          "lastFlushAt": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "上次 flush 的现实时间（unix 毫秒）。"
+          }
+        },
+        "required": [
+          "boundWorldId",
+          "accountCount",
+          "tickNumber",
+          "lastFlushedWorldId",
+          "lastFlushAt"
+        ],
+        "additionalProperties": false,
+        "description": "模拟器运行状态：模拟器周期性上报心跳，服务端按心跳新鲜度判定 running，编辑器控制台展示。 属轻量观测/基础设施状态，时间用现实时间（进程是否在世），与世界模拟时间无关。"
+      },
+      "ConversationView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "description": "v1 仅 'dm'；schema 已为群聊预留",
+            "enum": [
+              "dm"
+            ]
+          },
+          "otherParticipant": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConversationState"
+          },
+          "lastMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastMessagePreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unreadCount": {
+            "type": "number",
+            "description": "观察者未读消息数"
+          },
+          "markedUnread": {
+            "type": "boolean",
+            "description": "手动标记的未读点（打开会话或标记已读时清除）"
+          },
+          "muted": {
+            "type": "boolean",
+            "description": "静音：不计入导航未读角标，列表仍显示未读点"
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "置顶：收件箱列表浮顶"
+          },
+          "createdAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "type",
+          "otherParticipant",
+          "state",
+          "lastMessage",
+          "unreadCount",
+          "markedUnread",
+          "muted",
+          "pinned",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "description": "面向展示的会话（观察者视角）"
+      },
+      "ConversationState": {
+        "type": "string",
+        "enum": [
+          "inbox",
+          "request"
+        ],
+        "description": "会话在观察者收件箱中的位置：主收件箱 / 消息请求（对方未关注你时的来信）"
+      },
+      "LastMessagePreview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "senderId": {
+            "type": "number"
+          },
+          "content": {
+            "type": "string"
+          },
+          "hasMedia": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "senderId",
+          "content",
+          "hasMedia",
+          "deleted",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "description": "会话列表预览用的最后一条消息摘要"
+      },
+      "ConversationDetailView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "description": "v1 仅 'dm'；schema 已为群聊预留",
+            "enum": [
+              "dm"
+            ]
+          },
+          "otherParticipant": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ConversationState"
+          },
+          "lastMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LastMessagePreview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unreadCount": {
+            "type": "number",
+            "description": "观察者未读消息数"
+          },
+          "markedUnread": {
+            "type": "boolean",
+            "description": "手动标记的未读点（打开会话或标记已读时清除）"
+          },
+          "muted": {
+            "type": "boolean",
+            "description": "静音：不计入导航未读角标，列表仍显示未读点"
+          },
+          "pinned": {
+            "type": "boolean",
+            "description": "置顶：收件箱列表浮顶"
+          },
+          "createdAt": {
+            "type": "number"
+          },
+          "otherLastReadMessageId": {
+            "type": "number",
+            "description": "对方已读到的消息 id（0 = 一条未读）；驱动\"已读\"回执"
+          },
+          "blockedEither": {
+            "type": "boolean",
+            "description": "双方任一方向存在屏蔽（前端禁用输入框）"
+          }
+        },
+        "required": [
+          "blockedEither",
+          "createdAt",
+          "id",
+          "lastMessage",
+          "markedUnread",
+          "muted",
+          "otherLastReadMessageId",
+          "otherParticipant",
+          "pinned",
+          "state",
+          "type",
+          "unreadCount"
+        ],
+        "additionalProperties": false,
+        "description": "会话详情：列表视图 + 已读回执与屏蔽状态"
+      },
+      "MessageView": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "conversationId": {
+            "type": "number"
+          },
+          "sender": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "content": {
+            "type": "string",
+            "description": "墓碑（已删除）时为 ''"
+          },
+          "media": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MediaView"
+            },
+            "description": "按 position 排序，最多 4 个；墓碑时为空数组"
+          },
+          "linkCard": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LinkCardView"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "正文首个 URL 的链接卡片；有媒体/墓碑/抓取失败时为 null（同帖子规则）"
+          },
+          "reactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageReactionView"
+            }
+          },
+          "deleted": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "conversationId",
+          "sender",
+          "content",
+          "media",
+          "linkCard",
+          "reactions",
+          "deleted",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "description": "面向展示的私信消息"
+      },
+      "MessageReactionView": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "number"
+          },
+          "emoji": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "emoji"
+        ],
+        "additionalProperties": false
+      },
+      "DmMessageMatch": {
+        "type": "object",
+        "properties": {
+          "conversationId": {
+            "type": "number"
+          },
+          "messageId": {
+            "type": "number"
+          },
+          "excerpt": {
+            "type": "string",
+            "description": "命中消息的内容截断"
+          },
+          "senderId": {
+            "type": "number"
+          },
+          "otherParticipant": {
+            "$ref": "#/components/schemas/UserSummary"
+          },
+          "createdAt": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "conversationId",
+          "messageId",
+          "excerpt",
+          "senderId",
+          "otherParticipant",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "description": "私信搜索：命中消息（点击跳转所属会话）"
+      },
+      "DmSearchResults": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationView"
+            }
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DmMessageMatch"
+            }
+          }
+        },
+        "required": [
+          "conversations",
+          "messages"
+        ],
+        "additionalProperties": false,
+        "description": "私信搜索结果：按对方用户名/昵称命中的会话 + 按内容命中的消息"
+      },
+      "DmUnreadCount": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "number",
+            "description": "主收件箱中含未读消息的会话数"
+          },
+          "requestCount": {
+            "type": "number",
+            "description": "待处理的消息请求会话数"
+          }
+        },
+        "required": [
+          "count",
+          "requestCount"
+        ],
+        "additionalProperties": false
+      },
+      "SimTraceEvent": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number",
+            "description": "现实时间（unix 毫秒）。"
+          },
+          "simTime": {
+            "type": "number",
+            "description": "世界模拟时间（unix 毫秒形态）。"
+          },
+          "entity": {
+            "type": "string",
+            "description": "驱动账号 handle。"
+          },
+          "action": {
+            "$ref": "#/components/schemas/SimTraceAction"
+          },
+          "activityState": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "当前活动状态（状态机阶段填真值，先确定性阶段为占位）。"
+          },
+          "intent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "粗粒度意图（earnest/mock/... ；先确定性阶段为占位）。"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimTraceShape"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "内容形态；like/repost/follow 等非内容动作为 null。"
+          },
+          "poolId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "命中的池 id（内容池 ECS 阶段填，先确定性阶段可为 null）。"
+          },
+          "entryId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "池内所选条目/语法标识（内容池 ECS 阶段填）。"
+          },
+          "mediaAttached": {
+            "type": "boolean"
+          },
+          "mediaReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "配图/不配图的原因（配图阶段填）。"
+          },
+          "targetPostId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "reply/quote/like/repost 时为被作用帖 id；其余为 null。"
+          }
+        },
+        "required": [
+          "at",
+          "simTime",
+          "entity",
+          "action"
+        ],
+        "additionalProperties": false
+      },
+      "SimTraceAction": {
+        "type": "string",
+        "enum": [
+          "post",
+          "reply",
+          "quote",
+          "like",
+          "repost",
+          "follow"
+        ],
+        "description": "决策轨迹事件：模拟器每次写世界（发帖/回复/引用/赞/转/关注）吐一条， 记录\"为什么这么做\"，落盘为 per-world 的 sim-trace.db（模拟器独占，不进 world.db）。 同时记 at（现实时间）与 simTime（世界模拟时间）：现实时间供追溯动作在现实里何时发生， 世界时间供对齐到时间轴。"
+      },
+      "SimTraceShape": {
+        "type": "string",
+        "enum": [
+          "standalone",
+          "reply",
+          "quote"
+        ],
+        "description": "内容形态。standalone=顶层帖，reply=回复，quote=引用。"
+      },
+      "StoredSimTraceEvent": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number",
+            "description": "现实时间（unix 毫秒）。"
+          },
+          "simTime": {
+            "type": "number",
+            "description": "世界模拟时间（unix 毫秒形态）。"
+          },
+          "entity": {
+            "type": "string",
+            "description": "驱动账号 handle。"
+          },
+          "action": {
+            "$ref": "#/components/schemas/SimTraceAction"
+          },
+          "activityState": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "当前活动状态（状态机阶段填真值，先确定性阶段为占位）。"
+          },
+          "intent": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "粗粒度意图（earnest/mock/... ；先确定性阶段为占位）。"
+          },
+          "shape": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SimTraceShape"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "内容形态；like/repost/follow 等非内容动作为 null。"
+          },
+          "poolId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "命中的池 id（内容池 ECS 阶段填，先确定性阶段可为 null）。"
+          },
+          "entryId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "池内所选条目/语法标识（内容池 ECS 阶段填）。"
+          },
+          "mediaAttached": {
+            "type": "boolean"
+          },
+          "mediaReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "配图/不配图的原因（配图阶段填）。"
+          },
+          "targetPostId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "reply/quote/like/repost 时为被作用帖 id；其余为 null。"
+          },
+          "id": {
+            "type": "number",
+            "description": "trace_event 表自增主键。"
+          }
+        },
+        "required": [
+          "action",
+          "at",
+          "entity",
+          "id",
+          "simTime"
+        ],
+        "additionalProperties": false,
+        "description": "已落盘的决策轨迹事件：sim-trace.db 一行，比 SimTraceEvent 多自增主键 id。 编辑器后端只读查询返回此形态，时间轴块以 id 为稳定 key。"
+      },
+      "GmAgentLogEvent": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "number",
+            "description": "现实时间（unix 毫秒）。"
+          },
+          "simTime": {
+            "type": "number",
+            "description": "世界模拟时间（unix 毫秒形态）。"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "gm",
+              "agent"
+            ]
+          },
+          "taskLabel": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "任务标签（如 make-hot-thread / npc-post）。"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "本轮决策摘要（GM 写回日志的连续性凭据）。"
+          },
+          "detail": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "结构化明细（工具调用链 / 步数 / token 等），存 JSON 文本。"
+          }
+        },
+        "required": [
+          "at",
+          "simTime",
+          "kind"
+        ],
+        "additionalProperties": false,
+        "description": "GM/Agent 决策日志：导演层/Agent\"为什么这么调度\"的观测记录，与决策轨迹同属观测线， 同库（sim-trace.db）独立表存放，绝不进 world.db。 同记 at（现实时间，供追溯每次 LLM 调用在现实里何时发生）与 simTime（世界时间，供对齐时间轴）。 先确定性阶段无 LLM 运行，此结构与表先建好\"家\"、暂无写入，待 LLM 行为层/GM 导演层接入。"
+      }
+    }
   },
   "paths": {
     "/api/health": {
@@ -1597,8 +3185,21 @@
           }
         ],
         "responses": {
-          "200": {
-            "description": "Default Response"
+          "201": {
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "post": {
+                      "$ref": "#/components/schemas/PostView"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1628,7 +3229,20 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "post": {
+                      "$ref": "#/components/schemas/PostView"
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -1703,7 +3317,29 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PostView"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1763,7 +3399,29 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PostView"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1811,7 +3469,29 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PostView"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1859,7 +3539,29 @@
         ],
         "responses": {
           "200": {
-            "description": "Default Response"
+            "description": "Default Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/PostView"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
