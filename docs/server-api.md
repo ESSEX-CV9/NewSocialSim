@@ -78,7 +78,8 @@
   - query `{ sort?: 'latest'|'hot', cursor?, limit? }` → `200` `Page<TimelineItem>`
 - **GET** `/api/timeline/foryou` · JWT? — 推荐流 → `200` `Page<TimelineItem>`
 - **GET** `/api/timeline/global` · JWT? — **全站流（firehose）**：所有账号顶层帖按时间
-  - query `{ cursor?, limit? }` → `200` `Page<TimelineItem>`（⚠️ **仅顶层帖**，不含回复；转发为 `type:'repost'`）
+  - query `{ cursor?, limit?, from?, to? }` → `200` `Page<TimelineItem>`（⚠️ **仅顶层帖**，不含回复；转发为 `type:'repost'`）
+  - `from`/`to`（模拟时间 ms，作用于 `activity_at`）限定区间，供时间轴跳转任意历史时段（T.2），仍按 `cursor` 在窗口内倒序翻页
 - **GET** `/api/users/:handle/timeline` · JWT? — 某账号主页流（其帖 + 转发）
   - query `{ cursor?, limit? }` → `200` `Page<TimelineItem>`
 

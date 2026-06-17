@@ -20,8 +20,12 @@ export class TimelineController {
     reply.send(this.service.forYou(viewerIdOf(req), req.query.cursor, req.query.limit));
   };
 
-  global = async (req: PageReq, reply: FastifyReply) => {
-    reply.send(this.service.global(viewerIdOf(req), req.query.cursor, req.query.limit));
+  global = async (
+    req: FastifyRequest<{ Querystring: { cursor?: string; limit?: number; from?: number; to?: number } }>,
+    reply: FastifyReply,
+  ) => {
+    const { cursor, limit, from, to } = req.query;
+    reply.send(this.service.global(viewerIdOf(req), cursor, limit, { from, to }));
   };
 
   user = async (

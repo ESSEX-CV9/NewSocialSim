@@ -144,14 +144,20 @@ export const timelineRepo = {
       }) as (TimelineEntryRow & { score: number })[];
   },
 
-  /** 全站流：所有原创帖（非回复），按时间 */
+  /** 全站流：所有原创帖（非回复），按时间。可选 from/to 限定 activity_at 区间（T.2 时间跳转）。 */
   globalEntries(
     db: WorldDb,
     viewerId: number | null,
     before: { ts: number; id: number } | null,
     limit: number,
+    range?: { from?: number | undefined; to?: number | undefined },
   ): TimelineEntryRow[] {
     const viewerClause = viewerId !== null ? `${NOT_BLOCKED_AUTHOR} ${NOT_HIDDEN}` : '';
+    const conds: string[] = [];
+    if (before) conds.push('(activity_at < @ts OR (activity_at = @ts AND post_id < @cid))');
+    if (range?.from != null) conds.push('activity_at >= @from');
+    if (range?.to != null) conds.push('activity_at <= @to');
+    const whereClause = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     return db
       .prepare(
         `SELECT * FROM (
@@ -159,7 +165,7 @@ export const timelineRepo = {
            FROM posts p
            WHERE p.deleted = 0 AND p.reply_to_id IS NULL ${viewerClause}
          )
-         ${before ? CURSOR_CLAUSE : ''}
+         ${whereClause}
          ORDER BY activity_at DESC, post_id DESC
          LIMIT @limit`,
       )
@@ -167,6 +173,8 @@ export const timelineRepo = {
         limit,
         ...(viewerId !== null ? { viewerId } : {}),
         ...(before ? { ts: before.ts, cid: before.id } : {}),
+        ...(range?.from != null ? { from: range.from } : {}),
+        ...(range?.to != null ? { to: range.to } : {}),
       }) as TimelineEntryRow[];
   },
 

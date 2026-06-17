@@ -141,7 +141,7 @@
 | 转发 | `GET /api/users/:handle/timeline`（其 `type=repost`） | ✅ 存在，但**按账号**、无时间区间查询 |
 | 引用 | 顶层帖的一种（`quoteOfId` 非空），随 global / `?type=posts` 来 | ✅ |
 | **赞 / 关注 / 书签** | —— | ❌ **无任何按时间列出互动事件的端点**；world.db 互动表的时间戳也未经 API 暴露 → 见 T.1 |
-| **按时间区间查询**（跳到任意历史时段） | —— | ❌ 无 `from/to` 端点；只能从最新游标无限回翻 → 见 T.2 |
+| **按时间区间查询**（跳到任意历史时段） | `GET /api/timeline/global?from&to`（主轴顶层帖） | ✅ T.2 已加；回复/互动区间随 T.3 聚合 |
 | **列世界全部账号**（含从未发帖者） | `GET /api/users`（公开、游标分页、不含 isBot） | ✅ T.5 已加；轨道改从全部账号 roster ∪ 帖作者 |
 | 建历史 / 排程帖 | `POST /api/admin/posts`（带 `createdAt` / `replyToId`） | ✅ 后端已支持，供 T.6 轴上编辑 |
 
@@ -153,10 +153,12 @@
 - **结果**：2026-06-17 实现并冒烟通过——social 与编辑器后端代理均返回赞/转事件带时间戳、游标可翻页；五工作区 typecheck + editor build 全绿。**无需 migration**（三表已有 `created_at`）。
 - **交接提示**：赞/转/关注属真人也会有的数据 → 进 world.db、走社交站 API（分库原则），不走决策轨迹。游标三段 `[created_at, kind, ref]` 避免同毫秒（模拟器同 tick 多互动）翻页死循环。检视器分流赞/转（互动者 + 原帖卡）/关注（关注者→被关注者）。
 
-### T.2 跳转任意时间区间（time-range 查询）⬜
+### T.2 跳转任意时间区间（time-range 查询）✅
 - **目标**：用户直接跳到某历史时间区间查看，而非只能从最新游标无限回翻。
-- **改动**：`server` 或 `editor/src/server/`（帖子 / 互动按 `from&to` 时间区间查询端点），renderer 跳转后按区间加载。
-- **交接提示**：全站流是"按新近游标"，跳到很老时间需翻多页；time-range 端点是干净解法。
+- **改动**：`server` 全站流 `GET /api/timeline/global` 加可选 `from`/`to`（作用于 `activity_at`，timelineRepo.globalEntries 拼 WHERE 区间 + service/controller 透传）；`editor/src/server/` 代理透传 from/to；`editor/src/renderer/` `jumpToTime` 改为单请求按 `to=目标+半屏窗口` 拉该时间窗（替代逐页回翻），并入后滚到目标。
+- **结果**：2026-06-17 实现并冒烟通过——`?to=T` 只返回 `createdAt ≤ T` 的帖；编辑器后端代理透传正确。**无 migration**。
+- **范围说明**：本步只给**主轴顶层帖**做区间跳转（时间跳转的核心）。回复/互动的深度历史仍按账号封顶（EXTRA_PAGE_CAP），其区间取数随 **T.3 后端聚合**一并解决；跳转窗口与最近段之间的空隙由向后滚动渐进填补（块按时间绝对定位、postId 去重，无需连续）。
+- **交接提示**：全站流是"按新近游标"，跳到很老时间需翻多页；time-range 端点是干净解法。`exactOptionalPropertyTypes` 下区间参数类型须含 `| undefined`。
 
 ### T.3 编辑器后端时间轴聚合端点 ⬜
 - **目标**：把"全站流 + 互动 + 轨迹增强"的合并从 renderer 移入编辑器后端，定稳定接口 `GET /api/timeline?from&to&accounts`，renderer 吃单一接口、后续服务端改进只动后端内部。

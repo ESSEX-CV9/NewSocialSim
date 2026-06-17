@@ -140,15 +140,17 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const ppmRef = useRef(pxPerMin);
   ppmRef.current = pxPerMin;
   const pendingJumpRef = useRef<number | null>(null);
-  const jumpLoadsRef = useRef(0);
   const [, rerender] = useState(0);
 
   const backend = window.editor.backendUrl;
 
-  async function fetchFeed(cursor?: string): Promise<{ items: TimelineItem[]; nextCursor: string | null }> {
+  async function fetchFeed(
+    opts?: { cursor?: string | undefined; to?: number | undefined },
+  ): Promise<{ items: TimelineItem[]; nextCursor: string | null }> {
     const u = new URL(`${backend}/api/timeline/global`);
     u.searchParams.set('limit', String(FEED_LIMIT));
-    if (cursor) u.searchParams.set('cursor', cursor);
+    if (opts?.cursor) u.searchParams.set('cursor', opts.cursor);
+    if (opts?.to != null) u.searchParams.set('to', String(Math.round(opts.to))); // T.2 时间区间跳转
     const r = await fetch(u);
     if (!r.ok) throw new Error(`backend ${r.status}`);
     return (await r.json()) as { items: TimelineItem[]; nextCursor: string | null };
@@ -212,7 +214,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       let cursor: string | undefined;
       const acc: TimelineItem[] = [];
       for (let p = 0; p < INITIAL_PAGES; p++) {
-        const r = await fetchFeed(cursor);
+        const r = await fetchFeed({ cursor });
         acc.push(...r.items);
         cursor = r.nextCursor ?? undefined;
         if (!cursor) break;
@@ -229,7 +231,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     if (loadingOlderRef.current || !oldestCursorRef.current) return;
     loadingOlderRef.current = true;
     try {
-      const r = await fetchFeed(oldestCursorRef.current);
+      const r = await fetchFeed({ cursor: oldestCursorRef.current });
       ingestFeed(r.items);
       oldestCursorRef.current = r.nextCursor ?? null;
     } catch {
@@ -395,22 +397,31 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const trackWidth = Math.max(ax(maxTime), ax(now)) + RIGHT_PAD;
   const ready = blocks.length > 0;
 
-  /** 跳转视图到某时间（停止跟随；必要时向后加载至覆盖该时间）。 */
-  function jumpToTime(t: number): void {
+  /** 跳转视图到某时间（停止跟随）。目标早于已加载最早内容时，单请求按时间区间拉取该窗口（T.2），
+   *  直接落到目标附近，而非从最新游标逐页回翻。 */
+  async function jumpToTime(t: number): Promise<void> {
     setFollowing(false);
-    jumpLoadsRef.current = 0;
+    if (!ready || t < minTime) {
+      const halfWinMs = ((viewW / Math.max(0.1, ppmRef.current)) * 60_000) / 2;
+      try {
+        const r = await fetchFeed({ to: t + halfWinMs });
+        ingestFeed(r.items);
+      } catch {
+        /* 拉不到则停在现有范围 */
+      }
+    }
     pendingJumpRef.current = t;
     rerender((x) => x + 1);
   }
   function commitTimeEdit(): void {
     if (editingTime) {
       const t = parseSimTime(editingTime);
-      if (t != null) jumpToTime(t);
+      if (t != null) void jumpToTime(t);
     }
     setEditingTime(null);
   }
 
-  // 处理跳转：滚到目标时间居中；若早于已加载范围则继续向后加载（封顶）。
+  // 处理跳转：窗口已并入后，滚到目标时间居中并清除待跳转。
   useEffect(() => {
     const t = pendingJumpRef.current;
     if (t == null) return;
@@ -420,13 +431,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     el.scrollLeft = target;
     expectedLeftRef.current = target;
     setScrollX(target);
-    if (t < minTime && oldestCursorRef.current && jumpLoadsRef.current < 40) {
-      jumpLoadsRef.current++;
-      void loadOlder();
-    } else {
-      pendingJumpRef.current = null;
-      jumpLoadsRef.current = 0;
-    }
+    pendingJumpRef.current = null;
   });
 
   // 加载更老使 minTime 减小 → x 右移；非跟随且非跳转中时补偿 scrollLeft。

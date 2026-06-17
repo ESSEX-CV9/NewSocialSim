@@ -12,6 +12,17 @@ const pageQuerySchema = {
   },
 } as const;
 
+const globalQuerySchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    cursor: { type: 'string' },
+    limit: { type: 'integer', minimum: 1, maximum: 50 },
+    from: { type: 'integer', description: '只取 activity_at ≥ from 的帖（模拟时间 ms，T.2 时间跳转）' },
+    to: { type: 'integer', description: '只取 activity_at ≤ to 的帖（模拟时间 ms）' },
+  },
+} as const;
+
 const homeQuerySchema = {
   type: 'object',
   additionalProperties: false,
@@ -61,7 +72,7 @@ export function registerTimelineRoutes(app: FastifyInstance, deps: TimelineRoute
     },
     controller.forYou,
   );
-  app.get<{ Querystring: { cursor?: string; limit?: number } }>(
+  app.get<{ Querystring: { cursor?: string; limit?: number; from?: number; to?: number } }>(
     '/api/timeline/global',
     {
       preHandler: deps.optionalAuth,
@@ -70,7 +81,7 @@ export function registerTimelineRoutes(app: FastifyInstance, deps: TimelineRoute
         summary: '全站流（firehose）',
         operationId: 'getGlobalTimeline',
         security: OPTIONAL_JWT,
-        querystring: pageQuerySchema,
+        querystring: globalQuerySchema,
         response: { 200: pageOf('TimelineItem') },
       },
     },

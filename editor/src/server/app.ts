@@ -160,11 +160,11 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
     },
   );
 
-  // 全站时间流：时间轴块的主数据源（纯读 world.db、与模拟器无关）。
-  app.get<{ Querystring: { cursor?: string; limit?: string } }>(
+  // 全站时间流：时间轴块的主数据源（纯读 world.db、与模拟器无关）。from/to 供时间跳转（T.2）。
+  app.get<{ Querystring: { cursor?: string; limit?: string; from?: string; to?: string } }>(
     '/api/timeline/global',
     { schema: { tags: ['timeline'], summary: '全站流（时间轴主轴，代理）', operationId: 'getGlobalTimeline' } },
-    (req, reply) => proxyGet('/api/timeline/global', req.query, ['cursor', 'limit'], reply),
+    (req, reply) => proxyGet('/api/timeline/global', req.query, ['cursor', 'limit', 'from', 'to'], reply),
   );
 
   // 账号互动事件流：赞/转/关注（带时间），供时间轴互动块。

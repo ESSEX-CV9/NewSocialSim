@@ -47,10 +47,15 @@ export class TimelineService {
     return this.toHotPage(rows, pageSize, viewerId);
   }
 
-  global(viewerId: number | null, cursor?: string, limit?: number): Page<TimelineItem> {
+  global(
+    viewerId: number | null,
+    cursor?: string,
+    limit?: number,
+    range?: { from?: number | undefined; to?: number | undefined },
+  ): Page<TimelineItem> {
     const { db } = this.worldManager.current();
     const pageSize = clampLimit(limit);
-    const rows = timelineRepo.globalEntries(db, viewerId, decodeTsIdCursor(cursor), pageSize + 1);
+    const rows = timelineRepo.globalEntries(db, viewerId, decodeTsIdCursor(cursor), pageSize + 1, range);
     return this.toPage(rows, pageSize, viewerId);
   }
 

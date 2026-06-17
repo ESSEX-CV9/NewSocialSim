@@ -5843,6 +5843,24 @@
             "in": "query",
             "name": "limit",
             "required": false
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "in": "query",
+            "name": "from",
+            "required": false,
+            "description": "只取 activity_at ≥ from 的帖（模拟时间 ms，T.2 时间跳转）"
+          },
+          {
+            "schema": {
+              "type": "integer"
+            },
+            "in": "query",
+            "name": "to",
+            "required": false,
+            "description": "只取 activity_at ≤ to 的帖（模拟时间 ms）"
           }
         ],
         "security": [
