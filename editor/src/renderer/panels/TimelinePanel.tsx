@@ -32,6 +32,9 @@ const DAY_MS = 86_400_000;
 const INITIAL_AXIS_SPAN = 7 * DAY_MS; // 初始横轴左界 = 最新内容前 7 天（可自由拖滚到此范围）
 const AXIS_EXTEND = 3 * DAY_MS; // 拖到左边缘时再往更早扩 3 天
 const AXIS_EDGE_PX = 600; // 距左边缘多少像素内触发扩展
+const PREFETCH_CHUNK_MS = 12 * 3_600_000; // 后台预取每块 12 小时
+const PREFETCH_GAP_MS = 40; // 预取块之间让步间隔，避免占满
+const sleep = (ms: number): Promise<void> => new Promise((r) => window.setTimeout(r, ms));
 const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
 
 interface Anchor {
@@ -137,13 +140,13 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const postIdsRef = useRef<Set<number>>(new Set());
   const actKeysRef = useRef<Set<string>>(new Set());
   const coverToRef = useRef<number | null>(null); // 已加载到的最新时间（轮询据此向"现在"续接）
-  const loadingRef = useRef(false); // loadWindow 互斥，避免并发
   // 最近一次按可见窗口加载的区间；可见窗口落在其内则跳过重复加载。
   const lastLoadFromRef = useRef(Infinity);
   const lastLoadToRef = useRef(-Infinity);
   const originSimRef = useRef(0); // 当前 originSim（时间↔x 映射），供滚动时由像素反推可见时间
   const scrollLoadTimerRef = useRef<number | null>(null);
   const prevAxisFromRef = useRef<number | null>(null); // axisFrom 减小（左扩）时补偿 scrollLeft
+  const prefetchTokenRef = useRef(0); // 后台预取取消令牌（切世界/刷新即作废旧循环）
   const ppmRef = useRef(pxPerMin);
   ppmRef.current = pxPerMin;
   const viewWRef = useRef(viewW); // 供 poll useEffect 的陈旧闭包里读到当前视宽
@@ -170,10 +173,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return (await r.json()) as TimelineResult;
   }
 
-  /** 加载某时间窗口的完整内容（顶层帖 + 回复 + 互动 + roster），并入既有数据（按 id/key 去重）。 */
+  /** 加载某时间窗口的完整内容（顶层帖 + 回复 + 互动 + roster），并入既有数据（按 id/key 去重）。
+   *  不加互斥——用户滚动取数与后台预取可并发（结果幂等去重），互斥会让用户取数被后台挤掉。 */
   async function loadWindow(from: number, to: number): Promise<void> {
-    if (loadingRef.current) return;
-    loadingRef.current = true;
     try {
       const r = await fetchTimeline({ from, to });
       if (r.accounts.length) setRoster(r.accounts.map((a) => ({ handle: a.handle, displayName: a.displayName })));
@@ -182,9 +184,23 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       setError(null);
     } catch (e) {
       setError(String(e));
-    } finally {
-      loadingRef.current = false;
     }
+  }
+
+  /** 后台预取：初始秒显后，由近及远把 [fromTime, toTime] 按 12h 一块悄悄拉完，
+   *  使拖滚到该范围任意时段时数据已在内存、瞬间出现。切世界/刷新令牌作废即停。 */
+  function startPrefetch(fromTime: number, toTime: number): void {
+    const token = ++prefetchTokenRef.current;
+    void (async () => {
+      let cursor = toTime;
+      while (cursor > fromTime) {
+        if (prefetchTokenRef.current !== token) return; // 已作废
+        const from = Math.max(fromTime, cursor - PREFETCH_CHUNK_MS);
+        await loadWindow(from, cursor);
+        cursor = from;
+        await sleep(PREFETCH_GAP_MS);
+      }
+    })();
   }
 
   /** 一次加载的时间跨度：至少 1.5 个可见屏宽或 6 小时（缩得越远一次取越多）。 */
@@ -241,6 +257,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
         pendingJumpRef.current = latest;
       }
       setError(null);
+      // 后台把整条初始轴（最新内容前 7 天）预取完，使拖滚到任意时段都即时
+      if (times.length) startPrefetch(latest - INITIAL_AXIS_SPAN, latest);
     } catch (e) {
       setError(String(e));
     }
@@ -317,6 +335,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     const tid = setInterval(() => rerender((t) => t + 1), TICK_MS);
     return () => {
       alive = false;
+      prefetchTokenRef.current++; // 卸载即停后台预取
       clearInterval(pid);
       clearInterval(tid);
     };

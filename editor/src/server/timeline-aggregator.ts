@@ -45,7 +45,16 @@ async function getJson<T>(url: string): Promise<T | null> {
   }
 }
 
+// roster 短 TTL 缓存：时间轴按窗口加载/后台预取会高频聚合，避免每次重拉全部账号。
+// TTL 用真实时间（缓存新鲜度，非世界业务时间）；切世界后至多 TTL 内 roster 略旧，可接受。
+let rosterCache: { at: number; api: string; roster: UserSummary[] } | null = null;
+const ROSTER_TTL_MS = 5000;
+
 async function fetchRoster(api: string): Promise<UserSummary[]> {
+  const nowReal = Date.now();
+  if (rosterCache && rosterCache.api === api && nowReal - rosterCache.at < ROSTER_TTL_MS) {
+    return rosterCache.roster;
+  }
   const all: UserSummary[] = [];
   let cursor: string | undefined;
   for (let p = 0; p < 20; p++) {
@@ -58,6 +67,7 @@ async function fetchRoster(api: string): Promise<UserSummary[]> {
     if (!j.nextCursor) break;
     cursor = j.nextCursor;
   }
+  rosterCache = { at: nowReal, api, roster: all };
   return all;
 }
 
