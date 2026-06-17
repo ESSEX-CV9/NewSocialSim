@@ -442,9 +442,18 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     const el = tlRef.current;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
-      if (!e.ctrlKey) return;
-      e.preventDefault();
-      setPxPerMin((p) => clamp(+(p * (e.deltaY < 0 ? 1.12 : 1 / 1.12)).toFixed(2), MIN_PPM, MAX_PPM));
+      if (e.ctrlKey) {
+        // Ctrl+滚轮：缩放
+        e.preventDefault();
+        setPxPerMin((p) => clamp(+(p * (e.deltaY < 0 ? 1.12 : 1 / 1.12)).toFixed(2), MIN_PPM, MAX_PPM));
+        return;
+      }
+      if (e.altKey) {
+        // Alt+滚轮：横向滚动（行模式换算成像素）
+        e.preventDefault();
+        const d = e.deltaY !== 0 ? e.deltaY : e.deltaX;
+        el.scrollLeft += e.deltaMode === 1 ? d * 16 : d;
+      }
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -529,7 +538,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
             <i className="ri-focus-3-line" /> 回到现在
           </button>
         )}
-        <span className="ml-auto flex items-center gap-1.5 text-(--dim)" title="缩放（也可在时间轴内 Ctrl+滚轮）">
+        <span className="ml-auto flex items-center gap-1.5 text-(--dim)" title="缩放（时间轴内 Ctrl+滚轮缩放、Alt+滚轮横向滚动）">
           <i className="ri-zoom-out-line" />
           <input
             type="range"
