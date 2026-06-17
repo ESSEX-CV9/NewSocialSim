@@ -167,10 +167,11 @@
 - **范围说明 / 后续重构**：T.3 落地后又由"看不到历史互动"牵出取数重构（同日，详见日志 `2026-06-17-时间轴完善与取数重构.md`）：①给互动/回复端点补 `from/to`，聚合器窗口模式在区间内翻全 → **消除"按账号只取最新 N 条"丢历史**；②renderer 改**稳定横轴 + 按可见窗口加载**（横轴不再耦合已加载 minTime，可拖滚到任意时段）；③**后台预取整条轴**消除拖动空白 + 聚合器 roster 短 TTL 缓存。**稳定接口的意义验证**：以上 ①②③ 全程未改 renderer 与 aggregator 的对外契约，将来再给社交站补全局 by-time 端点提升大世界扩展性时同样只动 aggregator 内部。
 - **交接提示**：符合「API 优先 + 编辑器后端是 renderer 唯一数据源 / 负责聚合」。renderer 不再直接调 `/api/timeline/global` / `/api/users/:h/*`（那些代理保留供调试）。聚合每次全量调用重做 roster + 按账号扇出，roster 大时较重——后续可在 aggregator 内加缓存或换全局端点，renderer 无感。
 
-### T.4 帖子↔决策轨迹"为什么"合并 ⬜
+### T.4 帖子↔决策轨迹"为什么"合并 ✅
 - **目标**：点开帖子块，检视器在帖子预览下附该动作的决策轨迹（模拟器发的帖才有）。
-- **改动**：`shared`（`SimTraceEvent` 加 `postId`）、`simulator`（发帖后把新帖 id 写进轨迹）、`editor`（按 postId 关联 trace 与 post，检视器合并展示）。
-- **交接提示**：即此前所说"B 轮"。轨迹缺 `postId` 是当前无法关联的唯一缺口。
+- **改动**：`shared`（`SimTraceEvent` 加 `postId`）、`simulator`（`trace-sink` 加 `post_id` 列 + v1→v2 迁移；PostingSystem / CascadeSystem 发帖/回复后写产出帖 id 进轨迹）、`editor`（`trace-reader` / `GET /api/trace` 支持 `postId` / `targetPostId` / `action` 过滤；检视器按 postId 精确关联帖子块、按 entity+targetPostId+action 关联赞/转块，展示意图/形态/池/配图原因等）。
+- **结果**：2026-06-17 实现，模块级冒烟 8/8（迁移 + postId 往返 + 三种关联查询）。帖子块带**兜底关联**：无 `post_id` 的老轨迹按 账号+动作+时间窗（simTime≈createdAt）取最接近一条，使上线前的老帖也能显示"为什么"；新帖走 postId 精确命中。
+- **交接提示**：精确路径只对本特性上线后模拟器产出的帖有效（老轨迹 `post_id` 为空、补不回，靠兜底近似）。种子/真人帖无轨迹属正常。
 
 ### T.5 列全部世界账号（轨道完整）✅
 - **目标**：轨道含世界全部账号（含从未发帖 / 纯真人账号），不止全站流里出现过作者的。
@@ -178,9 +179,11 @@
 - **结果**：2026-06-17 实现并冒烟通过——`GET /api/users` 返回全部账号无 isBot；时间轴轨道列全。server spec 102 路径 / editor 14。
 - **交接提示**：列账号属真人也有的数据 → 进 world.db、走公开 API（不暴露 isBot，符合账号模型约束）。renderer 的 `accounts`（驱动 fetchAccountExtra）与 `lanes` 均改为 roster ∪ 帖作者，roster 拉不到时退回从内容发现。
 
-### T.6 轴上编辑与轴维度切换 ⬜
+### T.6 轴上编辑与轴维度切换 🟡（部分）
 - **目标**：`m5-design.md` 的"在轴上添加 / 移动帖子（预填历史 / 排程未来）""纵轴切按话题 / 世界事件""选中部分 NPC 只看其轨道"。
-- **改动**：`editor`（编辑交互、轴维度切换）；建历史帖走 `POST /api/admin/posts`（已支持 `createdAt` / `replyToId`）。
+- **已完成**：**选中部分账号只看其轨道**——时间轴左栏重做为常驻轨道管理面板（搜索筛选 + 多选勾选 + 全选/清空 + 有内容/未活跃分组折叠），纯前端过滤已加载数据，可扩展到大量账号。
+- **未完成（押后）**：轴上添加帖子、轴上移动帖子、纵轴维度切换（按话题 / 世界事件）。这三块属"世界初始化与预填"工种，且依赖 Phase 1-3 才定型的模型（池/语法可追溯、配图、回复挂楼、话题拆分），及尚不存在的"世界事件"概念与服务端 `created_at` 改时端点 —— 故与「世界初始化与预填」里程碑一并做，不阻塞 Phase 1。
+- **改动**：`editor`（编辑交互、轴维度切换）；建历史帖走 `POST /api/admin/posts`（已支持 `createdAt` / `replyToId`）；移动帖子需新增 server 改 `created_at` 端点；添加帖子需编辑器后端 admin 写代理。
 
 ---
 
@@ -193,7 +196,7 @@
 - **目标**：实现加载全局 defaults + 世界级 override 并 deep-merge 的 TuningService，提供 `get(path)`，先供内容池组装权重取值。
 - **改动**：`data/global-config/defaults.json`（初稿，至少含 `pools` 命名空间的权重）、`simulator/src/`（TuningService：加载、deep-merge、`get`）；世界级 override 读 `data/worlds/<id>/tuning.json`。
 - **验收**：内容池组装的语法权重 / slangDensity / novelty 系数全部经 `tuning.get(...)` 取得，代码中无对应字面量；写一个世界 `tuning.json` override 某系数，组装行为随之变化。
-- **交接提示**：这是完整 Tuning 层（M5-X.0）的最小子集，后续在状态机阶段补全 `evalDerive` / `reload` / `onChange` 与编辑器 Tuning 面板。命名空间结构以 `docs/m5-npc-state-machine.md`「Tuning 配置层」节为准，本步只落 `pools` 一组。世界级配置供给方式（经 server admin 端点 vs 模拟器按活动世界 id 直读文件）取与 npc-profiles 一致的范式优先；若 API 表面膨胀过快，再改为直读世界文件夹。
+- **交接提示**：这是完整 Tuning 层（M5-X.0）的最小子集，后续在状态机阶段补全 `evalDerive` / `reload` / `onChange` 与编辑器 Tuning 面板。命名空间结构以 `docs/m5-npc-state-machine.md`「Tuning 配置层」节为准，本步只落 `pools` 一组。**配置范式已定（见 `docs/m5-x-phase1-baseline.md`）：模拟器用 `dataDir` 直读 `data/global-config/defaults.json` + 世界 `tuning.json` 自行 deep-merge，社交站 server 不经手模拟器域配置；编辑器面板改配置经编辑器后端直接读写文件。** 不走 server admin 端点。
 
 ### 1.1 内容池三层 schema 与加载 ⬜
 

@@ -9,6 +9,7 @@
 - `docs/m5-x-re-plan.md` — 本轮纲领【设计+进度】：先确定性后 LLM、四步阶梯（Step 0 地基 → 1 顶层帖 → 2 配图 → 3 回复）、三条数据线、编辑器双层、内容池 ECS 模型 + 篇幅维度 + NPC 私有池。
 - `docs/m5-x-roadmap.md` — 施工路线图【设计+进度】：把四步阶梯展开为单提交级原子步，每步含目标 / 改动 / 验收 / 交接提示，模拟器与编辑器面板逐步同步长出；后续状态机层与 GM 层粗线条占位。接手具体某步先读此文件。
 - `docs/m5-real-usage-contract.md` — 模拟器真实使用契约【约束】：跟随活动世界、账号模型、形态忠实、媒体、金标准端到端验收（须在全新世界跑通）。
+- `docs/m5-x-phase1-baseline.md` — Phase 1 基线【约束+现状】：配置范式（模拟器直读世界文件夹配置、social server 不经手）、当前 npc-profiles/内容池/话题的送达现状、各旧件在 1.x 各步的处置、`data/` 目录入 git 约定。
 
 ### 2. NPC 与内容设计
 - `docs/m5-npc-state-machine.md` — 【设计】NPC 三层数据与存储（一 NPC 一文件夹 / 文件为准·DB 副本）、数值五层（Alignment/Persona/Mood/关系/Activity FSM）、RP 资料层、关系两面与阶段化、内容池 ECS（组件类型→语法→池）。
