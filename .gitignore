@@ -1,7 +1,10 @@
 node_modules/
 dist/
 out/
-data/
+# data/ 运行时数据不入 git，但全局共享配置/原子池入 git（见 docs/m5-x-phase1-baseline.md）
+data/*
+!data/global-config/
+!data/global-pools/
 *.log
 .env
 

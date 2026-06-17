@@ -4,6 +4,7 @@ import { PostingSystem } from './systems/posting-system.js';
 import { InteractionSystem } from './systems/interaction-system.js';
 import { CascadeSystem } from './systems/cascade-system.js';
 import { TraceSink } from './trace/trace-sink.js';
+import { TuningService } from './tuning/tuning-service.js';
 import type { System, Entity, TickContext, SimulatorConfig, DrivenAccount } from './ecs/types.js';
 import type { SimulatorHeartbeat } from '@socialsim/shared';
 import { logger } from './logger.js';
@@ -40,6 +41,7 @@ interface WorldSession {
 export class Simulator {
   private api: ApiClient;
   private traceSink: TraceSink;
+  private tuning: TuningService;
   private session: WorldSession | null = null;
   private clock: WorldClock | null = null;
   private running = false;
@@ -51,6 +53,7 @@ export class Simulator {
   constructor(private config: SimulatorConfig) {
     this.api = new ApiClient({ baseUrl: config.apiBaseUrl });
     this.traceSink = new TraceSink(config.dataDir, config.traceSinkUrl);
+    this.tuning = new TuningService(config.dataDir);
   }
 
   start(): void {
@@ -149,6 +152,8 @@ export class Simulator {
     }
 
     this.traceSink.setWorld(worldId);
+    // 直读世界文件夹的配置：全局 defaults + 世界级 tuning.json override（见 docs/m5-x-phase1-baseline.md）。
+    this.tuning.load(worldId);
 
     const registry = new EntityRegistry();
     let profiles: Awaited<ReturnType<ApiClient['getNpcProfiles']>>['profiles'] = [];

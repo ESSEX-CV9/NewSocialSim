@@ -1,0 +1,9 @@
+{
+  "pools": {
+    "alignmentMatchWeight": { "match": 1.5, "neutral": 1.0, "mismatch": 0.6 },
+    "noveltyWindowMs": 1800000,
+    "noveltyPenalty": 0.4,
+    "grammarWeightFloor": 0.01,
+    "compositionByDensity": { "prefixProb": "slangDensity", "suffixProb": "slangDensity * 0.6" }
+  }
+}
