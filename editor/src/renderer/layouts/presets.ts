@@ -17,7 +17,7 @@ export const PRESETS: Preset[] = [
   // 观察：控制台顶部通栏；下方时间轴(宽) | 检视器(窄)并排。
   { id: 'observe', name: '观察', panes: ['console', 'timeline', 'inspector'], build: buildObserve },
   { id: 'npc', name: 'NPC 建设', panes: ['npc', 'inspector'] },
-  { id: 'pools', name: '内容池', panes: ['pools', 'inspector'] },
+  { id: 'pools', name: '内容池', panes: ['pools', 'pools', 'preview'], build: buildPools },
   { id: 'lore', name: '设定', panes: ['lore', 'inspector'] },
 ];
 
@@ -48,6 +48,22 @@ export function applyPanes(api: DockviewApi, panes: string[]): void {
     });
     prevId = panel.id;
   });
+}
+
+/** 内容池布局：左 内容池（语法）| 右上 内容池（组件）/ 右下 预览器。 */
+function buildPools(api: DockviewApi): void {
+  api.clear();
+  const base = (id: string, type: string, params: Record<string, unknown>) => ({
+    id,
+    component: 'pane-host',
+    title: panelById[type]?.title ?? type,
+    params: { panelType: type, ...params },
+  });
+  api.addPanel(base('pane-1', 'pools', { tab: 'grammar' }));
+  // 右侧再开一个内容池面板，默认组件 tab（便于把组件拖进左边语法槽位）。
+  const right = api.addPanel({ ...base('pane-2', 'pools', { tab: 'component' }), position: { referencePanel: 'pane-1', direction: 'right' } });
+  // 预览器贴在右侧面板下方。
+  api.addPanel({ ...base('pane-3', 'preview', {}), position: { referencePanel: right.id, direction: 'below' } });
 }
 
 /** 观察布局：控制台顶部通栏；下方 时间轴(宽) | 检视器(窄) 并排。 */

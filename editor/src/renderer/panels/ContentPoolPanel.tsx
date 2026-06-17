@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { Fragment, GrammarSlot, PoolGrammarRef, PoolPreviewResponse } from '@socialsim/shared';
+import type { Fragment, GrammarSlot, PoolGrammarRef } from '@socialsim/shared';
+import { runPreview } from '../state/preview-bus.js';
 
 /**
- * 内容池面板（1.6 打磨版）：三区布局——左、右上都是内容池浏览器（可切 池/语法/组件，默认左语法、
- * 右上组件），右下是独立预览器（点预览才出结果）。语法用卡片条编辑：组件可从右上拖入槽位；
- * 槽位详情用小选择窗选组件、用勾选其它槽位来组互斥组。组件/语法/池都支持分组（=子文件夹）。
+ * 内容池面板（单一面板）：一个内容池浏览器——可切 池/语法/组件 tab，分组列表 + 编辑器。
+ * 语法用卡片条编辑：组件可从另一个内容池面板（组件 tab）拖入槽位；槽位详情用小选择窗选组件、
+ * 用勾选其它槽位来组互斥组。组件/语法/池都支持分组（=子文件夹）。
+ *
+ * 布局（左内容池 | 右上内容池 | 右下预览器）由 dockview 预设布局编排（layouts/presets「内容池」），
+ * 预览结果经 preview-bus 推到独立的预览器面板，不在本面板内部出。
+ * 默认 tab 可由 dockview 面板参数 `params.tab` 指定（预设用它让右侧那格默认组件 tab）。
  */
 
 type Scope = 'global' | 'world';
@@ -35,14 +40,10 @@ function colorOf(s: string): string {
   return GROUP_COLORS[h % GROUP_COLORS.length]!;
 }
 
-interface PreviewState { samples: string[]; msg: string | null; loading: boolean }
-
-export function ContentPoolPanel(_props: IDockviewPanelProps) {
+export function ContentPoolPanel(props: IDockviewPanelProps) {
   const [view, setView] = useState<PoolsView | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<PreviewState>({ samples: [], msg: null, loading: false });
-  const [leftW, setLeftW] = useState(50);
-  const [topH, setTopH] = useState(58);
+  const defaultTab = ((props.params as { tab?: Tab } | undefined)?.tab) ?? 'grammar';
 
   const load = useCallback(async () => {
     try {
@@ -54,71 +55,13 @@ export function ContentPoolPanel(_props: IDockviewPanelProps) {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const requestPreview = useCallback(async (pool: unknown, grammars?: Record<string, unknown>) => {
-    setPreview({ samples: [], msg: null, loading: true });
-    const body: Record<string, unknown> = { pool, count: 8 };
-    if (grammars) body.grammars = grammars;
-    try {
-      const res = await api('/api/content-pools/preview', body);
-      if (res.status === 503) { setPreview({ samples: [], msg: '模拟器未运行，启动后可预览。', loading: false }); return; }
-      const data = (await res.json()) as PoolPreviewResponse;
-      if (!data.samples?.length) setPreview({ samples: [], msg: `没组装出内容（失败 ${data.failed ?? 0} 次）——检查语法/组件是否齐全。`, loading: false });
-      else setPreview({ samples: data.samples.map((s) => s.text), msg: null, loading: false });
-    } catch (e) { setPreview({ samples: [], msg: String(e), loading: false }); }
-  }, []);
-
-  function dragX(setter: (v: number) => void, axis: 'x' | 'y', el: HTMLElement) {
-    const rect = el.getBoundingClientRect();
-    const onMove = (e: MouseEvent) => {
-      const pct = axis === 'x' ? ((e.clientX - rect.left) / rect.width) * 100 : ((e.clientY - rect.top) / rect.height) * 100;
-      setter(Math.min(80, Math.max(20, pct)));
-    };
-    const onUp = () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-  }
-
   if (error) return <div className="p-3.5"><p className="text-(--pink) text-sm">编辑器后端不可达：{error}</p></div>;
   if (!view) return <div className="p-3.5"><p className="text-(--dim) text-sm">加载中…</p></div>;
 
-  return (
-    <div className="flex h-full text-(--text)" id="cp-root">
-      <div style={{ width: `${leftW}%` }} className="min-w-0 h-full">
-        <PoolBrowser view={view} defaultTab="grammar" onSaved={load} onPreview={requestPreview} />
-      </div>
-      <div
-        className="w-1 shrink-0 cursor-col-resize bg-(--border) hover:bg-(--blue)"
-        onMouseDown={(e) => { e.preventDefault(); dragX(setLeftW, 'x', document.getElementById('cp-root')!); }}
-      />
-      <div style={{ width: `${100 - leftW}%` }} className="min-w-0 h-full flex flex-col" id="cp-right">
-        <div style={{ height: `${topH}%` }} className="min-h-0">
-          <PoolBrowser view={view} defaultTab="component" onSaved={load} onPreview={requestPreview} />
-        </div>
-        <div
-          className="h-1 shrink-0 cursor-row-resize bg-(--border) hover:bg-(--blue)"
-          onMouseDown={() => dragX(setTopH, 'y', document.getElementById('cp-right')!)}
-        />
-        <div style={{ height: `${100 - topH}%` }} className="min-h-0 overflow-y-auto">
-          <Previewer state={preview} />
-        </div>
-      </div>
-    </div>
-  );
+  return <PoolBrowser view={view} defaultTab={defaultTab} onSaved={load} onPreview={runPreview} />;
 }
 
-function Previewer({ state }: { state: PreviewState }) {
-  return (
-    <div className="p-3 h-full">
-      <h4 className="text-xs font-semibold mb-2 flex items-center gap-1.5 text-(--dim)"><i className="ri-eye-line" /> 预览器</h4>
-      {state.loading && <p className="text-(--dim) text-sm">组装中…</p>}
-      {!state.loading && state.msg && <p className="text-(--dim) text-sm">{state.msg}</p>}
-      {!state.loading && !state.msg && !state.samples.length && <p className="text-(--dim) text-sm">点某个池或语法的「预览」查看组装结果。</p>}
-      <ul className="space-y-1.5">{state.samples.map((s, i) => <li key={i} className="text-sm border-b border-[#15171b] pb-1.5">{s}</li>)}</ul>
-    </div>
-  );
-}
-
-// ============ 内容池浏览器（左、右上各一个）============
+// ============ 内容池浏览器 ============
 
 interface BrowserProps {
   view: PoolsView;
