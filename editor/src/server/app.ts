@@ -296,9 +296,19 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
   const traceSse = new TraceSseHub();
 
   /** 按 sim_time 区间查活动世界的轨迹事件；世界没跑过模拟器返回空集。 */
-  app.get<{ Querystring: { from?: string; to?: string; entity?: string; limit?: string } }>(
+  app.get<{
+    Querystring: {
+      from?: string;
+      to?: string;
+      entity?: string;
+      limit?: string;
+      postId?: string;
+      targetPostId?: string;
+      action?: string;
+    };
+  }>(
     '/api/trace',
-    { schema: { tags: ['trace'], summary: '按模拟时间区间查决策轨迹', operationId: 'getTrace' } },
+    { schema: { tags: ['trace'], summary: '按模拟时间区间查决策轨迹（postId/targetPostId/action 精确关联块）', operationId: 'getTrace' } },
     async (req, reply) => {
       const id = await activeWorldId();
       if (!id) {
@@ -315,6 +325,9 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
         to: num(req.query.to),
         entity: req.query.entity || undefined,
         limit: num(req.query.limit),
+        postId: req.query.postId || undefined,
+        targetPostId: req.query.targetPostId || undefined,
+        action: req.query.action || undefined,
       });
       return { events };
     },

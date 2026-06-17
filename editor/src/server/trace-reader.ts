@@ -27,6 +27,7 @@ interface TraceRow {
   media_attached: number;
   media_reason: string | null;
   target_post_id: string | null;
+  post_id: string | null;
 }
 
 export interface TraceQuery {
@@ -38,6 +39,12 @@ export interface TraceQuery {
   entity?: string | undefined;
   /** 返回条数上限（防一次拉爆），缺省 2000、硬上限 10000。 */
   limit?: number | undefined;
+  /** 精确取产出该帖的轨迹（post/reply/quote 块「为什么」增强用，匹配 post_id）。 */
+  postId?: string | undefined;
+  /** 精确取作用于该帖的轨迹（like/repost 块「为什么」增强用，匹配 target_post_id）。 */
+  targetPostId?: string | undefined;
+  /** 限定动作类型（如 like/repost，与 targetPostId 联用区分同帖的赞/转）。 */
+  action?: string | undefined;
 }
 
 const DEFAULT_LIMIT = 2000;
@@ -62,10 +69,22 @@ export class TraceReader {
         where.push('entity = @entity');
         params.entity = q.entity;
       }
+      if (q.postId) {
+        where.push('post_id = @postId');
+        params.postId = q.postId;
+      }
+      if (q.targetPostId) {
+        where.push('target_post_id = @targetPostId');
+        params.targetPostId = q.targetPostId;
+      }
+      if (q.action) {
+        where.push('action = @action');
+        params.action = q.action;
+      }
       const rows = db
         .prepare(
           `SELECT id, at, sim_time, entity, action, activity_state, intent, shape,
-                  pool_id, entry_id, media_attached, media_reason, target_post_id
+                  pool_id, entry_id, media_attached, media_reason, target_post_id, post_id
              FROM trace_event
             WHERE ${where.join(' AND ')}
             ORDER BY sim_time ASC, id ASC
@@ -99,5 +118,6 @@ function mapRow(r: TraceRow): StoredSimTraceEvent {
     mediaAttached: r.media_attached === 1,
     mediaReason: r.media_reason,
     targetPostId: r.target_post_id,
+    postId: r.post_id,
   };
 }

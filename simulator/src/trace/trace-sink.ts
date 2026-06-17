@@ -44,7 +44,8 @@ export class TraceSink {
           entry_id TEXT,
           media_attached INTEGER NOT NULL DEFAULT 0,
           media_reason TEXT,
-          target_post_id TEXT
+          target_post_id TEXT,
+          post_id TEXT
         );
         CREATE INDEX IF NOT EXISTS idx_trace_sim_time ON trace_event(sim_time);
         CREATE INDEX IF NOT EXISTS idx_trace_entity_sim_time ON trace_event(entity, sim_time);
@@ -60,14 +61,21 @@ export class TraceSink {
         );
         CREATE INDEX IF NOT EXISTS idx_gm_log_at ON gm_agent_log(at);
       `);
-      if (db.pragma('user_version', { simple: true }) === 0) {
-        db.pragma('user_version = 1');
+      // 迁移 v1→v2：老库的 trace_event 无 post_id 列（CREATE TABLE IF NOT EXISTS 不补列），按需 ALTER 补上，
+      // 再建 post_id 索引（须在列存在后，否则对老库会报"no such column"）。
+      const cols = db.prepare('PRAGMA table_info(trace_event)').all() as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === 'post_id')) {
+        db.exec('ALTER TABLE trace_event ADD COLUMN post_id TEXT');
+      }
+      db.exec('CREATE INDEX IF NOT EXISTS idx_trace_post_id ON trace_event(post_id)');
+      if ((db.pragma('user_version', { simple: true }) as number) < 2) {
+        db.pragma('user_version = 2');
       }
       this.insertStmt = db.prepare(`
         INSERT INTO trace_event
-          (at, sim_time, entity, action, activity_state, intent, shape, pool_id, entry_id, media_attached, media_reason, target_post_id)
+          (at, sim_time, entity, action, activity_state, intent, shape, pool_id, entry_id, media_attached, media_reason, target_post_id, post_id)
         VALUES
-          (@at, @simTime, @entity, @action, @activityState, @intent, @shape, @poolId, @entryId, @mediaAttached, @mediaReason, @targetPostId)
+          (@at, @simTime, @entity, @action, @activityState, @intent, @shape, @poolId, @entryId, @mediaAttached, @mediaReason, @targetPostId, @postId)
       `);
       this.db = db;
       this.worldId = worldId;
@@ -96,6 +104,7 @@ export class TraceSink {
         mediaAttached: event.mediaAttached ? 1 : 0,
         mediaReason: event.mediaReason ?? null,
         targetPostId: event.targetPostId ?? null,
+        postId: event.postId ?? null,
       });
       this.push({ ...event, id: Number(info.lastInsertRowid) });
     } catch (err) {

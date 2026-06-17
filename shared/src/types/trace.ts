@@ -33,6 +33,11 @@ export interface SimTraceEvent {
   mediaReason?: string | null;
   /** reply/quote/like/repost 时为被作用帖 id；其余为 null。 */
   targetPostId?: string | null;
+  /**
+   * 本动作**产出**的帖 id（post/reply/quote 时为新帖 id；like/repost/follow 为 null）。
+   * 供编辑器把帖子块与其决策轨迹按 id 精确关联（T.4「为什么」增强层）——区别于 targetPostId（被作用的父帖）。
+   */
+  postId?: string | null;
 }
 
 /**

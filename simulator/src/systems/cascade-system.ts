@@ -114,7 +114,7 @@ export class CascadeSystem implements System {
             logger.info(`[${entity.profile.handle}] cascade-replied to post ${reaction.postId}: "${replyContent.slice(0, 30)}..."`);
             this.trace.emit({
               at: Date.now(), simTime: ctx.simTime, entity: entity.profile.handle,
-              action: 'reply', shape: 'reply', intent: 'earnest', targetPostId: reaction.postId,
+              action: 'reply', shape: 'reply', intent: 'earnest', targetPostId: reaction.postId, postId: reply.id,
             });
 
             this.triggerCascadeForReply(reply.id, entity, ctx, reaction.depth + 1);

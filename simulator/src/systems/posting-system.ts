@@ -99,6 +99,7 @@ export class PostingSystem implements System {
         entryId: null,
         mediaAttached: false,
         targetPostId: null,
+        postId: result.id,
       });
     } catch (err) {
       logger.error(`[${entity.profile.handle}] post failed:`, err);

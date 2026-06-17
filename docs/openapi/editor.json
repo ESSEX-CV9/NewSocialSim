@@ -232,7 +232,7 @@
     "/api/trace": {
       "get": {
         "operationId": "getTrace",
-        "summary": "按模拟时间区间查决策轨迹",
+        "summary": "按模拟时间区间查决策轨迹（postId/targetPostId/action 精确关联块）",
         "tags": [
           "trace"
         ],
