@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { REQUIRE_JWT, pageOf } from '../../core/openapi/swagger.js';
 import { FollowsController } from './follows.controller.js';
 import type { FollowsService } from './follows.service.js';
 
@@ -29,6 +29,13 @@ export function registerFollowsRoutes(app: FastifyInstance, deps: FollowsRoutesD
         summary: '关注',
         operationId: 'followUser',
         security: REQUIRE_JWT,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { following: { type: 'boolean' } },
+          },
+        },
       },
     },
     controller.follow,
@@ -42,6 +49,13 @@ export function registerFollowsRoutes(app: FastifyInstance, deps: FollowsRoutesD
         summary: '取关',
         operationId: 'unfollowUser',
         security: REQUIRE_JWT,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { following: { type: 'boolean' } },
+          },
+        },
       },
     },
     controller.unfollow,
@@ -54,6 +68,7 @@ export function registerFollowsRoutes(app: FastifyInstance, deps: FollowsRoutesD
         summary: '粉丝',
         operationId: 'listFollowers',
         querystring: pageQuerySchema,
+        response: { 200: pageOf('UserSummary') },
       },
     },
     controller.followers,
@@ -66,6 +81,7 @@ export function registerFollowsRoutes(app: FastifyInstance, deps: FollowsRoutesD
         summary: '关注列表',
         operationId: 'listFollowing',
         querystring: pageQuerySchema,
+        response: { 200: pageOf('UserSummary') },
       },
     },
     controller.following,

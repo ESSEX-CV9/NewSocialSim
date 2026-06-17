@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { envelope, ref } from '../../core/openapi/swagger.js';
 import { WorldsController } from './worlds.controller.js';
 import { WorldsService } from './worlds.service.js';
 
@@ -100,22 +101,58 @@ export function registerWorldsRoutes(app: FastifyInstance, deps: WorldsRoutesDep
 
   app.get(
     '/api/admin/worlds',
-    { schema: { tags: [TAG], summary: '列世界', operationId: 'listWorlds' } },
+    {
+      schema: {
+        tags: [TAG],
+        summary: '列世界',
+        operationId: 'listWorlds',
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { worlds: { type: 'array', items: ref('WorldSummary') } },
+          },
+        },
+      },
+    },
     controller.list,
   );
   app.post(
     '/api/admin/worlds',
-    { schema: { tags: [TAG], summary: '创建世界', operationId: 'createWorld', body: createWorldBodySchema } },
+    {
+      schema: {
+        tags: [TAG],
+        summary: '创建世界',
+        operationId: 'createWorld',
+        body: createWorldBodySchema,
+        response: { 201: envelope('world', 'WorldMeta') },
+      },
+    },
     controller.create,
   );
   app.post(
     '/api/admin/worlds/:id/activate',
-    { schema: { tags: [TAG], summary: '激活（切换）世界', operationId: 'activateWorld', params: worldIdParamsSchema } },
+    {
+      schema: {
+        tags: [TAG],
+        summary: '激活（切换）世界',
+        operationId: 'activateWorld',
+        params: worldIdParamsSchema,
+        response: { 200: { type: 'object', additionalProperties: true } },
+      },
+    },
     controller.activate,
   );
   app.get(
     '/api/admin/worlds/active',
-    { schema: { tags: [TAG], summary: '活动世界 + 当前模拟时间', operationId: 'getActiveWorld' } },
+    {
+      schema: {
+        tags: [TAG],
+        summary: '活动世界 + 当前模拟时间',
+        operationId: 'getActiveWorld',
+        response: { 200: ref('ActiveWorldInfo') },
+      },
+    },
     controller.active,
   );
   app.patch(
@@ -127,6 +164,7 @@ export function registerWorldsRoutes(app: FastifyInstance, deps: WorldsRoutesDep
         operationId: 'updateWorldMeta',
         params: worldIdParamsSchema,
         body: updateMetaBodySchema,
+        response: { 200: envelope('world', 'WorldMeta') },
       },
     },
     controller.updateMeta,
@@ -139,6 +177,7 @@ export function registerWorldsRoutes(app: FastifyInstance, deps: WorldsRoutesDep
         summary: '时钟控制（暂停/恢复/调速/跳转）',
         operationId: 'controlWorldClock',
         body: clockControlBodySchema,
+        response: { 200: envelope('clock', 'ClockState') },
       },
     },
     controller.clockControl,
@@ -152,6 +191,7 @@ export function registerWorldsRoutes(app: FastifyInstance, deps: WorldsRoutesDep
         operationId: 'copyWorld',
         params: worldIdParamsSchema,
         body: copyBodySchema,
+        response: { 201: envelope('world', 'WorldMeta') },
       },
     },
     controller.copyWorld,
@@ -164,13 +204,30 @@ export function registerWorldsRoutes(app: FastifyInstance, deps: WorldsRoutesDep
         summary: '对活动世界建快照',
         operationId: 'createWorldSnapshot',
         body: createSnapshotBodySchema,
+        response: { 201: { type: 'object', additionalProperties: true } },
       },
     },
     controller.createSnapshot,
   );
   app.get<{ Params: { id: string } }>(
     '/api/admin/worlds/:id/snapshots',
-    { schema: { tags: [TAG], summary: '列快照', operationId: 'listWorldSnapshots', params: worldIdParamsSchema } },
+    {
+      schema: {
+        tags: [TAG],
+        summary: '列快照',
+        operationId: 'listWorldSnapshots',
+        params: worldIdParamsSchema,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: {
+              snapshots: { type: 'array', items: { type: 'object', additionalProperties: true } },
+            },
+          },
+        },
+      },
+    },
     controller.listSnapshots,
   );
   app.post<{ Params: { id: string; name: string } }>(
@@ -181,6 +238,13 @@ export function registerWorldsRoutes(app: FastifyInstance, deps: WorldsRoutesDep
         summary: '恢复快照',
         operationId: 'restoreWorldSnapshot',
         params: snapshotParamsSchema,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { ok: { type: 'boolean' } },
+          },
+        },
       },
     },
     controller.restoreSnapshot,

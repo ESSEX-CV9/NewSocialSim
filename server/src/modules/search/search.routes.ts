@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { OPTIONAL_JWT } from '../../core/openapi/swagger.js';
+import { OPTIONAL_JWT, ref, pageOf } from '../../core/openapi/swagger.js';
 import { SearchController } from './search.controller.js';
 import type { SearchService } from './search.service.js';
 
@@ -32,6 +32,7 @@ export function registerSearchRoutes(app: FastifyInstance, deps: SearchRoutesDep
         operationId: 'searchPosts',
         security: OPTIONAL_JWT,
         querystring: searchQuerySchema,
+        response: { 200: pageOf('PostView') },
       },
     },
     controller.posts,
@@ -46,6 +47,7 @@ export function registerSearchRoutes(app: FastifyInstance, deps: SearchRoutesDep
         operationId: 'searchUsers',
         security: OPTIONAL_JWT,
         querystring: searchQuerySchema,
+        response: { 200: pageOf('UserSummary') },
       },
     },
     controller.users,
@@ -63,6 +65,13 @@ export function registerSearchRoutes(app: FastifyInstance, deps: SearchRoutesDep
           additionalProperties: false,
           properties: { limit: { type: 'integer', minimum: 1, maximum: 20 } },
         } as const,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { trends: { type: 'array', items: ref('TrendItem') } },
+          },
+        },
       },
     },
     controller.trends,

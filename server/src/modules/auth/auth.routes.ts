@@ -1,6 +1,6 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { WorldManager } from '../../core/world/world-manager.js';
-import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { REQUIRE_JWT, envelope, ref } from '../../core/openapi/swagger.js';
 import { AuthController } from './auth.controller.js';
 import type { AuthService } from './auth.service.js';
 
@@ -42,6 +42,7 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthRoutesDeps): 
         summary: '注册真人账号',
         operationId: 'register',
         body: registerBodySchema,
+        response: { 201: ref('AuthResponse') },
       },
     },
     controller.register,
@@ -49,7 +50,13 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthRoutesDeps): 
   app.post(
     '/api/auth/login',
     {
-      schema: { tags: ['auth'], summary: '登录', operationId: 'login', body: loginBodySchema },
+      schema: {
+        tags: ['auth'],
+        summary: '登录',
+        operationId: 'login',
+        body: loginBodySchema,
+        response: { 200: ref('AuthResponse') },
+      },
     },
     controller.login,
   );
@@ -57,7 +64,13 @@ export function registerAuthRoutes(app: FastifyInstance, deps: AuthRoutesDeps): 
     '/api/auth/me',
     {
       preHandler: deps.requireAuth,
-      schema: { tags: ['auth'], summary: '当前登录用户', operationId: 'getMe', security: REQUIRE_JWT },
+      schema: {
+        tags: ['auth'],
+        summary: '当前登录用户',
+        operationId: 'getMe',
+        security: REQUIRE_JWT,
+        response: { 200: envelope('user', 'UserProfile') },
+      },
     },
     controller.me,
   );

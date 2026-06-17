@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { REQUIRE_JWT, ref } from '../../core/openapi/swagger.js';
 import { MediaController } from './media.controller.js';
 import type { MediaService } from './media.service.js';
 
@@ -43,6 +43,7 @@ export function registerMediaRoutes(app: FastifyInstance, deps: MediaRoutesDeps)
         summary: '上传文件',
         operationId: 'uploadMedia',
         security: REQUIRE_JWT,
+        response: { 200: ref('MediaView') },
       },
     },
     controller.upload,
@@ -57,6 +58,7 @@ export function registerMediaRoutes(app: FastifyInstance, deps: MediaRoutesDeps)
         operationId: 'importMediaFromUrl',
         security: REQUIRE_JWT,
         body: fromUrlBodySchema,
+        response: { 200: ref('MediaView') },
       },
     },
     controller.fromUrl,

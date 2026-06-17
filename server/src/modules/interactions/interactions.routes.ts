@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { OPTIONAL_JWT, REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { OPTIONAL_JWT, REQUIRE_JWT, pageOf } from '../../core/openapi/swagger.js';
 import { InteractionsController } from './interactions.controller.js';
 import type { InteractionsService } from './interactions.service.js';
 
@@ -20,7 +20,22 @@ export function registerInteractionsRoutes(
   deps: InteractionsRoutesDeps,
 ): void {
   const controller = new InteractionsController(deps.interactionsService);
-  const interaction = (summary: string, operationId: string) => ({
+  // 赞/转返回 { active, count }；收藏/隐藏只返回 { active }——response 形态不同，故由调用方传入。
+  const interactionResultResponse = {
+    type: 'object',
+    additionalProperties: true,
+    properties: { active: { type: 'boolean' }, count: { type: 'integer' } },
+  } as const;
+  const activeOnlyResponse = {
+    type: 'object',
+    additionalProperties: true,
+    properties: { active: { type: 'boolean' } },
+  } as const;
+  const interaction = (
+    summary: string,
+    operationId: string,
+    response: typeof interactionResultResponse | typeof activeOnlyResponse,
+  ) => ({
     preHandler: deps.requireAuth,
     schema: {
       tags: ['interactions'],
@@ -28,47 +43,48 @@ export function registerInteractionsRoutes(
       operationId,
       security: REQUIRE_JWT,
       params: idParamsSchema,
+      response: { 200: response },
     },
   });
 
   app.post<{ Params: { id: number } }>(
     '/api/posts/:id/like',
-    interaction('赞', 'likePost'),
+    interaction('赞', 'likePost', interactionResultResponse),
     controller.like,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/posts/:id/like',
-    interaction('取消赞', 'unlikePost'),
+    interaction('取消赞', 'unlikePost', interactionResultResponse),
     controller.unlike,
   );
   app.post<{ Params: { id: number } }>(
     '/api/posts/:id/repost',
-    interaction('转', 'repostPost'),
+    interaction('转', 'repostPost', interactionResultResponse),
     controller.repost,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/posts/:id/repost',
-    interaction('取消转', 'unrepostPost'),
+    interaction('取消转', 'unrepostPost', interactionResultResponse),
     controller.unrepost,
   );
   app.post<{ Params: { id: number } }>(
     '/api/posts/:id/bookmark',
-    interaction('收藏（私密）', 'bookmarkPost'),
+    interaction('收藏（私密）', 'bookmarkPost', activeOnlyResponse),
     controller.bookmark,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/posts/:id/bookmark',
-    interaction('取消收藏（私密）', 'unbookmarkPost'),
+    interaction('取消收藏（私密）', 'unbookmarkPost', activeOnlyResponse),
     controller.unbookmark,
   );
   app.post<{ Params: { id: number } }>(
     '/api/posts/:id/hide',
-    interaction('隐藏（"不感兴趣"）', 'hidePost'),
+    interaction('隐藏（"不感兴趣"）', 'hidePost', activeOnlyResponse),
     controller.hide,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/posts/:id/hide',
-    interaction('取消隐藏（"不感兴趣"）', 'unhidePost'),
+    interaction('取消隐藏（"不感兴趣"）', 'unhidePost', activeOnlyResponse),
     controller.unhide,
   );
   app.get<{ Querystring: { cursor?: string; limit?: number } }>(
@@ -81,6 +97,7 @@ export function registerInteractionsRoutes(
         operationId: 'listBookmarks',
         security: REQUIRE_JWT,
         querystring: bookmarksQuerySchema,
+        response: { 200: pageOf('PostView') },
       },
     },
     controller.listBookmarks,
@@ -96,6 +113,7 @@ export function registerInteractionsRoutes(
         operationId: 'listUserInteractions',
         security: OPTIONAL_JWT,
         querystring: bookmarksQuerySchema,
+        response: { 200: pageOf('InteractionEvent') },
       },
     },
     controller.listUserInteractions,

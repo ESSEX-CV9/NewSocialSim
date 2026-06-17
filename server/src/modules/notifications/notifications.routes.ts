@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { REQUIRE_JWT, pageOf } from '../../core/openapi/swagger.js';
 import { NotificationsController } from './notifications.controller.js';
 import type { NotificationsService } from './notifications.service.js';
 
@@ -34,6 +34,7 @@ export function registerNotificationsRoutes(
         operationId: 'listNotifications',
         security: REQUIRE_JWT,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('NotificationView') },
       },
     },
     controller.list,
@@ -47,6 +48,13 @@ export function registerNotificationsRoutes(
         summary: '通知未读数',
         operationId: 'getNotificationsUnreadCount',
         security: REQUIRE_JWT,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { count: { type: 'integer' } },
+          },
+        },
       },
     },
     controller.unreadCount,

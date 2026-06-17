@@ -1,6 +1,6 @@
 import type { UpdateProfileRequest } from '@socialsim/shared';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { OPTIONAL_JWT, REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { OPTIONAL_JWT, REQUIRE_JWT, envelope, ref } from '../../core/openapi/swagger.js';
 import { UsersController } from './users.controller.js';
 import type { UsersService } from './users.service.js';
 
@@ -38,6 +38,13 @@ export function registerUsersRoutes(app: FastifyInstance, deps: UsersRoutesDeps)
         summary: '推荐关注',
         operationId: 'listSuggestedUsers',
         security: OPTIONAL_JWT,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { users: { type: 'array', items: ref('UserSummary') } },
+          },
+        },
       },
     },
     controller.suggested,
@@ -51,6 +58,7 @@ export function registerUsersRoutes(app: FastifyInstance, deps: UsersRoutesDeps)
         summary: '账号资料',
         operationId: 'getUserProfile',
         security: OPTIONAL_JWT,
+        response: { 200: envelope('user', 'UserProfile') },
       },
     },
     controller.getByHandle,
@@ -65,6 +73,7 @@ export function registerUsersRoutes(app: FastifyInstance, deps: UsersRoutesDeps)
         operationId: 'updateMyProfile',
         security: REQUIRE_JWT,
         body: updateProfileBodySchema,
+        response: { 200: envelope('user', 'UserProfile') },
       },
     },
     controller.updateMe,

@@ -20,6 +20,13 @@ export function registerBlocksRoutes(app: FastifyInstance, deps: BlocksRoutesDep
         summary: '屏蔽',
         operationId: 'blockUser',
         security: REQUIRE_JWT,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { blocked: { type: 'boolean' } },
+          },
+        },
       },
     },
     controller.block,
@@ -33,6 +40,13 @@ export function registerBlocksRoutes(app: FastifyInstance, deps: BlocksRoutesDep
         summary: '取消屏蔽',
         operationId: 'unblockUser',
         security: REQUIRE_JWT,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { blocked: { type: 'boolean' } },
+          },
+        },
       },
     },
     controller.unblock,

@@ -1,5 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { OPTIONAL_JWT, REQUIRE_JWT } from '../../core/openapi/swagger.js';
+import { OPTIONAL_JWT, REQUIRE_JWT, pageOf } from '../../core/openapi/swagger.js';
 import { TimelineController } from './timeline.controller.js';
 import type { HomeSort, TimelineService } from './timeline.service.js';
 
@@ -41,6 +41,7 @@ export function registerTimelineRoutes(app: FastifyInstance, deps: TimelineRoute
         operationId: 'getHomeTimeline',
         security: REQUIRE_JWT,
         querystring: homeQuerySchema,
+        response: { 200: pageOf('TimelineItem') },
       },
     },
     controller.home,
@@ -55,6 +56,7 @@ export function registerTimelineRoutes(app: FastifyInstance, deps: TimelineRoute
         operationId: 'getForYouTimeline',
         security: OPTIONAL_JWT,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('TimelineItem') },
       },
     },
     controller.forYou,
@@ -69,6 +71,7 @@ export function registerTimelineRoutes(app: FastifyInstance, deps: TimelineRoute
         operationId: 'getGlobalTimeline',
         security: OPTIONAL_JWT,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('TimelineItem') },
       },
     },
     controller.global,
@@ -83,6 +86,7 @@ export function registerTimelineRoutes(app: FastifyInstance, deps: TimelineRoute
         operationId: 'getUserTimeline',
         security: OPTIONAL_JWT,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('TimelineItem') },
       },
     },
     controller.user,

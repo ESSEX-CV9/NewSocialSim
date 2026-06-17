@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, preHandlerHookHandler } from 'fastify';
-import { REQUIRE_ADMIN } from '../../core/openapi/swagger.js';
+import { REQUIRE_ADMIN, ref } from '../../core/openapi/swagger.js';
 import { AdminController } from './admin.controller.js';
 import type { AdminService } from './admin.service.js';
 import type { LoreService } from './lore.service.js';
@@ -301,17 +301,71 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
   );
 
   // Users
-  app.get('/api/admin/users', admin('列账号', 'listAdminUsers'), controller.listUsers);
+  app.get(
+    '/api/admin/users',
+    admin('列账号', 'listAdminUsers', {
+      response: {
+        200: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            users: {
+              type: 'array',
+              items: {
+                type: 'object',
+                additionalProperties: true,
+                properties: {
+                  id: { type: 'integer' },
+                  handle: { type: 'string' },
+                  displayName: { type: 'string' },
+                  isBot: { type: 'boolean' },
+                },
+              },
+            },
+          },
+        },
+      },
+    }),
+    controller.listUsers,
+  );
   app.post<{ Body: { handle: string; displayName: string; password?: string } }>(
     '/api/admin/users',
-    admin('代理建号（设 is_bot=1）', 'createAdminUser', { body: createUserBodySchema }),
+    admin('代理建号（设 is_bot=1）', 'createAdminUser', {
+      body: createUserBodySchema,
+      response: {
+        201: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            id: { type: 'integer' },
+            handle: { type: 'string' },
+            displayName: { type: 'string' },
+            password: { type: 'string', description: '若请求未给 password，此处返回随机生成值' },
+          },
+        },
+      },
+    }),
     controller.createUser,
   );
 
   // Login-as: 凭 admin key 为某账号换一张登录票，供模拟器驱动（不存明文密码）
   app.post<{ Body: { userId: number } }>(
     '/api/admin/login-as',
-    admin('代登录票据（供模拟器驱动）', 'loginAs', { body: loginAsBodySchema }),
+    admin('代登录票据（供模拟器驱动）', 'loginAs', {
+      body: loginAsBodySchema,
+      response: {
+        200: {
+          type: 'object',
+          additionalProperties: true,
+          properties: {
+            token: { type: 'string' },
+            userId: { type: 'integer' },
+            handle: { type: 'string' },
+            displayName: { type: 'string' },
+          },
+        },
+      },
+    }),
     controller.loginAs,
   );
 
@@ -338,7 +392,14 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
   // Simulator status (no auth — editor polls GET, simulator posts heartbeat; localhost infra)
   app.get(
     '/api/simulator/status',
-    { schema: { tags: ['simulator'], summary: '模拟器状态（编辑器轮询）', operationId: 'getSimulatorStatus' } },
+    {
+      schema: {
+        tags: ['simulator'],
+        summary: '模拟器状态（编辑器轮询）',
+        operationId: 'getSimulatorStatus',
+        response: { 200: ref('SimulatorStatus') },
+      },
+    },
     controller.simulatorStatus,
   );
   app.post<{ Body: { boundWorldId: string | null; accountCount: number; tickNumber: number; lastFlushedWorldId: string | null; lastFlushAt: number | null } }>(
@@ -349,6 +410,7 @@ export function registerAdminRoutes(app: FastifyInstance, deps: AdminRoutesDeps)
         summary: '模拟器上报心跳（每 loop）',
         operationId: 'postSimulatorHeartbeat',
         body: heartbeatBodySchema,
+        response: { 200: { type: 'object', additionalProperties: true } },
       },
     },
     controller.simulatorHeartbeat,

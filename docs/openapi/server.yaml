@@ -1187,6 +1187,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  worlds:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WorldSummary"
     post:
       operationId: createWorld
       summary: 创建世界
@@ -1243,8 +1253,16 @@ paths:
                       minLength: 1
                       maxLength: 50
       responses:
-        "200":
+        "201":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  world:
+                    $ref: "#/components/schemas/WorldMeta"
   /api/admin/worlds/{id}/activate:
     post:
       operationId: activateWorld
@@ -1260,6 +1278,11 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/admin/worlds/active:
     get:
       operationId: getActiveWorld
@@ -1268,7 +1291,11 @@ paths:
         - worlds
       responses:
         "200":
-          description: Default Response
+          description: GET /api/admin/worlds/active 的响应
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActiveWorldInfo"
   /api/admin/worlds/{id}:
     patch:
       operationId: updateWorldMeta
@@ -1319,6 +1346,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  world:
+                    $ref: "#/components/schemas/WorldMeta"
     delete:
       operationId: deleteWorld
       summary: 删除世界
@@ -1363,6 +1398,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  clock:
+                    $ref: "#/components/schemas/ClockState"
   /api/admin/worlds/{id}/copy:
     post:
       operationId: copyWorld
@@ -1388,8 +1431,16 @@ paths:
           name: id
           required: true
       responses:
-        "200":
+        "201":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  world:
+                    $ref: "#/components/schemas/WorldMeta"
   /api/admin/worlds/snapshots:
     post:
       operationId: createWorldSnapshot
@@ -1412,8 +1463,13 @@ paths:
                 description:
                   type: string
       responses:
-        "200":
+        "201":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/admin/worlds/{id}/snapshots:
     get:
       operationId: listWorldSnapshots
@@ -1429,6 +1485,17 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  snapshots:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
   /api/admin/worlds/{id}/snapshots/{name}/restore:
     post:
       operationId: restoreWorldSnapshot
@@ -1449,6 +1516,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  ok:
+                    type: boolean
   /api/admin/worlds/{id}/snapshots/{name}:
     delete:
       operationId: deleteWorldSnapshot
@@ -1479,7 +1554,11 @@ paths:
         - bearerJWT: []
       responses:
         "200":
-          description: Default Response
+          description: 媒体资源视图（文件本体经 url 流式获取）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaView"
   /api/media/from-url:
     post:
       operationId: importMediaFromUrl
@@ -1506,7 +1585,11 @@ paths:
       security: *a1
       responses:
         "200":
-          description: Default Response
+          description: 媒体资源视图（文件本体经 url 流式获取）
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaView"
   /api/media/{id}/file:
     get:
       operationId: getMediaFile
@@ -1997,8 +2080,12 @@ paths:
                   type: string
                   maxLength: 200
       responses:
-        "200":
+        "201":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
   /api/auth/login:
     post:
       operationId: login
@@ -2023,6 +2110,10 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
   /api/auth/me:
     get:
       operationId: getMe
@@ -2033,6 +2124,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserProfile"
   /api/users/suggested:
     get:
       operationId: listSuggestedUsers
@@ -2045,6 +2144,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserSummary"
   /api/users/{handle}:
     get:
       operationId: getUserProfile
@@ -2061,6 +2170,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserProfile"
   /api/users/me:
     patch:
       operationId: updateMyProfile
@@ -2119,6 +2236,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  user:
+                    $ref: "#/components/schemas/UserProfile"
   /api/posts:
     post:
       operationId: createPost
@@ -2451,6 +2576,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
+                  count:
+                    type: integer
     delete:
       operationId: unlikePost
       summary: 取消赞
@@ -2466,6 +2601,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
+                  count:
+                    type: integer
   /api/posts/{id}/repost:
     post:
       operationId: repostPost
@@ -2482,6 +2627,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
+                  count:
+                    type: integer
     delete:
       operationId: unrepostPost
       summary: 取消转
@@ -2497,6 +2652,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
+                  count:
+                    type: integer
   /api/posts/{id}/bookmark:
     post:
       operationId: bookmarkPost
@@ -2513,6 +2678,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
     delete:
       operationId: unbookmarkPost
       summary: 取消收藏（私密）
@@ -2528,6 +2701,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
   /api/posts/{id}/hide:
     post:
       operationId: hidePost
@@ -2544,6 +2725,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
     delete:
       operationId: unhidePost
       summary: 取消隐藏（"不感兴趣"）
@@ -2559,6 +2748,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  active:
+                    type: boolean
   /api/bookmarks:
     get:
       operationId: listBookmarks
@@ -2582,6 +2779,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PostView"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/users/{handle}/interactions:
     get:
       operationId: listUserInteractions
@@ -2610,6 +2821,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/InteractionEvent"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/users/{handle}/follow:
     post:
       operationId: followUser
@@ -2626,6 +2851,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  following:
+                    type: boolean
     delete:
       operationId: unfollowUser
       summary: 取关
@@ -2641,6 +2874,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  following:
+                    type: boolean
   /api/users/{handle}/followers:
     get:
       operationId: listFollowers
@@ -2668,6 +2909,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserSummary"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/users/{handle}/following:
     get:
       operationId: listFollowing
@@ -2695,6 +2950,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserSummary"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/users/{handle}/block:
     post:
       operationId: blockUser
@@ -2711,6 +2980,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  blocked:
+                    type: boolean
     delete:
       operationId: unblockUser
       summary: 取消屏蔽
@@ -2726,6 +3003,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  blocked:
+                    type: boolean
   /api/notifications:
     get:
       operationId: listNotifications
@@ -2757,6 +3042,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationView"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/notifications/unread-count:
     get:
       operationId: getNotificationsUnreadCount
@@ -2767,6 +3066,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  count:
+                    type: integer
   /api/notifications/read-all:
     post:
       operationId: markAllNotificationsRead
@@ -2825,6 +3132,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  conversation:
+                    $ref: "#/components/schemas/ConversationDetailView"
     get:
       operationId: listConversations
       summary: 会话列表
@@ -2857,6 +3172,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ConversationView"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/messages/unread-count:
     get:
       operationId: getMessagesUnreadCount
@@ -2867,6 +3196,10 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DmUnreadCount"
   /api/messages/read-all:
     post:
       operationId: markAllMessagesRead
@@ -2894,7 +3227,11 @@ paths:
       security: *a1
       responses:
         "200":
-          description: Default Response
+          description: 私信搜索结果：按对方用户名/昵称命中的会话 + 按内容命中的消息
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DmSearchResults"
   /api/messages/conversations/{id}:
     get:
       operationId: getConversation
@@ -2911,6 +3248,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  conversation:
+                    $ref: "#/components/schemas/ConversationDetailView"
     delete:
       operationId: hideConversation
       summary: 隐藏会话
@@ -2954,6 +3299,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageView"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
     post:
       operationId: sendMessage
       summary: 发消息
@@ -2987,6 +3346,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  message:
+                    $ref: "#/components/schemas/MessageView"
   /api/messages/conversations/{id}/read:
     post:
       operationId: markMessagesRead
@@ -3013,6 +3380,11 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/messages/conversations/{id}/accept:
     post:
       operationId: acceptConversationRequest
@@ -3029,6 +3401,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  conversation:
+                    $ref: "#/components/schemas/ConversationDetailView"
   /api/messages/conversations/{id}/unread:
     post:
       operationId: markConversationUnread
@@ -3123,6 +3503,14 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  message:
+                    $ref: "#/components/schemas/MessageView"
   /api/messages/{messageId}/reaction:
     put:
       operationId: setMessageReaction
@@ -3159,6 +3547,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  reactions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageReactionView"
     delete:
       operationId: deleteMessageReaction
       summary: 删表情回应
@@ -3174,6 +3572,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  reactions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/MessageReactionView"
   /api/messages/stream:
     get:
       operationId: streamMessages
@@ -3216,6 +3624,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineItem"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/timeline/foryou:
     get:
       operationId: getForYouTimeline
@@ -3239,6 +3661,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineItem"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/timeline/global:
     get:
       operationId: getGlobalTimeline
@@ -3262,6 +3698,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineItem"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/users/{handle}/timeline:
     get:
       operationId: getUserTimeline
@@ -3290,6 +3740,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TimelineItem"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/search/posts:
     get:
       operationId: searchPosts
@@ -3320,6 +3784,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/PostView"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/search/users:
     get:
       operationId: searchUsers
@@ -3350,6 +3828,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserSummary"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/search/trends:
     get:
       operationId: getTrends
@@ -3367,6 +3859,16 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  trends:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/TrendItem"
   /api/admin/posts:
     post:
       operationId: createAdminPost
@@ -3811,6 +4313,26 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  users:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: true
+                      properties:
+                        id:
+                          type: integer
+                        handle:
+                          type: string
+                        displayName:
+                          type: string
+                        isBot:
+                          type: boolean
     post:
       operationId: createAdminUser
       summary: 代理建号（设 is_bot=1）
@@ -3837,8 +4359,23 @@ paths:
                   description: 不给则随机生成并在响应返回
       security: *a3
       responses:
-        "200":
+        "201":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  id:
+                    type: integer
+                  handle:
+                    type: string
+                  displayName:
+                    type: string
+                  password:
+                    type: string
+                    description: 若请求未给 password，此处返回随机生成值
   /api/admin/login-as:
     post:
       operationId: loginAs
@@ -3861,6 +4398,20 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  token:
+                    type: string
+                  userId:
+                    type: integer
+                  handle:
+                    type: string
+                  displayName:
+                    type: string
   /api/admin/llm-config:
     get:
       operationId: getLlmConfig
@@ -3945,6 +4496,10 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SimulatorStatus"
   /api/simulator/heartbeat:
     post:
       operationId: postSimulatorHeartbeat
@@ -3984,6 +4539,11 @@ paths:
       responses:
         "200":
           description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
 servers:
   - url: http://127.0.0.1:3000
     description: 本地开发

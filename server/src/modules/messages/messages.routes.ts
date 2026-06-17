@@ -3,7 +3,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { AuthTokenPayload } from '../../core/auth/auth-guard.js';
 import { UnauthorizedError } from '../../core/errors/app-error.js';
 import type { SseHub } from '../../core/events/sse-hub.js';
-import { REQUIRE_JWT, REQUIRE_SSE } from '../../core/openapi/swagger.js';
+import { REQUIRE_JWT, REQUIRE_SSE, envelope, pageOf, ref } from '../../core/openapi/swagger.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import { MessagesController } from './messages.controller.js';
 import type { MessagesService } from './messages.service.js';
@@ -104,6 +104,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         operationId: 'createConversation',
         security: REQUIRE_JWT,
         body: createConversationBodySchema,
+        response: { 200: envelope('conversation', 'ConversationDetailView') },
       },
     },
     controller.createConversation,
@@ -118,6 +119,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         operationId: 'listConversations',
         security: REQUIRE_JWT,
         querystring: listConversationsQuerySchema,
+        response: { 200: pageOf('ConversationView') },
       },
     },
     controller.listConversations,
@@ -131,6 +133,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         summary: '私信总未读',
         operationId: 'getMessagesUnreadCount',
         security: REQUIRE_JWT,
+        response: { 200: ref('DmUnreadCount') },
       },
     },
     controller.unreadCount,
@@ -158,6 +161,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         operationId: 'searchMessages',
         security: REQUIRE_JWT,
         querystring: searchQuerySchema,
+        response: { 200: ref('DmSearchResults') },
       },
     },
     controller.search,
@@ -172,6 +176,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         operationId: 'getConversation',
         security: REQUIRE_JWT,
         params: idParamsSchema,
+        response: { 200: envelope('conversation', 'ConversationDetailView') },
       },
     },
     controller.getConversation,
@@ -187,6 +192,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         security: REQUIRE_JWT,
         params: idParamsSchema,
         querystring: pageQuerySchema,
+        response: { 200: pageOf('MessageView') },
       },
     },
     controller.listMessages,
@@ -202,6 +208,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         security: REQUIRE_JWT,
         params: idParamsSchema,
         body: sendMessageBodySchema,
+        response: { 200: envelope('message', 'MessageView') },
       },
     },
     controller.sendMessage,
@@ -217,6 +224,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         security: REQUIRE_JWT,
         params: idParamsSchema,
         body: markReadBodySchema,
+        response: { 200: { type: 'object', additionalProperties: true } },
       },
     },
     controller.markRead,
@@ -231,6 +239,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         operationId: 'acceptConversationRequest',
         security: REQUIRE_JWT,
         params: idParamsSchema,
+        response: { 200: envelope('conversation', 'ConversationDetailView') },
       },
     },
     controller.acceptRequest,
@@ -329,6 +338,7 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         operationId: 'deleteMessage',
         security: REQUIRE_JWT,
         params: messageIdParamsSchema,
+        response: { 200: envelope('message', 'MessageView') },
       },
     },
     controller.deleteMessage,
@@ -344,6 +354,13 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         security: REQUIRE_JWT,
         params: messageIdParamsSchema,
         body: reactionBodySchema,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { reactions: { type: 'array', items: ref('MessageReactionView') } },
+          },
+        },
       },
     },
     controller.setReaction,
@@ -358,6 +375,13 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
         operationId: 'deleteMessageReaction',
         security: REQUIRE_JWT,
         params: messageIdParamsSchema,
+        response: {
+          200: {
+            type: 'object',
+            additionalProperties: true,
+            properties: { reactions: { type: 'array', items: ref('MessageReactionView') } },
+          },
+        },
       },
     },
     controller.removeReaction,
