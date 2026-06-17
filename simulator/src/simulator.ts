@@ -11,13 +11,7 @@ import type { System, Entity, TickContext, SimulatorConfig, DrivenAccount } from
 import type { SimulatorHeartbeat } from '@socialsim/shared';
 import { logger } from './logger.js';
 
-/** 内置兜底语料（内容池全空时的最后一档），与世界无关，可被世界场景池覆盖。 */
-const DEFAULT_FALLBACK_POOL = [
-  '今天天气不错', '刚摸了会儿鱼', '有没有人推荐点好看的', '这周末终于能歇了',
-  '深夜了还睡不着', '又是平平无奇的一天', '分享一下今天的心情', '蹲一个后续',
-];
-
-/** 级联回复用的兜底短语料（Step 1 由 reply 形态的内容池接管）。 */
+/** 级联回复用的兜底短语料（Phase 3 由 reply 形态的内容池接管）。 */
 const REPLY_POOL = [
   '确实', '有道理', '笑死', '同意', '不太认同', '哈哈哈',
   '学到了', '太真实了', '蹲一个后续', 'mark', '+1', '离谱',
@@ -157,12 +151,13 @@ export class Simulator {
     this.traceSink.setWorld(worldId);
     // 直读世界文件夹的配置：全局 defaults + 世界级 tuning.json override（见 docs/m5-x-phase1-baseline.md）。
     this.tuning.load(worldId);
-    // 直读并合并三类内容池来源（全局原子 + 世界场景 + 话题）。组装与发帖接入属 1.2 / 1.4。
-    this.loadedPools = loadPools(this.config.dataDir, worldId);
+    // 直读并合并三类内容池来源（全局原子 + 世界场景 + 话题），供 PostingSystem 组装发帖。
+    const pools = loadPools(this.config.dataDir, worldId);
+    this.loadedPools = pools;
     logger.info(
       `Content pools loaded for world ${worldId}: ` +
-        `${Object.keys(this.loadedPools.components).length} 组件类型 / ` +
-        `${Object.keys(this.loadedPools.grammars).length} 语法 / ${this.loadedPools.pools.length} 池`,
+        `${Object.keys(pools.components).length} 组件类型 / ` +
+        `${Object.keys(pools.grammars).length} 语法 / ${pools.pools.length} 池`,
     );
 
     const registry = new EntityRegistry();
@@ -189,6 +184,8 @@ export class Simulator {
           repostProbability: p.repostProbability,
           replyProbability: p.replyProbability,
           actionIntervalMinutes: p.actionIntervalMinutes,
+          ...(p.factions !== undefined ? { factions: p.factions } : {}),
+          ...(p.poolAffinities !== undefined ? { poolAffinities: p.poolAffinities } : {}),
           ...(p.personality !== undefined ? { personality: p.personality } : {}),
           ...(p.stance !== undefined ? { stance: p.stance } : {}),
           ...(p.writingStyle !== undefined ? { writingStyle: p.writingStyle } : {}),
@@ -203,7 +200,7 @@ export class Simulator {
 
     const entityMap = new Map<string, Entity>(registry.getAll().map(e => [e.id, e]));
     const systems: System[] = [
-      new PostingSystem(this.api, [...DEFAULT_FALLBACK_POOL], this.config.adminToken, this.traceSink),
+      new PostingSystem(this.api, pools, this.tuning, this.traceSink),
       new InteractionSystem(this.api, this.traceSink),
       new CascadeSystem(this.api, entityMap, [...REPLY_POOL], this.traceSink),
     ];

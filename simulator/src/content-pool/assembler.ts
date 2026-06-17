@@ -24,11 +24,11 @@ export interface AssembleContext {
   /** 随机源 [0,1)；注入种子化 RNG 即可复现。 */
   rng: () => number;
   /** prob 表达式里的变量值（如 slangDensity）；表达式引用未知变量时用 exprVarDefault。 */
-  vars?: Record<string, number>;
-  /** prob 表达式未知变量的默认值（调用方从 tuning 取）。 */
-  exprVarDefault?: number;
-  /** 标了 optional 但无 prob 的槽，出现概率（调用方从 tuning 取）。 */
-  optionalProb?: number;
+  vars?: Record<string, number> | undefined;
+  /** prob 表达式未知变量的默认值（调用方从 tuning 取，缺省时 assembler 内部回退中性值）。 */
+  exprVarDefault?: number | undefined;
+  /** 标了 optional 但无 prob 的槽，出现概率（调用方从 tuning 取，缺省时回退中性值）。 */
+  optionalProb?: number | undefined;
 }
 
 const SHAPES: readonly PoolShape[] = ['standalone', 'reply', 'quote'];
@@ -67,8 +67,20 @@ export function seededRng(seed: number): () => number {
   };
 }
 
-/** 组装一条内容；无可用语法或必填槽无法填充时返回 null（调用方降级：跳过本次发帖）。 */
+/** 组装结果（轨迹用）：成文 + 所用语法名 + 各 present 槽所选片段原始 text（「所选模块」）。 */
+export interface AssembleResult {
+  text: string;
+  grammar: string;
+  fragments: string[];
+}
+
+/** 组装一条内容（只要成文）；无可用语法或必填槽无法填充时返回 null（调用方降级：跳过本次发帖）。 */
 export function assemble(pool: Pool, ctx: AssembleContext): string | null {
+  return assembleDetailed(pool, ctx)?.text ?? null;
+}
+
+/** 组装并返回追溯信息（语法 + 所选片段）；供 PostingSystem 吐 poolId / entryId 轨迹。 */
+export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResult | null {
   const fragmentsFor = (name: string): Fragment[] => pool.fragments?.[name] ?? ctx.pools.components[name] ?? [];
   const exprVarDefault = ctx.exprVarDefault ?? NEUTRAL_PROB;
   const optionalProb = ctx.optionalProb ?? NEUTRAL_PROB;
@@ -86,6 +98,7 @@ export function assemble(pool: Pool, ctx: AssembleContext): string | null {
   if (!chosen) return null;
 
   const parts: string[] = [];
+  const picked: string[] = [];
   for (const slot of chosen.grammar!.slots) {
     // 出现判定：prob 优先；否则 optional 用 optionalProb；否则必出现。
     const appear =
@@ -96,31 +109,33 @@ export function assemble(pool: Pool, ctx: AssembleContext): string | null {
           : true;
     if (!appear) continue;
 
-    const text = pickSlotText(slot.component, fragmentsFor, ctx);
-    if (text === null) {
+    const slotPick = pickSlot(slot.component, fragmentsFor, ctx);
+    if (slotPick === null) {
       // 取不到可用片段：必填槽则整条作废，可选槽则跳过。
       if (!slot.optional && slot.prob === undefined) return null;
       continue;
     }
-    if (text) parts.push(text);
+    parts.push(slotPick.text);
+    picked.push(slotPick.raw);
   }
 
   const out = parts.join('').trim();
-  return out.length ? out : null;
+  if (!out.length) return null;
+  return { text: out, grammar: chosen.ref, fragments: picked };
 }
 
-/** 为某组件取一个片段并解析其占位符；候选解析不到则丢弃重抽，全失败返回 null。 */
-function pickSlotText(
+/** 为某组件取一个片段并解析其占位符；返回 { raw 原始片段, text 解析后 }；候选解析不到则丢弃重抽，全失败返回 null。 */
+function pickSlot(
   component: string,
   fragmentsFor: (name: string) => Fragment[],
   ctx: AssembleContext,
-): string | null {
+): { raw: string; text: string } | null {
   const frags = fragmentsFor(component);
   if (!frags.length) return null;
   for (let i = 0; i < MAX_FRAGMENT_TRIES; i++) {
     const frag = frags[Math.floor(ctx.rng() * frags.length)]!;
     const resolved = resolvePlaceholders(frag.text, fragmentsFor, ctx, 0);
-    if (resolved !== null) return resolved;
+    if (resolved !== null) return { raw: frag.text, text: resolved };
   }
   return null;
 }
@@ -175,7 +190,7 @@ function clamp01(v: number): number {
 }
 
 /** 按权重抽一个；空数组返回 null。 */
-function weightedPick<T>(items: T[], weightOf: (t: T) => number, rng: () => number): T | null {
+export function weightedPick<T>(items: T[], weightOf: (t: T) => number, rng: () => number): T | null {
   if (!items.length) return null;
   const total = items.reduce((s, it) => s + Math.max(0, weightOf(it)), 0);
   if (total <= 0) return items[0]!;

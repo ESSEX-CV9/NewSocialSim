@@ -4,6 +4,9 @@
     "noveltyWindowMs": 1800000,
     "noveltyPenalty": 0.4,
     "grammarWeightFloor": 0.01,
-    "compositionByDensity": { "prefixProb": "slangDensity", "suffixProb": "slangDensity * 0.6" }
+    "compositionByDensity": { "prefixProb": "slangDensity", "suffixProb": "slangDensity * 0.6" },
+    "exprVarDefault": 0.5,
+    "optionalProb": 0.5,
+    "defaultAffinity": 0.3
   }
 }

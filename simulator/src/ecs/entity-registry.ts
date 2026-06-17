@@ -12,6 +12,8 @@ export class EntityRegistry {
         displayName: account.displayName,
         tier: account.tier,
         interests: account.interests,
+        ...(account.factions !== undefined ? { factions: account.factions } : {}),
+        ...(account.poolAffinities !== undefined ? { poolAffinities: account.poolAffinities } : {}),
         ...(account.personality !== undefined ? { personality: account.personality } : {}),
         ...(account.stance !== undefined ? { stance: account.stance } : {}),
         ...(account.writingStyle !== undefined ? { writingStyle: account.writingStyle } : {}),

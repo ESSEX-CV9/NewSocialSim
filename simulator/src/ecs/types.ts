@@ -13,6 +13,10 @@ export interface ProfileComponent {
   stance?: string;
   writingStyle?: string;
   interests: string[];
+  /** 订阅的派系（Layer 3）；选池/片段过滤用。数据由 NPC 设计器（1.7）填，缺省视为无订阅。 */
+  factions?: string[];
+  /** 池亲和权重表（场景名/维度值 → 权重）；选池加权用。缺省走中性默认权重。 */
+  poolAffinities?: Record<string, number>;
 }
 
 export interface ScheduleComponent {
@@ -87,6 +91,8 @@ export interface DrivenAccount {
   displayName: string;
   tier: 'core' | 'ambient';
   interests: string[];
+  factions?: string[];
+  poolAffinities?: Record<string, number>;
   personality?: string;
   stance?: string;
   writingStyle?: string;

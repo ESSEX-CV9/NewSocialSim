@@ -23,6 +23,8 @@ export interface NpcProfileDto {
   stance?: string;
   writingStyle?: string;
   interests: string[];
+  factions?: string[];
+  poolAffinities?: Record<string, number>;
   activeHoursStart: number;
   activeHoursEnd: number;
   postProbability: number;

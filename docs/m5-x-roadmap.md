@@ -232,12 +232,12 @@
 - **结果**：模块级冒烟 8/8——`assembleForShape('standalone')` 只产 standalone 池内容，reply / 无形态池被排除；`reply` 只产 reply；无 quote 池返回 null。
 - **交接提示**：`assembleForShape` 的池选择本步等权随机，1.4 PostingSystem 接组装时把它换成按人设（factions / poolAffinities）选池，但复用同一形态过滤。回复 / 引用形态池属 Phase 3。
 
-### 1.4 PostingSystem 接组装引擎 ⬜
+### 1.4 PostingSystem 接组装引擎 ✅
 
 - **目标**：发顶层帖改为按 NPC 的 factions / poolAffinities 选池、经组装引擎产文、发 `standalone` 帖，并吐含池 · 语法 · 模块的轨迹。
-- **改动**：`simulator/src/systems/posting-system.ts`（替换现扁平 `string[]` 的 `pickContent`，接组装引擎）；轨迹事件填 `poolId` / `entryId`（语法与所选片段标识）。
-- **验收**：时间线全是顶层帖；时间轴每个块点开可追溯到 账号 · 池 · 语法 · 所选模块。
-- **交接提示**：现 `PostingSystem` 用 `scenePools` / `topicPools` / `fallbackPool` 三档扁平字符串，本步整体替换；`simulator.ts` 构造 `PostingSystem` 处的 `DEFAULT_FALLBACK_POOL` 参数随之调整或移除。保持「获取不到内容则跳过本次发帖、不崩」的降级行为。
+- **改动**：`posting-system.ts` 整体重写——直读内容池（`simulator.ts` 构造时传入 `LoadedPools` + `TuningService`），`selectPool` 在 standalone 池里按 `poolAffinities` 加权选池（无亲和→中性默认≈均匀）→ `assembleDetailed` 产文 → 发帖 → 轨迹填 `poolId` + `entryId`（`语法｜所选模块`）+ `postId`。`assembler.ts` 加 `assembleDetailed` / 导出 `weightedPick`；`ecs/types.ts` + `entity-registry.ts` + `api-client.ts` NpcProfileDto 加可选 `factions` / `poolAffinities`（数据待 1.7 填）；`defaults.json` pools 加 `exprVarDefault` / `optionalProb` / `defaultAffinity`；删 `DEFAULT_FALLBACK_POOL`。取不到内容则跳过本次发帖、不崩。
+- **结果**：集成层冒烟 12/12——亲和加权选池（偏向池 ≥80%）、轨迹带 poolId/语法/模块/postId/shape=standalone、真实 demo 产出"雷神演出拉满"/"刚刷到本期深渊演出拉满绷不住了"/"今天天气不错"等、无病句。时间线端到端可视验收随 1.9 / 用户人工验收。
+- **交接提示**：每帖一个种子化 RNG（hash(handle) ^ tickNumber），同（账号,tick）可复现。`getActiveTopics` / `getContentPools` 已不再被 PostingSystem 使用（话题见 1.1b 押后）。`exprVarDefault` 当 slangDensity 未接（persona 属状态机层）时的回退值。
 
 ### 1.5 氛围号水贴 ⬜
 
