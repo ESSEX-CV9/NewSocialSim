@@ -34,6 +34,8 @@ type RawGrammarFile = Record<string, Grammar>;
 interface RawPoolBody {
   dimensions: PoolDimensions;
   grammars: PoolGrammarRef[];
+  /** 池级片段覆盖（混合式）：组件名 → 仅本池生效的候选片段（允许字符串简写）。 */
+  fragments?: Record<string, RawFragment[]>;
 }
 type RawPoolFile = Record<string, RawPoolBody>;
 
@@ -58,7 +60,17 @@ export function loadPools(dataDir: string, worldId: string): LoadedPools {
     path.join(worldDir, 'scene-pools'),
     path.join(worldDir, 'topic-pools'),
   ]) {
-    for (const [id, body] of readPoolDir(dir)) poolMap.set(id, { id, dimensions: body.dimensions, grammars: body.grammars });
+    for (const [id, body] of readPoolDir(dir)) {
+      const pool: Pool = { id, dimensions: body.dimensions, grammars: body.grammars };
+      if (body.fragments) {
+        const overrides: ComponentRegistry = {};
+        for (const [name, frags] of Object.entries(body.fragments)) {
+          if (Array.isArray(frags)) overrides[name] = frags.map(normalizeFragment);
+        }
+        pool.fragments = overrides;
+      }
+      poolMap.set(id, pool);
+    }
   }
   const pools = [...poolMap.values()];
 

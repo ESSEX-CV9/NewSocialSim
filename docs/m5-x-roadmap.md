@@ -191,14 +191,14 @@
 
 内容池从扁平 `string[]` 重做为与 ECS 同构的三层（组件类型 → 语法 → 池），模拟器按人设从池组装并发顶层帖，编辑器长出内容池面板与 NPC 设计器。本阶段交付后，时间线全是顶层帖、每个时间轴块可追溯到账号 · 池 · 语法 · 模块。
 
-### 1.0 最小 TuningService ⬜
+### 1.0 最小 TuningService ✅
 
 - **目标**：实现加载全局 defaults + 世界级 override 并 deep-merge 的 TuningService，提供 `get(path)`，先供内容池组装权重取值。
 - **改动**：`data/global-config/defaults.json`（初稿，至少含 `pools` 命名空间的权重）、`simulator/src/`（TuningService：加载、deep-merge、`get`）；世界级 override 读 `data/worlds/<id>/tuning.json`。
 - **验收**：内容池组装的语法权重 / slangDensity / novelty 系数全部经 `tuning.get(...)` 取得，代码中无对应字面量；写一个世界 `tuning.json` override 某系数，组装行为随之变化。
 - **交接提示**：这是完整 Tuning 层（M5-X.0）的最小子集，后续在状态机阶段补全 `evalDerive` / `reload` / `onChange` 与编辑器 Tuning 面板。命名空间结构以 `docs/m5-npc-state-machine.md`「Tuning 配置层」节为准，本步只落 `pools` 一组。**配置范式已定（见 `docs/m5-x-phase1-baseline.md`）：模拟器用 `dataDir` 直读 `data/global-config/defaults.json` + 世界 `tuning.json` 自行 deep-merge，社交站 server 不经手模拟器域配置；编辑器面板改配置经编辑器后端直接读写文件。** 不走 server admin 端点。
 
-### 1.1 内容池三层 schema 与加载 ⬜
+### 1.1 内容池三层 schema 与加载 ✅
 
 - **目标**：定义组件类型库 / 语法库 / 池的结构类型，实现三类布局加载（全局原子池 + 世界场景池 + 临时话题池）。
 - **改动**：`shared/src/types/`（`PoolComponent` / `Grammar` / `Pool` 类型）；`data/global-pools/`（基础原子池，入 git）、`data/worlds/<id>/scene-pools/`、`data/worlds/<id>/topic-pools/`；组件类型库与语法库按「全局共享 / 世界级」两层存放（全局层入 git）；`simulator/src/`（池加载器，按活动世界合并三类来源）。
@@ -212,12 +212,13 @@
 - **验收**：`world.db` `topics` 表只剩真人可见字段；模拟器选题用的池绑定 / 标签 / 编排从模拟器侧加载；编辑器话题面板能分别编辑两侧。
 - **交接提示**：随 1.1 `topic-pools` 一并做。本步只做结构性拆分与存储归位——完整热度生命周期曲线属 GM/议程层、此处不必实现，只需把 `heat` / `tags` 中的"导演用途"挪出 `world.db`，用户可见的展示值可留。
 
-### 1.2 组装引擎 ⬜
+### 1.2 组装引擎 ✅
 
 - **目标**：实现零 LLM 的内容组装：按池选一套语法 → 逐槽过滤并加权取片段 → 解析内联占位符 → 输出一条文本，给定 RNG 种子可复现。
-- **改动**：`simulator/src/`（assembler 模块：语法加权抽选、可选槽 / prob 判定、片段加权、占位符解析）。
-- **验收**：dev 脚本喂一个池连出 N 条，多数不重样且无病句；占位符解析不到匹配项时丢弃该候选片段重抽，不输出残缺占位符。
-- **交接提示**：占位符 `{key}` / `{key:variant}` 即内联组件引用，与槽位同一机制。权重系数（alignmentMatch / novelty / topicRelevance）取自 tuning，本阶段 alignment 相关可中性化（待 Phase 状态机层接真值）。
+- **改动**：`simulator/src/content-pool/assembler.ts`（语法加权抽选、optional / prob 判定、片段抽选、占位符解析、mulberry32 种子 RNG）。
+- **结果**：模块级冒烟 13/13——确定性复现、多样性、**池级覆盖优先**、占位符解析、坏占位符候选丢弃重抽、optional 槽、真实 demo 跨层组装无病句。
+- **取片段规则（混合式，见 re-plan「池级片段覆盖」）**：`pool.fragments[组件] ?? 共享组件库[组件]`——池写了用池的、没写退回共享库；占位符内联引用同此优先级。
+- **交接提示**：占位符 `{key}` / `{key:variant}` 即内联组件引用，与槽位同一机制（variant 待 faction 注册表，现按基础组件名解析）。`prob` 支持数字或 `var [* const]` 表达式（var 取自注入的 vars，缺省 exprVarDefault）；alignment / novelty 加权待状态机层，本阶段片段等权抽。业务可调值（exprVarDefault / optionalProb）由调用方从 tuning 注入，assembler 不写死。
 
 ### 1.3 shape 维度过滤 ⬜
 

@@ -81,6 +81,13 @@ export interface Pool {
   id: string;
   dimensions: PoolDimensions;
   grammars: PoolGrammarRef[];
+  /**
+   * 池级片段覆盖（混合式）：组件类型名 → 仅本池生效的候选片段。
+   * 组装某槽取片段时：本池写了该组件 → 用本池的；没写 → 退回共享组件库。
+   * 使通用片段（黑话/情绪词）在组件库写一次跨池复用，同时各池可就地定制自己的槽位内容，
+   * 无需为每种语境另造一个组件类型。
+   */
+  fragments?: ComponentRegistry;
 }
 
 /** 加载并合并三类来源（全局原子 + 世界场景 + 临时话题）后的内容池总集。 */
