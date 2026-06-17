@@ -34,11 +34,20 @@ NPC 档案与旧内容池的文件本就在世界文件夹内，社交站 server
 | `simulator/src/simulator.ts` 的硬编码 `DEFAULT_FALLBACK_POOL` / `REPLY_POOL` | 删除，由内容池接管 | 1.4 / 1.5 |
 | `simulator/src/systems/posting-system.ts` 的 `pickContent`（随机取一条） | 重写接组装引擎；`refreshPoolsIfNeeded` 改直读文件 | 1.4 |
 | `posting-system.ts` 内散落的 `Math.random` 抖动 / 概率字面量 | 抽进 TuningService | 1.0 起 |
-| 话题（`world.db` 表，含 heat / tags / 生命周期） | 拆分：用户可见字段留 `world.db`，选题 / 编排元数据移模拟器侧文件 | 1.1b |
+| 话题（`world.db` 表，含 heat / tags / 生命周期） | **不动**（经勘察重新定性，见下）；表保留备用 | 1.1b 押后 |
 | NPC 档案 | 复用并扩字段（加 factions / poolAffinities），读改为直读文件 | 1.7 |
 | lore / llm-config / 快照 / agent 等 admin 端点 | 不动（属后续 LLM / GM 阶段） | — |
 
 Phase 1 顶层帖相关的全部旧件恰好落在以上各步的计划改动内，计划外无遗留依赖。
+
+## 话题表定性（2026-06-18 勘察结论，勿回退）
+
+`world.db` 的 `topics` 表**不给真人用户看**，整个属模拟器/导演侧——**不拆、不迁移**。依据：
+
+- 用户侧"趋势 / 热门话题"（`GET /api/search/trends`）**完全由帖子正文的 `#话题` 标签统计而来**（`search.service.trends` 读 `posts` 表数 hashtag），**与 `topics` 表无关**。
+- `topics` 表无任何公开端点，只有 admin（编辑器/配置）与模拟器（选题）读；真人从不创建或看到它。
+
+因此早先"按字段拆 topics 表 + 加 migration"的设想（基于"话题对真人可见"的假设）取消。`world.db` 的 `topics` 表保留不动，留给将来"真给用户看的话题页"那个尚未实现的功能。话题的导演议程（hashtag + 选题标签 + 绑定话题池 + 热度）作为后续独立一步落在**模拟器侧文件**，模拟器直读、NPC 发帖带 hashtag 即经趋势对真人可见，**无需 migration**。若将来真做"用户可见话题页"，再按 `docs/m5-x-re-plan.md`「双重身份实体」把展示字段进 `world.db`、编排元数据留模拟器侧。
 
 ## `data/` 目录约定
 
