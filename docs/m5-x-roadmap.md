@@ -142,7 +142,7 @@
 | 引用 | 顶层帖的一种（`quoteOfId` 非空），随 global / `?type=posts` 来 | ✅ |
 | **赞 / 关注 / 书签** | —— | ❌ **无任何按时间列出互动事件的端点**；world.db 互动表的时间戳也未经 API 暴露 → 见 T.1 |
 | **按时间区间查询**（跳到任意历史时段） | —— | ❌ 无 `from/to` 端点；只能从最新游标无限回翻 → 见 T.2 |
-| **列世界全部账号**（含从未发帖者） | —— | ❌ 仅 `GET /api/users/suggested`（子集）；轨道现从全站流作者发现 → 见 T.5 |
+| **列世界全部账号**（含从未发帖者） | `GET /api/users`（公开、游标分页、不含 isBot） | ✅ T.5 已加；轨道改从全部账号 roster ∪ 帖作者 |
 | 建历史 / 排程帖 | `POST /api/admin/posts`（带 `createdAt` / `replyToId`） | ✅ 后端已支持，供 T.6 轴上编辑 |
 
 **当前实现的取数策略**：global 流作"发现账号 + 顶层帖主轴（无限向后滚动）"，再**按账号封顶拉取**回复（`?type=replies`）与转发（`/timeline`）。因此**回复/转发只覆盖各账号近期若干页**（`EXTRA_PAGE_CAP`），深度历史与赞/关注待下列步骤补齐。
@@ -168,9 +168,11 @@
 - **改动**：`shared`（`SimTraceEvent` 加 `postId`）、`simulator`（发帖后把新帖 id 写进轨迹）、`editor`（按 postId 关联 trace 与 post，检视器合并展示）。
 - **交接提示**：即此前所说"B 轮"。轨迹缺 `postId` 是当前无法关联的唯一缺口。
 
-### T.5 列全部世界账号（轨道完整）⬜
+### T.5 列全部世界账号（轨道完整）✅
 - **目标**：轨道含世界全部账号（含从未发帖 / 纯真人账号），不止全站流里出现过作者的。
-- **改动**：`server`（列账号端点）、`editor`（轨道来源补充）。
+- **改动**：`server` 加公开 `GET /api/users`（游标分页、id 升序、不含 isBot；usersRepo.listAll + service.listAll + controller.list）；`editor/src/server/` 代理；`editor/src/renderer/` 时间轴拉全 roster→轨道与补拉来源改为 roster ∪ 帖作者（纯回复/纯互动/从未发帖账号都得轨道且补拉其内容）。
+- **结果**：2026-06-17 实现并冒烟通过——`GET /api/users` 返回全部账号无 isBot；时间轴轨道列全。server spec 102 路径 / editor 14。
+- **交接提示**：列账号属真人也有的数据 → 进 world.db、走公开 API（不暴露 isBot，符合账号模型约束）。renderer 的 `accounts`（驱动 fetchAccountExtra）与 `lanes` 均改为 roster ∪ 帖作者，roster 拉不到时退回从内容发现。
 
 ### T.6 轴上编辑与轴维度切换 ⬜
 - **目标**：`m5-design.md` 的"在轴上添加 / 移动帖子（预填历史 / 排程未来）""纵轴切按话题 / 世界事件""选中部分 NPC 只看其轨道"。

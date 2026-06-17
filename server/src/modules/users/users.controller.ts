@@ -14,6 +14,13 @@ export class UsersController {
     reply.send({ users: this.service.suggested(viewerIdOf(req)) });
   };
 
+  list = async (
+    req: FastifyRequest<{ Querystring: { cursor?: string; limit?: number } }>,
+    reply: FastifyReply,
+  ) => {
+    reply.send(this.service.listAll(req.query.cursor, req.query.limit));
+  };
+
   updateMe = async (req: FastifyRequest<{ Body: UpdateProfileRequest }>, reply: FastifyReply) => {
     reply.send({ user: this.service.updateMe(req.user.sub, req.body) });
   };

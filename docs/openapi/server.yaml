@@ -2132,6 +2132,42 @@ paths:
                 properties:
                   user:
                     $ref: "#/components/schemas/UserProfile"
+  /api/users:
+    get:
+      operationId: listUsers
+      summary: 列全部账号（公开，游标分页）
+      tags:
+        - users
+      parameters:
+        - schema:
+            type: string
+          in: query
+          name: cursor
+          required: false
+        - schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+          in: query
+          name: limit
+          required: false
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/UserSummary"
+                  nextCursor:
+                    type:
+                      - string
+                      - "null"
   /api/users/suggested:
     get:
       operationId: listSuggestedUsers

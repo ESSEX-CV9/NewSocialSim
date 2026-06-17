@@ -51,6 +51,20 @@
         }
       }
     },
+    "/api/users": {
+      "get": {
+        "operationId": "listUsers",
+        "summary": "列全部账号（代理）",
+        "tags": [
+          "timeline"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/users/{handle}": {
       "get": {
         "operationId": "getUser",

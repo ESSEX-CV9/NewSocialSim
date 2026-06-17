@@ -1,8 +1,12 @@
-import type { UpdateProfileRequest, UserProfile, UserSummary, VerifiedType } from '@socialsim/shared';
+import type { Page, UpdateProfileRequest, UserProfile, UserSummary, VerifiedType } from '@socialsim/shared';
 import { NotFoundError, ValidationError } from '../../core/errors/app-error.js';
+import { decodeCursor, encodeCursor } from '../../core/pagination.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import type { MediaService } from '../media/media.service.js';
 import { toUser, usersRepo, type UserRow } from './users.repo.js';
+
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 50;
 
 export class UsersService {
   constructor(
@@ -26,6 +30,26 @@ export class UsersService {
       verified: r.verified as VerifiedType,
       followerCount: r.follower_count,
     }));
+  }
+
+  /** 全部账号（游标分页，id 升序）；供时间轴列全部轨道（含从未发帖者）。不含 isBot。 */
+  listAll(cursor?: string, limit?: number): Page<UserSummary> {
+    const { db } = this.worldManager.current();
+    const pageSize = Math.max(1, Math.min(MAX_PAGE_SIZE, limit ?? DEFAULT_PAGE_SIZE));
+    const parts = decodeCursor(cursor);
+    const afterId = parts && typeof parts[0] === 'number' ? parts[0] : null;
+    const rows = usersRepo.listAll(db, afterId, pageSize + 1);
+    const hasMore = rows.length > pageSize;
+    const pageRows = hasMore ? rows.slice(0, pageSize) : rows;
+    const last = pageRows[pageRows.length - 1];
+    const items: UserSummary[] = pageRows.map((r) => ({
+      id: r.id,
+      handle: r.handle,
+      displayName: r.display_name,
+      avatarUrl: this.avatarUrlOf(r.avatar_media_id),
+      verified: r.verified as VerifiedType,
+    }));
+    return { items, nextCursor: hasMore && last ? encodeCursor([last.id]) : null };
   }
 
   /** 按 handle 找用户 id；不存在返回 null（@mention 解析等场景，不抛错） */

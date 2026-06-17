@@ -137,6 +137,13 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
     },
   );
 
+  // 列全部账号：转发社交站公开列账号端点，供时间轴列全部轨道（含从未发帖者）。
+  app.get<{ Querystring: { cursor?: string; limit?: string } }>(
+    '/api/users',
+    { schema: { tags: ['timeline'], summary: '列全部账号（代理）', operationId: 'listUsers' } },
+    (req, reply) => proxyGet('/api/users', req.query, ['cursor', 'limit'], reply),
+  );
+
   // 账号资料：转发社交站按 handle 取单账号（供时间轴显示昵称）。
   app.get<{ Params: { handle: string } }>(
     '/api/users/:handle',

@@ -41,6 +41,8 @@
 
 ## 账号 `users`
 
+- **GET** `/api/users` · 公开 — 列全部账号（游标分页，id 升序，不含 isBot；供时间轴列全部轨道含从未发帖者）
+  - query `{ cursor?, limit?(≤50) }` → `200` `Page<UserSummary>`
 - **GET** `/api/users/:handle` · JWT? — 账号资料
   - `200` `{ user: UserProfile }`
 - **GET** `/api/users/suggested` · JWT? — 推荐关注

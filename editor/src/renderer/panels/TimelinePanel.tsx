@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { TimelineItem, PostView, InteractionEvent } from '@socialsim/shared';
+import type { TimelineItem, PostView, InteractionEvent, UserSummary } from '@socialsim/shared';
 import { useSelectedBlock, setSelectedBlock } from '../state/selection.js';
 import { ACTION_COLOR, formatSimTime } from './trace-meta.js';
 import { Avatar } from './Avatar.js';
@@ -118,6 +118,7 @@ function computeLayout(blocks: TimelineBlock[], lanes: string[], originSim: numb
 export function TimelinePanel(_props: IDockviewPanelProps) {
   const [posts, setPosts] = useState<PostView[]>([]); // 顶层帖（global）+ 回复（per-account）
   const [acts, setActs] = useState<Array<{ actor: string; ev: InteractionEvent }>>([]); // 赞/转/关注（per-account）
+  const [roster, setRoster] = useState<Array<{ handle: string; displayName: string }>>([]); // 全部账号（轨道列全）
   const [worldId, setWorldId] = useState<string | null>(null);
   const selected = useSelectedBlock();
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +176,28 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     addPosts(items.filter((it) => it.type === 'post').map((it) => it.post));
   }
 
+  /** 列全部账号（分页拉全）→ 轨道列全，含从未发帖者。 */
+  async function loadRoster(): Promise<void> {
+    try {
+      const all: Array<{ handle: string; displayName: string }> = [];
+      let cursor: string | undefined;
+      for (let p = 0; p < 20; p++) {
+        const u = new URL(`${backend}/api/users`);
+        u.searchParams.set('limit', '50');
+        if (cursor) u.searchParams.set('cursor', cursor);
+        const r = await fetch(u);
+        if (!r.ok) break;
+        const j = (await r.json()) as { items: UserSummary[]; nextCursor: string | null };
+        all.push(...j.items.map((x) => ({ handle: x.handle, displayName: x.displayName })));
+        if (!j.nextCursor) break;
+        cursor = j.nextCursor;
+      }
+      setRoster(all);
+    } catch {
+      /* 拉不到则退回从内容发现账号 */
+    }
+  }
+
   async function loadInitial(): Promise<void> {
     postIdsRef.current = new Set();
     actKeysRef.current = new Set();
@@ -183,6 +206,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     prevMinRef.current = null;
     setPosts([]);
     setActs([]);
+    setRoster([]);
+    void loadRoster();
     try {
       let cursor: string | undefined;
       const acc: TimelineItem[] = [];
@@ -305,8 +330,11 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 账号（从顶层帖作者发现）→ 补拉其回复与转发。
-  const accounts = useMemo(() => [...new Set(posts.map((p) => p.author.handle))].sort(), [posts]);
+  // 账号 = 全部账号 roster ∪ 顶层帖作者（roster 拉不到时退回作者发现）→ 补拉各自回复与互动。
+  const accounts = useMemo(
+    () => [...new Set([...roster.map((r) => r.handle), ...posts.map((p) => p.author.handle)])].sort(),
+    [roster, posts],
+  );
   useEffect(() => {
     const missing = accounts.filter((h) => !fetchedExtraRef.current.has(h));
     if (missing.length === 0) return;
@@ -324,16 +352,17 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts, backend]);
 
-  // 昵称取自帖子 / 转发里携带的 displayName。
+  // 昵称取自 roster + 帖子 / 互动里携带的 displayName。
   const names = useMemo(() => {
     const m: Record<string, string> = {};
+    for (const r of roster) m[r.handle] = r.displayName;
     for (const p of posts) m[p.author.handle] = p.author.displayName;
     for (const a of acts) {
       if (a.ev.type === 'follow') m[a.ev.target.handle] = a.ev.target.displayName;
       else m[a.ev.post.author.handle] = a.ev.post.author.displayName;
     }
     return m;
-  }, [posts, acts]);
+  }, [roster, posts, acts]);
   const nameOf = (h: string): string => names[h] || h;
 
   const blocks = useMemo<TimelineBlock[]>(
@@ -342,7 +371,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   );
 
   const { lanes, minTime, maxTime } = useMemo(() => {
-    const ls = [...new Set(blocks.map((b) => b.entity))].sort();
+    // 轨道 = 内容里出现的账号 ∪ 全部账号 roster（含从未发帖者）
+    const ls = [...new Set([...blocks.map((b) => b.entity), ...roster.map((r) => r.handle)])].sort();
     let lo = Infinity;
     let hi = 0;
     for (const b of blocks) {
@@ -350,7 +380,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       if (b.time > hi) hi = b.time;
     }
     return { lanes: ls, minTime: Number.isFinite(lo) ? lo : 0, maxTime: hi };
-  }, [blocks]);
+  }, [blocks, roster]);
 
   const originSim = minTime - 2 * 60_000;
   const ax = (t: number) => ((t - originSim) / 60_000) * pxPerMin;

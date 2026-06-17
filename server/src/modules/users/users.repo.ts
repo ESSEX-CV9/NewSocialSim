@@ -46,6 +46,29 @@ export const usersRepo = {
     return db.prepare('SELECT * FROM users WHERE handle = ?').get(handle) as UserRow | undefined;
   },
 
+  /** 全部账号，按 id 升序、游标 id 之后；供时间轴轨道列全（含从未发帖者）。 */
+  listAll(
+    db: WorldDb,
+    afterId: number | null,
+    limit: number,
+  ): { id: number; handle: string; display_name: string; avatar_media_id: number | null; verified: string }[] {
+    return db
+      .prepare(
+        `SELECT id, handle, display_name, avatar_media_id, verified
+         FROM users
+         WHERE (@afterId IS NULL OR id > @afterId)
+         ORDER BY id ASC
+         LIMIT @limit`,
+      )
+      .all({ afterId, limit }) as {
+      id: number;
+      handle: string;
+      display_name: string;
+      avatar_media_id: number | null;
+      verified: string;
+    }[];
+  },
+
   counts(db: WorldDb, userId: number): UserCounts {
     const row = db
       .prepare(
