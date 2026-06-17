@@ -199,7 +199,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     if (fresh.length) setActs((prev) => [...prev, ...fresh]);
   }
 
-  /** 初始/刷新：加载"当前模拟时间起、向前一个 step"的窗口。 */
+  /** 初始/刷新：取最新实际内容（非窗口、最新在前）——世界时钟可能远超内容（模拟器停了时钟仍走），
+   *  故不能假设内容在"现在"附近。时钟明显领先内容时把视图落到最新内容、停跟随。 */
   async function loadInitial(): Promise<void> {
     postIdsRef.current = new Set();
     actKeysRef.current = new Set();
@@ -207,11 +208,26 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     setPosts([]);
     setActs([]);
     setRoster([]);
-    const to = simNow();
-    const from = to - loadStepMs();
-    coverFromRef.current = from;
-    coverToRef.current = to;
-    await loadWindow(from, to);
+    const now = simNow();
+    try {
+      const r = await fetchTimeline(); // 非窗口：最新顶层帖 + roster + 近期互动
+      if (r.accounts.length) setRoster(r.accounts.map((a) => ({ handle: a.handle, displayName: a.displayName })));
+      addPosts(r.posts);
+      ingestInteractions(r.interactions);
+      const times = r.posts.map((p) => p.createdAt);
+      const latest = times.length ? Math.max(...times) : now;
+      const oldest = times.length ? Math.min(...times) : now;
+      coverFromRef.current = oldest; // 向左滚动从已加载最早内容续接
+      coverToRef.current = now;
+      if (now - latest > 30 * 60_000) {
+        // 时钟领先内容超 30 分钟（模拟器空闲）：落到最新内容、停跟随，否则播放头在空白处
+        setFollowing(false);
+        pendingJumpRef.current = latest;
+      }
+      setError(null);
+    } catch (e) {
+      setError(String(e));
+    }
   }
 
   /** 向左滚到边缘：把覆盖区间往更早扩一个 step（窗口内取全，含历史回复/互动）。 */
