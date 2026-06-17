@@ -7,12 +7,21 @@ import type { StoredSimTraceEvent } from '@socialsim/shared';
 import { aggregateTimeline } from './timeline-aggregator.js';
 import { TraceReader } from './trace-reader.js';
 import { TraceSseHub } from './trace-sse.js';
+import {
+  readPools,
+  saveEntry,
+  deleteEntry,
+  type PoolLayer,
+  type PoolScope,
+} from './pool-files.js';
 
 /** 编辑器后端：renderer 的唯一数据源，聚合/代理社交站 admin API，承载布局存档等编辑器配置。
  *  基础设施配置（端口/社交站地址/数据根目录）经 env，与具体世界无关。 */
 export const PORT = Number(process.env.EDITOR_BACKEND_PORT ?? 5176);
 export const SOCIAL_API = (process.env.SOCIALSIM_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 export const DATA_DIR = process.env.SOCIALSIM_DATA_DIR ?? path.resolve(__dirname, '..', '..', '..', 'data');
+/** 模拟器本地控制接口地址（基础设施配置）：内容池预览代理到这里。 */
+export const SIM_CONTROL = (process.env.SOCIALSIM_CONTROL_URL ?? 'http://127.0.0.1:5177').replace(/\/$/, '');
 
 interface LayoutsDoc {
   saved: Array<{ name: string; layout: unknown }>;
@@ -39,6 +48,7 @@ async function registerEditorSwagger(app: FastifyInstance): Promise<void> {
         { name: 'timeline', description: '时间轴取数（代理社交站全站流 / 账号帖流 / 互动）' },
         { name: 'layouts', description: '编辑器布局存档（随活动世界文件夹）' },
         { name: 'trace', description: '决策轨迹：只读 sim-trace.db + SSE 推流' },
+        { name: 'pools', description: '内容池：读写世界文件夹三层池文件 + 预览（代理模拟器活引擎）' },
         { name: 'meta', description: '健康检查' },
       ],
     },
@@ -363,6 +373,89 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
       }
       traceSse.broadcast(e);
       return { ok: true };
+    },
+  );
+
+  // --- 内容池：读写当前世界的三层池文件（编辑器后端是唯一写方，模拟器只读 + 热重载） ---
+
+  app.get(
+    '/api/content-pools',
+    { schema: { tags: ['pools'], summary: '读当前世界内容池三层（组件/语法/池，带 provenance）', operationId: 'getContentPools' } },
+    async (_req, reply) => {
+      const id = await activeWorldId();
+      if (!id) {
+        reply.status(502);
+        return { error: 'no active world' };
+      }
+      return await readPools(DATA_DIR, id);
+    },
+  );
+
+  app.post<{ Body: { layer?: PoolLayer; key?: string; entry?: unknown; scope?: PoolScope; file?: string } }>(
+    '/api/content-pools/save',
+    { schema: { tags: ['pools'], summary: '新建/更新一个条目（缺 scope/file 则落世界层默认文件）', operationId: 'saveContentPool' } },
+    async (req, reply) => {
+      const id = await activeWorldId();
+      if (!id) {
+        reply.status(502);
+        return { error: 'no active world' };
+      }
+      const { layer, key, entry, scope, file } = req.body ?? {};
+      if ((layer !== 'component' && layer !== 'grammar' && layer !== 'pool') || !key) {
+        reply.status(400);
+        return { error: 'bad layer/key' };
+      }
+      try {
+        await saveEntry(DATA_DIR, id, { layer, key, entry, scope, file });
+        return { ok: true };
+      } catch (err) {
+        reply.status(400);
+        return { error: String(err) };
+      }
+    },
+  );
+
+  app.post<{ Body: { key?: string; scope?: PoolScope; file?: string } }>(
+    '/api/content-pools/delete',
+    { schema: { tags: ['pools'], summary: '从来源文件删除一个条目', operationId: 'deleteContentPool' } },
+    async (req, reply) => {
+      const id = await activeWorldId();
+      if (!id) {
+        reply.status(502);
+        return { error: 'no active world' };
+      }
+      const { key, scope, file } = req.body ?? {};
+      if (!key || (scope !== 'global' && scope !== 'world') || !file) {
+        reply.status(400);
+        return { error: 'bad key/scope/file' };
+      }
+      try {
+        await deleteEntry(DATA_DIR, id, { key, scope, file });
+        return { ok: true };
+      } catch (err) {
+        reply.status(400);
+        return { error: String(err) };
+      }
+    },
+  );
+
+  // 预览：代理到模拟器本地控制接口，用其活引擎组装（模拟器未运行则 503，renderer 优雅提示）。
+  app.post(
+    '/api/content-pools/preview',
+    { schema: { tags: ['pools'], summary: '内容池预览（代理模拟器活引擎）', operationId: 'previewContentPool' } },
+    async (req, reply) => {
+      try {
+        const res = await fetch(`${SIM_CONTROL}/preview`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(req.body ?? {}),
+        });
+        reply.status(res.status);
+        return await res.json();
+      } catch {
+        reply.status(503);
+        return { error: 'simulator not running' };
+      }
     },
   );
 

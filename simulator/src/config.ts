@@ -19,6 +19,7 @@ export function loadConfig(configPath?: string): SimulatorConfig {
     dataDir: DEFAULT_DATA_DIR,
     // 默认指向本机编辑器后端；编辑器未起时 POST 失败被吞，不影响写世界。空串=关闭推流。
     traceSinkUrl: process.env.SOCIALSIM_TRACE_SINK_URL ?? 'http://127.0.0.1:5176',
+    controlPort: Number(process.env.SOCIALSIM_CONTROL_PORT ?? 5177),
   };
 
   if (configPath && existsSync(configPath)) {
@@ -30,6 +31,7 @@ export function loadConfig(configPath?: string): SimulatorConfig {
       tickIntervalMs: parsed.tickIntervalMs ?? base.tickIntervalMs,
       dataDir: parsed.dataDir ?? base.dataDir,
       traceSinkUrl: parsed.traceSinkUrl ?? base.traceSinkUrl,
+      controlPort: parsed.controlPort ?? base.controlPort,
     };
   }
 

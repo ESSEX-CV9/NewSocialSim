@@ -97,6 +97,38 @@ export interface Pool {
   fragments?: ComponentRegistry;
 }
 
+/**
+ * 内容池预览请求（编辑器后端 → 模拟器本地控制接口）。
+ * 携带待预览的池（可含编辑器里尚未保存的草稿），模拟器用其活引擎 + 当前世界已加载的组件/语法库组装。
+ * `components` / `grammars` 为未保存草稿覆盖（合并在已加载库之上），使预览反映未存改动。
+ */
+export interface PoolPreviewRequest {
+  pool: Pool;
+  /** 生成几条样例，缺省由模拟器侧定。 */
+  count?: number;
+  /** 复现种子；缺省每条用不同随机种子。 */
+  seed?: number;
+  /** prob 表达式变量（如 slangDensity）。 */
+  vars?: Record<string, number>;
+  /** 未保存的组件草稿覆盖。 */
+  components?: ComponentRegistry;
+  /** 未保存的语法草稿覆盖。 */
+  grammars?: GrammarRegistry;
+}
+
+/** 预览的一条样例：成文 + 所用语法 + 所选片段（追溯）。 */
+export interface PoolPreviewSample {
+  text: string;
+  grammar: string;
+  fragments: string[];
+}
+
+/** 内容池预览响应。`failed` = 组装失败（无可用语法/必填槽填不上）的次数。 */
+export interface PoolPreviewResponse {
+  samples: PoolPreviewSample[];
+  failed: number;
+}
+
 /** 加载并合并三类来源（全局原子 + 世界场景 + 临时话题）后的内容池总集。 */
 export interface LoadedPools {
   /** 组件类型库（全局 + 世界级合并）。 */

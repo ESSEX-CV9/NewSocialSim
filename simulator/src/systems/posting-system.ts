@@ -23,7 +23,8 @@ export class PostingSystem implements System {
 
   constructor(
     private api: ApiClient,
-    private pools: LoadedPools,
+    /** 内容池提供者：每次取最新，支持文件改动后热重载（见 simulator 的 fs watch）。 */
+    private getPools: () => LoadedPools,
     private tuning: TuningService,
     private trace: TraceSink,
   ) {}
@@ -64,7 +65,7 @@ export class PostingSystem implements System {
     }
 
     const result = assembleDetailed(pool, {
-      pools: this.pools,
+      pools: this.getPools(),
       rng,
       exprVarDefault: this.tuning.get<number>('pools.exprVarDefault'),
       optionalProb: this.tuning.get<number>('pools.optionalProb'),
@@ -106,7 +107,7 @@ export class PostingSystem implements System {
    */
   private selectPool(entity: Entity, rng: () => number): Pool | null {
     const tier = entity.profile.tier;
-    const candidates = poolsForShape(this.pools.pools, 'standalone').filter((p) => p.tiers?.includes(tier));
+    const candidates = poolsForShape(this.getPools().pools, 'standalone').filter((p) => p.tiers?.includes(tier));
     if (!candidates.length) return null;
     const aff = entity.profile.poolAffinities;
     const fallback = this.tuning.get<number>('pools.defaultAffinity') ?? 0.3;

@@ -174,6 +174,42 @@ paths:
       responses:
         "200":
           description: Default Response
+  /api/content-pools:
+    get:
+      operationId: getContentPools
+      summary: 读当前世界内容池三层（组件/语法/池，带 provenance）
+      tags:
+        - pools
+      responses:
+        "200":
+          description: Default Response
+  /api/content-pools/save:
+    post:
+      operationId: saveContentPool
+      summary: 新建/更新一个条目（缺 scope/file 则落世界层默认文件）
+      tags:
+        - pools
+      responses:
+        "200":
+          description: Default Response
+  /api/content-pools/delete:
+    post:
+      operationId: deleteContentPool
+      summary: 从来源文件删除一个条目
+      tags:
+        - pools
+      responses:
+        "200":
+          description: Default Response
+  /api/content-pools/preview:
+    post:
+      operationId: previewContentPool
+      summary: 内容池预览（代理模拟器活引擎）
+      tags:
+        - pools
+      responses:
+        "200":
+          description: Default Response
 servers:
   - url: http://127.0.0.1:5176
     description: 编辑器后端（本地）
@@ -188,5 +224,7 @@ tags:
     description: 编辑器布局存档（随活动世界文件夹）
   - name: trace
     description: 决策轨迹：只读 sim-trace.db + SSE 推流
+  - name: pools
+    description: 内容池：读写世界文件夹三层池文件 + 预览（代理模拟器活引擎）
   - name: meta
     description: 健康检查

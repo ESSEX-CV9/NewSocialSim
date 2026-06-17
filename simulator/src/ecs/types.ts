@@ -82,6 +82,8 @@ export interface SimulatorConfig {
   /** 决策轨迹实时推送 sink（基础设施配置，与具体世界无关）：编辑器后端 ingest 地址，
    *  落盘后尽力而为 POST 一份供时间轴实时长块。空/缺失则仅本地落盘不推流，模拟器照常运行。 */
   traceSinkUrl?: string | undefined;
+  /** 本地控制接口端口（基础设施配置）：仅绑 127.0.0.1，供编辑器后端代理预览等控制请求。 */
+  controlPort: number;
 }
 
 /** 一个被驱动账号的完整配置，来自活动世界的 npc 档案。 */

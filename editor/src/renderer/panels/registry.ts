@@ -3,6 +3,7 @@ import type { IDockviewPanelProps } from 'dockview';
 import { ConsolePanel } from './ConsolePanel.js';
 import { TimelinePanel } from './TimelinePanel.js';
 import { InspectorPanel } from './InspectorPanel.js';
+import { ContentPoolPanel } from './ContentPoolPanel.js';
 import { PlaceholderPanel } from './PlaceholderPanel.js';
 
 /**
@@ -21,7 +22,7 @@ export const PANELS: PanelDef[] = [
   { id: 'timeline', title: '时间轴', component: TimelinePanel },
   { id: 'inspector', title: '检视器', component: InspectorPanel },
   { id: 'npc', title: 'NPC 设计器', component: PlaceholderPanel },
-  { id: 'pools', title: '内容池', component: PlaceholderPanel },
+  { id: 'pools', title: '内容池', component: ContentPoolPanel },
   { id: 'lore', title: '设定文档', component: PlaceholderPanel },
   { id: 'graph', title: '社交图谱', component: PlaceholderPanel },
   { id: 'topics', title: '话题', component: PlaceholderPanel },

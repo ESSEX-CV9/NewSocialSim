@@ -1,3 +1,6 @@
+import http from 'node:http';
+import { watch, existsSync, type FSWatcher } from 'node:fs';
+import path from 'node:path';
 import { ApiClient } from './api-client.js';
 import { EntityRegistry } from './ecs/entity-registry.js';
 import { PostingSystem } from './systems/posting-system.js';
@@ -6,10 +9,14 @@ import { CascadeSystem } from './systems/cascade-system.js';
 import { TraceSink } from './trace/trace-sink.js';
 import { TuningService } from './tuning/tuning-service.js';
 import { loadPools } from './content-pool/pool-loader.js';
+import { startControlServer } from './control/control-server.js';
 import type { LoadedPools } from '@socialsim/shared';
 import type { System, Entity, TickContext, SimulatorConfig, DrivenAccount } from './ecs/types.js';
 import type { SimulatorHeartbeat } from '@socialsim/shared';
 import { logger } from './logger.js';
+
+/** 内容池子目录名：fs watch 只关心这些目录下的 .json 改动（避开 world.db-wal 等高频写）。 */
+const POOL_DIRS = ['components', 'grammars', 'pools', 'scene-pools', 'topic-pools'];
 
 /** 级联回复用的兜底短语料（Phase 3 由 reply 形态的内容池接管）。 */
 const REPLY_POOL = [
@@ -46,6 +53,9 @@ export class Simulator {
   private tickNumber = 0;
   private lastFlushedWorldId: string | null = null;
   private lastFlushAt: number | null = null;
+  private controlServer: http.Server | null = null;
+  private poolWatchers: FSWatcher[] = [];
+  private reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private config: SimulatorConfig) {
     this.api = new ApiClient({ baseUrl: config.apiBaseUrl });
@@ -57,6 +67,13 @@ export class Simulator {
     if (this.running) return;
     this.running = true;
     logger.info(`Simulator starting (API ${this.config.apiBaseUrl}, tick ${this.config.tickIntervalMs}ms) — following active world`);
+    // 本地控制接口：供编辑器后端代理预览等请求（见 control-server.ts）。
+    this.controlServer = startControlServer(this.config.controlPort, {
+      boundWorldId: () => this.session?.worldId ?? null,
+      getPools: () => this.loadedPools,
+      exprVarDefault: () => this.tuning.get<number>('pools.exprVarDefault') ?? 0.5,
+      optionalProb: () => this.tuning.get<number>('pools.optionalProb') ?? 0.5,
+    });
     this.scheduleNext();
   }
 
@@ -65,6 +82,11 @@ export class Simulator {
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
+    }
+    this.unwatchPools();
+    if (this.controlServer) {
+      this.controlServer.close();
+      this.controlServer = null;
     }
     if (this.session) this.flush(this.session);
     this.traceSink.close();
@@ -159,6 +181,8 @@ export class Simulator {
         `${Object.keys(pools.components).length} 组件类型 / ` +
         `${Object.keys(pools.grammars).length} 语法 / ${pools.pools.length} 池`,
     );
+    // 监视世界的池子文件，编辑器改完保存即热重载，下次发帖用新定义、不重启。
+    this.watchPools(worldId);
 
     const registry = new EntityRegistry();
     let profiles: Awaited<ReturnType<ApiClient['getNpcProfiles']>>['profiles'] = [];
@@ -200,7 +224,8 @@ export class Simulator {
 
     const entityMap = new Map<string, Entity>(registry.getAll().map(e => [e.id, e]));
     const systems: System[] = [
-      new PostingSystem(this.api, pools, this.tuning, this.traceSink),
+      // 传内容池提供者（取最新）而非固定快照，支持热重载后立即生效。
+      new PostingSystem(this.api, () => this.loadedPools!, this.tuning, this.traceSink),
       new InteractionSystem(this.api, this.traceSink),
       new CascadeSystem(this.api, entityMap, [...REPLY_POOL], this.traceSink),
     ];
@@ -214,5 +239,56 @@ export class Simulator {
     logger.info(`Flushed world ${session.worldId} (no runtime state in Step 0)`);
     this.lastFlushedWorldId = session.worldId;
     this.lastFlushAt = Date.now();
+  }
+
+  /** 监视世界与全局的池子文件目录；改动经防抖后热重载内容池（编辑器存盘即生效）。 */
+  private watchPools(worldId: string): void {
+    this.unwatchPools();
+    const dirs = [
+      path.join(this.config.dataDir, 'global-pools'),
+      path.join(this.config.dataDir, 'worlds', worldId),
+    ];
+    for (const dir of dirs) {
+      if (!existsSync(dir)) continue;
+      try {
+        const w = watch(dir, { recursive: true }, (_event, filename) => {
+          if (!filename) return;
+          const f = filename.toString().replace(/\\/g, '/');
+          if (!f.endsWith('.json')) return;
+          if (!POOL_DIRS.includes(f.split('/')[0]!)) return; // 只关心池子相关子目录，避开 world.db-wal 等
+          this.scheduleReload();
+        });
+        this.poolWatchers.push(w);
+      } catch (err) {
+        logger.warn(`监视池子目录失败 ${dir}:`, err);
+      }
+    }
+  }
+
+  private unwatchPools(): void {
+    for (const w of this.poolWatchers) {
+      try { w.close(); } catch { /* 已关则忽略 */ }
+    }
+    this.poolWatchers = [];
+    if (this.reloadTimer) { clearTimeout(this.reloadTimer); this.reloadTimer = null; }
+  }
+
+  /** 防抖：文件多次写入合并为一次重载。 */
+  private scheduleReload(): void {
+    if (this.reloadTimer) clearTimeout(this.reloadTimer);
+    this.reloadTimer = setTimeout(() => {
+      this.reloadTimer = null;
+      this.reloadPools();
+    }, 300);
+  }
+
+  private reloadPools(): void {
+    if (!this.session) return;
+    try {
+      this.loadedPools = loadPools(this.config.dataDir, this.session.worldId);
+      logger.info(`Content pools hot-reloaded for world ${this.session.worldId}: ${this.loadedPools.pools.length} 池`);
+    } catch (err) {
+      logger.error('内容池热重载失败:', err);
+    }
   }
 }
