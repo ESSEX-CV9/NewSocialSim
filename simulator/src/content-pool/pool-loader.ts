@@ -1,14 +1,16 @@
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
-import type {
-  ComponentRegistry,
-  Fragment,
-  Grammar,
-  GrammarRegistry,
-  LoadedPools,
-  Pool,
-  PoolDimensions,
-  PoolGrammarRef,
+import {
+  POOL_DIM_SHAPE,
+  type ComponentRegistry,
+  type Fragment,
+  type Grammar,
+  type GrammarRegistry,
+  type LoadedPools,
+  type Pool,
+  type PoolDimensions,
+  type PoolGrammarRef,
+  type PoolShape,
 } from '@socialsim/shared';
 import { logger } from '../logger.js';
 
@@ -138,7 +140,10 @@ function mergeComponents(into: ComponentRegistry, add: ComponentRegistry): void 
 function validate(loaded: LoadedPools): void {
   const missingGrammars = new Set<string>();
   const missingComponents = new Set<string>();
+  const badShape = new Set<string>();
+  const SHAPES: readonly PoolShape[] = ['standalone', 'reply', 'quote'];
   for (const pool of loaded.pools) {
+    if (!SHAPES.includes(pool.dimensions[POOL_DIM_SHAPE] as PoolShape)) badShape.add(pool.id);
     for (const g of pool.grammars) {
       const grammar = loaded.grammars[g.ref];
       if (!grammar) {
@@ -152,4 +157,5 @@ function validate(loaded: LoadedPools): void {
   }
   if (missingGrammars.size) logger.warn(`内容池：悬空语法引用 ${[...missingGrammars].join(', ')}`);
   if (missingComponents.size) logger.warn(`内容池：悬空组件引用 ${[...missingComponents].join(', ')}`);
+  if (badShape.size) logger.warn(`内容池：池缺少/非法 形态 维度（不可被任何动作选中）：${[...badShape].join(', ')}`);
 }

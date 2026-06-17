@@ -220,11 +220,12 @@
 - **取片段规则（混合式，见 re-plan「池级片段覆盖」）**：`pool.fragments[组件] ?? 共享组件库[组件]`——池写了用池的、没写退回共享库；占位符内联引用同此优先级。
 - **交接提示**：占位符 `{key}` / `{key:variant}` 即内联组件引用，与槽位同一机制（variant 待 faction 注册表，现按基础组件名解析）。`prob` 支持数字或 `var [* const]` 表达式（var 取自注入的 vars，缺省 exprVarDefault）；alignment / novelty 加权待状态机层，本阶段片段等权抽。业务可调值（exprVarDefault / optionalProb）由调用方从 tuning 注入，assembler 不写死。
 
-### 1.3 shape 维度过滤 ⬜
+### 1.3 shape 维度过滤 ✅
 
 - **目标**：池 / 语法 / 片段带 `形态` 维度，组装入口按动作过滤，本步只放行 `standalone`。
-- **改动**：`simulator/src/`（组装入口加 shape 过滤）、内容池数据补 `形态` 维度。
-- **验收**：顶层发帖只组装出 `standalone` 内容，无 reply / quote 形态的片段被当顶层帖发出。
+- **改动**：`assembler.ts`（`poolShape` / `poolsForShape` / `assembleForShape` 形态过滤入口）、`pool-loader.ts`（缺/非法 `形态` 维度告警）。形态维度作于**池**（`dimensions.形态`）；池数据 1.1 已带 `形态`。
+- **结果**：模块级冒烟 8/8——`assembleForShape('standalone')` 只产 standalone 池内容，reply / 无形态池被排除；`reply` 只产 reply；无 quote 池返回 null。
+- **交接提示**：`assembleForShape` 的池选择本步等权随机，1.4 PostingSystem 接组装时把它换成按人设（factions / poolAffinities）选池，但复用同一形态过滤。回复 / 引用形态池属 Phase 3。
 
 ### 1.4 PostingSystem 接组装引擎 ⬜
 

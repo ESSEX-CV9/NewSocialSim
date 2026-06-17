@@ -1,4 +1,4 @@
-import type { Fragment, LoadedPools, Pool } from '@socialsim/shared';
+import { POOL_DIM_SHAPE, type Fragment, type LoadedPools, type Pool, type PoolShape } from '@socialsim/shared';
 
 /**
  * 内容组装引擎（1.2，零 LLM）：给定一个池，按其语法拼出一条文本。
@@ -29,6 +29,30 @@ export interface AssembleContext {
   exprVarDefault?: number;
   /** 标了 optional 但无 prob 的槽，出现概率（调用方从 tuning 取）。 */
   optionalProb?: number;
+}
+
+const SHAPES: readonly PoolShape[] = ['standalone', 'reply', 'quote'];
+
+/** 池的形态（取自维度 POOL_DIM_SHAPE）；未声明或非法值返回 null（不可被任何动作选中）。 */
+export function poolShape(pool: Pool): PoolShape | null {
+  const s = pool.dimensions[POOL_DIM_SHAPE];
+  return SHAPES.includes(s as PoolShape) ? (s as PoolShape) : null;
+}
+
+/** 按形态过滤池：顶层发帖只取 standalone、回复只取 reply、引用只取 quote（形态忠实，见 re-plan）。 */
+export function poolsForShape(pools: Pool[], shape: PoolShape): Pool[] {
+  return pools.filter((p) => poolShape(p) === shape);
+}
+
+/**
+ * 形态过滤的组装入口：只在与 `shape` 匹配的池里选一个组装，杜绝错形态内容混入。
+ * 本步（1.3）池选择为等权随机；按人设（factions / poolAffinities）选池属 1.4，将复用本过滤。
+ */
+export function assembleForShape(shape: PoolShape, ctx: AssembleContext): string | null {
+  const matching = poolsForShape(ctx.pools.pools, shape);
+  if (!matching.length) return null;
+  const pool = matching[Math.floor(ctx.rng() * matching.length)]!;
+  return assemble(pool, ctx);
 }
 
 /** mulberry32：32 位种子 PRNG，返回 [0,1) 的取数函数，供复现。 */
