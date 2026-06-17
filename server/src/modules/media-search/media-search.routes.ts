@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
 import { MediaSearchController } from './media-search.controller.js';
 import type { MediaSearchService } from './media-search.service.js';
 import type { MediaSearchConfig } from './search-config.js';
@@ -112,29 +113,135 @@ export function registerMediaSearchRoutes(app: FastifyInstance, deps: MediaSearc
 
   app.get<{ Querystring: { q: string; source?: string; rating?: 'safe' | 'all' | 'r18' } }>(
     '/api/media-search',
-    { ...auth, schema: { querystring: searchQuerySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: '关键字搜图',
+        operationId: 'searchImages',
+        security: REQUIRE_JWT,
+        querystring: searchQuerySchema,
+      },
+    },
     controller.search,
   );
-  app.get('/api/media-search/sources', auth, controller.sources);
+  app.get(
+    '/api/media-search/sources',
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: '可用图源',
+        operationId: 'listImageSources',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.sources,
+  );
   // 预览代理公开：<img> 标签带不了 Authorization 头；白名单在 service 内控制
   app.get<{ Querystring: { url: string } }>(
     '/api/media-search/preview',
-    { schema: { querystring: previewQuerySchema } },
+    {
+      schema: {
+        tags: ['media-search'],
+        summary: '外链预览代理',
+        operationId: 'previewImageUrl',
+        querystring: previewQuerySchema,
+      },
+    },
     controller.preview,
   );
-  app.get('/api/media-search/config', auth, controller.getConfig);
+  app.get(
+    '/api/media-search/config',
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: '读搜图配置',
+        operationId: 'getMediaSearchConfig',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.getConfig,
+  );
   app.patch<{ Body: Partial<MediaSearchConfig> }>(
     '/api/media-search/config',
-    { ...auth, schema: { body: configBodySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: '改搜图配置',
+        operationId: 'updateMediaSearchConfig',
+        security: REQUIRE_JWT,
+        body: configBodySchema,
+      },
+    },
     controller.patchConfig,
   );
-  app.post('/api/media-search/pixiv/login', auth, controller.pixivLogin);
-  app.get('/api/media-search/pixiv/login/status', auth, controller.pixivLoginStatus);
+  app.post(
+    '/api/media-search/pixiv/login',
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: 'Pixiv 引导登录',
+        operationId: 'pixivLogin',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.pixivLogin,
+  );
+  app.get(
+    '/api/media-search/pixiv/login/status',
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: 'Pixiv 登录态',
+        operationId: 'pixivLoginStatus',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.pixivLoginStatus,
+  );
   app.post<{ Body: { code: string } }>(
     '/api/media-search/pixiv/code',
-    { ...auth, schema: { body: codeBodySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: '提交 Pixiv code',
+        operationId: 'pixivSubmitCode',
+        security: REQUIRE_JWT,
+        body: codeBodySchema,
+      },
+    },
     controller.pixivCode,
   );
-  app.post('/api/media-search/bilibili/login', auth, controller.biliLogin);
-  app.get('/api/media-search/bilibili/login/status', auth, controller.biliLoginStatus);
+  app.post(
+    '/api/media-search/bilibili/login',
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: 'B 站引导登录',
+        operationId: 'bilibiliLogin',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.biliLogin,
+  );
+  app.get(
+    '/api/media-search/bilibili/login/status',
+    {
+      ...auth,
+      schema: {
+        tags: ['media-search'],
+        summary: 'B 站登录态',
+        operationId: 'bilibiliLoginStatus',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.biliLoginStatus,
+  );
 }

@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
 import { VideoSearchController } from './video-search.controller.js';
 import type { IngestMode, VideoSearchService } from './video-search.service.js';
 
@@ -54,31 +55,99 @@ export function registerVideoSearchRoutes(app: FastifyInstance, deps: VideoSearc
 
   app.post<{ Body: { url: string; mode?: IngestMode } }>(
     '/api/video/ingest',
-    { ...auth, schema: { body: ingestBodySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['video-search'],
+        summary: '引入视频',
+        operationId: 'ingestVideo',
+        security: REQUIRE_JWT,
+        body: ingestBodySchema,
+      },
+    },
     controller.ingest,
   );
-  app.get('/api/video/sources', auth, controller.sources);
+  app.get(
+    '/api/video/sources',
+    {
+      ...auth,
+      schema: {
+        tags: ['video-search'],
+        summary: '视频源',
+        operationId: 'listVideoSources',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.sources,
+  );
   app.get<{ Querystring: { q: string; source?: string } }>(
     '/api/video/search',
-    { ...auth, schema: { querystring: searchQuerySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['video-search'],
+        summary: '搜视频',
+        operationId: 'searchVideos',
+        security: REQUIRE_JWT,
+        querystring: searchQuerySchema,
+      },
+    },
     controller.search,
   );
-  app.get('/api/video/tasks', auth, controller.tasks);
+  app.get(
+    '/api/video/tasks',
+    {
+      ...auth,
+      schema: {
+        tags: ['video-search'],
+        summary: '异步任务列表',
+        operationId: 'listVideoTasks',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.tasks,
+  );
   app.get<{ Params: { id: string } }>(
     '/api/video/tasks/:id',
-    { ...auth, schema: { params: taskParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['video-search'],
+        summary: '单任务查询',
+        operationId: 'getVideoTask',
+        security: REQUIRE_JWT,
+        params: taskParamsSchema,
+      },
+    },
     controller.task,
   );
   app.delete<{ Params: { id: string } }>(
     '/api/video/tasks/:id',
-    { ...auth, schema: { params: taskParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['video-search'],
+        summary: '取消任务',
+        operationId: 'cancelVideoTask',
+        security: REQUIRE_JWT,
+        params: taskParamsSchema,
+      },
+    },
     controller.cancel,
   );
   // 流式播放代理公开：video 标签带不了 Authorization 头（与 /file 端点同口径，?w= 把门）
   // 路由由本模块注册（依赖 yt-dlp 解析直链），避免 media 模块反向依赖 video-search
   app.get<{ Params: { id: string }; Querystring: { w: string } }>(
     '/api/media/:id/stream',
-    { schema: { params: streamParamsSchema, querystring: streamQuerySchema } },
+    {
+      schema: {
+        tags: ['media'],
+        summary: '流式视频代理',
+        operationId: 'streamVideo',
+        params: streamParamsSchema,
+        querystring: streamQuerySchema,
+      },
+    },
     controller.stream,
   );
 }

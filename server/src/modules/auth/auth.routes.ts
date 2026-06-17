@@ -1,5 +1,6 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { WorldManager } from '../../core/world/world-manager.js';
+import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
 import { AuthController } from './auth.controller.js';
 import type { AuthService } from './auth.service.js';
 
@@ -33,7 +34,31 @@ export interface AuthRoutesDeps {
 export function registerAuthRoutes(app: FastifyInstance, deps: AuthRoutesDeps): void {
   const controller = new AuthController(deps.authService, deps.worldManager);
 
-  app.post('/api/auth/register', { schema: { body: registerBodySchema } }, controller.register);
-  app.post('/api/auth/login', { schema: { body: loginBodySchema } }, controller.login);
-  app.get('/api/auth/me', { preHandler: deps.requireAuth }, controller.me);
+  app.post(
+    '/api/auth/register',
+    {
+      schema: {
+        tags: ['auth'],
+        summary: '注册真人账号',
+        operationId: 'register',
+        body: registerBodySchema,
+      },
+    },
+    controller.register,
+  );
+  app.post(
+    '/api/auth/login',
+    {
+      schema: { tags: ['auth'], summary: '登录', operationId: 'login', body: loginBodySchema },
+    },
+    controller.login,
+  );
+  app.get(
+    '/api/auth/me',
+    {
+      preHandler: deps.requireAuth,
+      schema: { tags: ['auth'], summary: '当前登录用户', operationId: 'getMe', security: REQUIRE_JWT },
+    },
+    controller.me,
+  );
 }

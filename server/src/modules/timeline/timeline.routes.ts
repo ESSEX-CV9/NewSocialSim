@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { OPTIONAL_JWT, REQUIRE_JWT } from '../../core/openapi/swagger.js';
 import { TimelineController } from './timeline.controller.js';
 import type { HomeSort, TimelineService } from './timeline.service.js';
 
@@ -32,22 +33,58 @@ export function registerTimelineRoutes(app: FastifyInstance, deps: TimelineRoute
 
   app.get<{ Querystring: { cursor?: string; limit?: number; sort?: HomeSort } }>(
     '/api/timeline/home',
-    { preHandler: deps.requireAuth, schema: { querystring: homeQuerySchema } },
+    {
+      preHandler: deps.requireAuth,
+      schema: {
+        tags: ['timeline'],
+        summary: '关注流',
+        operationId: 'getHomeTimeline',
+        security: REQUIRE_JWT,
+        querystring: homeQuerySchema,
+      },
+    },
     controller.home,
   );
   app.get<{ Querystring: { cursor?: string; limit?: number } }>(
     '/api/timeline/foryou',
-    { preHandler: deps.optionalAuth, schema: { querystring: pageQuerySchema } },
+    {
+      preHandler: deps.optionalAuth,
+      schema: {
+        tags: ['timeline'],
+        summary: '推荐流',
+        operationId: 'getForYouTimeline',
+        security: OPTIONAL_JWT,
+        querystring: pageQuerySchema,
+      },
+    },
     controller.forYou,
   );
   app.get<{ Querystring: { cursor?: string; limit?: number } }>(
     '/api/timeline/global',
-    { preHandler: deps.optionalAuth, schema: { querystring: pageQuerySchema } },
+    {
+      preHandler: deps.optionalAuth,
+      schema: {
+        tags: ['timeline'],
+        summary: '全站流（firehose）',
+        operationId: 'getGlobalTimeline',
+        security: OPTIONAL_JWT,
+        querystring: pageQuerySchema,
+      },
+    },
     controller.global,
   );
   app.get<{ Params: { handle: string }; Querystring: { cursor?: string; limit?: number } }>(
     '/api/users/:handle/timeline',
-    { preHandler: deps.optionalAuth, schema: { querystring: pageQuerySchema } },
+    {
+      preHandler: deps.optionalAuth,
+      schema: {
+        tags: ['timeline'],
+        summary: '某账号主页流（其帖 + 转发）',
+        operationId: 'getUserTimeline',
+        security: OPTIONAL_JWT,
+        querystring: pageQuerySchema,
+      },
+    },
     controller.user,
   );
 }

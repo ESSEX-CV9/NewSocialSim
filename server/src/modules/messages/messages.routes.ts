@@ -3,6 +3,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { AuthTokenPayload } from '../../core/auth/auth-guard.js';
 import { UnauthorizedError } from '../../core/errors/app-error.js';
 import type { SseHub } from '../../core/events/sse-hub.js';
+import { REQUIRE_JWT, REQUIRE_SSE } from '../../core/openapi/swagger.js';
 import type { WorldManager } from '../../core/world/world-manager.js';
 import { MessagesController } from './messages.controller.js';
 import type { MessagesService } from './messages.service.js';
@@ -95,89 +96,270 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
 
   app.post<{ Body: { userId: number } }>(
     '/api/messages/conversations',
-    { ...auth, schema: { body: createConversationBodySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '发起会话',
+        operationId: 'createConversation',
+        security: REQUIRE_JWT,
+        body: createConversationBodySchema,
+      },
+    },
     controller.createConversation,
   );
   app.get<{ Querystring: { filter?: DmConversationFilter; cursor?: string; limit?: number } }>(
     '/api/messages/conversations',
-    { ...auth, schema: { querystring: listConversationsQuerySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '会话列表',
+        operationId: 'listConversations',
+        security: REQUIRE_JWT,
+        querystring: listConversationsQuerySchema,
+      },
+    },
     controller.listConversations,
   );
-  app.get('/api/messages/unread-count', auth, controller.unreadCount);
-  app.post('/api/messages/read-all', auth, controller.markAllRead);
+  app.get(
+    '/api/messages/unread-count',
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '私信总未读',
+        operationId: 'getMessagesUnreadCount',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.unreadCount,
+  );
+  app.post(
+    '/api/messages/read-all',
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '全部已读',
+        operationId: 'markAllMessagesRead',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.markAllRead,
+  );
   app.get<{ Querystring: { q: string } }>(
     '/api/messages/search',
-    { ...auth, schema: { querystring: searchQuerySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '搜会话/消息',
+        operationId: 'searchMessages',
+        security: REQUIRE_JWT,
+        querystring: searchQuerySchema,
+      },
+    },
     controller.search,
   );
   app.get<{ Params: { id: number } }>(
     '/api/messages/conversations/:id',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '单会话',
+        operationId: 'getConversation',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.getConversation,
   );
   app.get<{ Params: { id: number }; Querystring: { cursor?: string; limit?: number } }>(
     '/api/messages/conversations/:id/messages',
-    { ...auth, schema: { params: idParamsSchema, querystring: pageQuerySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '消息列表',
+        operationId: 'listMessages',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+        querystring: pageQuerySchema,
+      },
+    },
     controller.listMessages,
   );
   app.post<{ Params: { id: number }; Body: { content: string; mediaIds?: number[] } }>(
     '/api/messages/conversations/:id/messages',
-    { ...auth, schema: { params: idParamsSchema, body: sendMessageBodySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '发消息',
+        operationId: 'sendMessage',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+        body: sendMessageBodySchema,
+      },
+    },
     controller.sendMessage,
   );
   app.post<{ Params: { id: number }; Body: { messageId?: number } }>(
     '/api/messages/conversations/:id/read',
-    { ...auth, schema: { params: idParamsSchema, body: markReadBodySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '标已读',
+        operationId: 'markMessagesRead',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+        body: markReadBodySchema,
+      },
+    },
     controller.markRead,
   );
   app.post<{ Params: { id: number } }>(
     '/api/messages/conversations/:id/accept',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '接受消息请求',
+        operationId: 'acceptConversationRequest',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.acceptRequest,
   );
   app.post<{ Params: { id: number } }>(
     '/api/messages/conversations/:id/unread',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '标未读',
+        operationId: 'markConversationUnread',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.markUnread,
   );
   app.post<{ Params: { id: number } }>(
     '/api/messages/conversations/:id/mute',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '免打扰 开',
+        operationId: 'muteConversation',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.mute,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/messages/conversations/:id/mute',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '免打扰 关',
+        operationId: 'unmuteConversation',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.unmute,
   );
   app.post<{ Params: { id: number } }>(
     '/api/messages/conversations/:id/pin',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '置顶 开',
+        operationId: 'pinConversation',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.pin,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/messages/conversations/:id/pin',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '置顶 关',
+        operationId: 'unpinConversation',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.unpin,
   );
   app.delete<{ Params: { id: number } }>(
     '/api/messages/conversations/:id',
-    { ...auth, schema: { params: idParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '隐藏会话',
+        operationId: 'hideConversation',
+        security: REQUIRE_JWT,
+        params: idParamsSchema,
+      },
+    },
     controller.hideConversation,
   );
   app.delete<{ Params: { messageId: number } }>(
     '/api/messages/:messageId',
-    { ...auth, schema: { params: messageIdParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '删消息',
+        operationId: 'deleteMessage',
+        security: REQUIRE_JWT,
+        params: messageIdParamsSchema,
+      },
+    },
     controller.deleteMessage,
   );
   app.put<{ Params: { messageId: number }; Body: { emoji: string } }>(
     '/api/messages/:messageId/reaction',
-    { ...auth, schema: { params: messageIdParamsSchema, body: reactionBodySchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '设表情回应',
+        operationId: 'setMessageReaction',
+        security: REQUIRE_JWT,
+        params: messageIdParamsSchema,
+        body: reactionBodySchema,
+      },
+    },
     controller.setReaction,
   );
   app.delete<{ Params: { messageId: number } }>(
     '/api/messages/:messageId/reaction',
-    { ...auth, schema: { params: messageIdParamsSchema } },
+    {
+      ...auth,
+      schema: {
+        tags: ['messages'],
+        summary: '删表情回应',
+        operationId: 'deleteMessageReaction',
+        security: REQUIRE_JWT,
+        params: messageIdParamsSchema,
+      },
+    },
     controller.removeReaction,
   );
 
@@ -185,7 +367,15 @@ export function registerMessagesRoutes(app: FastifyInstance, deps: MessagesRoute
   // hijack 后自管原始连接生命周期（规避 async handler 与流式响应的竞争）
   app.get<{ Querystring: { token: string } }>(
     '/api/messages/stream',
-    { schema: { querystring: streamQuerySchema } },
+    {
+      schema: {
+        tags: ['messages'],
+        summary: '私信实时流',
+        operationId: 'streamMessages',
+        security: REQUIRE_SSE,
+        querystring: streamQuerySchema,
+      },
+    },
     (req, reply) => {
       let payload: AuthTokenPayload;
       try {

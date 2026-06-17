@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { OPTIONAL_JWT } from '../../core/openapi/swagger.js';
 import { SearchController } from './search.controller.js';
 import type { SearchService } from './search.service.js';
 
@@ -20,16 +21,33 @@ export interface SearchRoutesDeps {
 
 export function registerSearchRoutes(app: FastifyInstance, deps: SearchRoutesDeps): void {
   const controller = new SearchController(deps.searchService);
-  const opts = { preHandler: deps.optionalAuth, schema: { querystring: searchQuerySchema } };
 
   app.get<{ Querystring: { q: string; cursor?: string; limit?: number } }>(
     '/api/search/posts',
-    opts,
+    {
+      preHandler: deps.optionalAuth,
+      schema: {
+        tags: ['search'],
+        summary: '搜索帖子',
+        operationId: 'searchPosts',
+        security: OPTIONAL_JWT,
+        querystring: searchQuerySchema,
+      },
+    },
     controller.posts,
   );
   app.get<{ Querystring: { q: string; cursor?: string; limit?: number } }>(
     '/api/search/users',
-    opts,
+    {
+      preHandler: deps.optionalAuth,
+      schema: {
+        tags: ['search'],
+        summary: '搜索账号',
+        operationId: 'searchUsers',
+        security: OPTIONAL_JWT,
+        querystring: searchQuerySchema,
+      },
+    },
     controller.users,
   );
   // 趋势为公开数据（同全站流），无需鉴权
@@ -37,6 +55,9 @@ export function registerSearchRoutes(app: FastifyInstance, deps: SearchRoutesDep
     '/api/search/trends',
     {
       schema: {
+        tags: ['search'],
+        summary: '趋势',
+        operationId: 'getTrends',
         querystring: {
           type: 'object',
           additionalProperties: false,

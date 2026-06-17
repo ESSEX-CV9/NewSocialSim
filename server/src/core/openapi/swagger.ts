@@ -17,6 +17,14 @@ export const SEC = {
   sse: 'sseToken',
 } as const;
 
+/** 路由 `schema.security` 便捷值——值即 OpenAPI security requirement 数组。
+ *  公开端点不写 security（无全局 security，缺省即公开）。 */
+export const REQUIRE_JWT = [{ [SEC.jwt]: [] }];
+export const REQUIRE_ADMIN = [{ [SEC.admin]: [] }];
+export const REQUIRE_SSE = [{ [SEC.sse]: [] }];
+/** 可选登录（optionalAuth）：不带凭证也可读，带 JWT 有观察者态（likedByViewer 等）。 */
+export const OPTIONAL_JWT = [{}, { [SEC.jwt]: [] }];
+
 /** 按模块分组的 tag 表；顺序即 Swagger UI 中的展示顺序。 */
 export const TAGS = [
   { name: 'auth', description: '认证：注册 / 登录 / 当前用户' },

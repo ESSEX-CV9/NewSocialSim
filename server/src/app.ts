@@ -106,7 +106,11 @@ export async function buildApp(deps: AppDeps): Promise<FastifyInstance> {
   const searchService = new SearchService(worldManager, postsService);
   const messagesService = new MessagesService(worldManager, mediaService, linkCardsService, sseHub);
 
-  app.get('/api/health', async () => ({ ok: true }));
+  app.get(
+    '/api/health',
+    { schema: { tags: ['meta'], summary: '健康检查', operationId: 'health' } },
+    async () => ({ ok: true }),
+  );
 
   registerWorldsRoutes(app, { worldManager });
   registerMediaRoutes(app, { mediaService, requireAuth });

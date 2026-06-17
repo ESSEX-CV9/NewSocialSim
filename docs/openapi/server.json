@@ -30,6 +30,11 @@
   "paths": {
     "/api/health": {
       "get": {
+        "operationId": "health",
+        "summary": "健康检查",
+        "tags": [
+          "meta"
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -39,6 +44,11 @@
     },
     "/api/admin/worlds": {
       "get": {
+        "operationId": "listWorlds",
+        "summary": "列世界",
+        "tags": [
+          "worlds"
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -46,6 +56,11 @@
         }
       },
       "post": {
+        "operationId": "createWorld",
+        "summary": "创建世界",
+        "tags": [
+          "worlds"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -127,6 +142,11 @@
     },
     "/api/admin/worlds/{id}/activate": {
       "post": {
+        "operationId": "activateWorld",
+        "summary": "激活（切换）世界",
+        "tags": [
+          "worlds"
+        ],
         "parameters": [
           {
             "schema": {
@@ -146,6 +166,11 @@
     },
     "/api/admin/worlds/active": {
       "get": {
+        "operationId": "getActiveWorld",
+        "summary": "活动世界 + 当前模拟时间",
+        "tags": [
+          "worlds"
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -155,6 +180,61 @@
     },
     "/api/admin/worlds/{id}": {
       "patch": {
+        "operationId": "updateWorldMeta",
+        "summary": "改世界元数据",
+        "tags": [
+          "worlds"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "locale": {
+                    "type": "string",
+                    "enum": [
+                      "zh-CN",
+                      "en"
+                    ]
+                  },
+                  "contentRating": {
+                    "type": "string",
+                    "enum": [
+                      "safe",
+                      "all"
+                    ]
+                  },
+                  "calendar": {
+                    "type": "object",
+                    "required": [
+                      "label"
+                    ],
+                    "additionalProperties": false,
+                    "properties": {
+                      "label": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 50
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -172,6 +252,11 @@
         }
       },
       "delete": {
+        "operationId": "deleteWorld",
+        "summary": "删除世界",
+        "tags": [
+          "worlds"
+        ],
         "parameters": [
           {
             "schema": {
@@ -191,6 +276,42 @@
     },
     "/api/admin/worlds/clock": {
       "post": {
+        "operationId": "controlWorldClock",
+        "summary": "时钟控制（暂停/恢复/调速/跳转）",
+        "tags": [
+          "worlds"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "type"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "pause",
+                      "resume",
+                      "setScale",
+                      "setTime"
+                    ]
+                  },
+                  "scale": {
+                    "type": "number"
+                  },
+                  "simTimeMs": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Default Response"
@@ -200,6 +321,30 @@
     },
     "/api/admin/worlds/{id}/copy": {
       "post": {
+        "operationId": "copyWorld",
+        "summary": "复制世界",
+        "tags": [
+          "worlds"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "newId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "newId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -219,6 +364,34 @@
     },
     "/api/admin/worlds/snapshots": {
       "post": {
+        "operationId": "createWorldSnapshot",
+        "summary": "对活动世界建快照",
+        "tags": [
+          "worlds"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "description": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Default Response"
@@ -228,6 +401,11 @@
     },
     "/api/admin/worlds/{id}/snapshots": {
       "get": {
+        "operationId": "listWorldSnapshots",
+        "summary": "列快照",
+        "tags": [
+          "worlds"
+        ],
         "parameters": [
           {
             "schema": {
@@ -247,6 +425,11 @@
     },
     "/api/admin/worlds/{id}/snapshots/{name}/restore": {
       "post": {
+        "operationId": "restoreWorldSnapshot",
+        "summary": "恢复快照",
+        "tags": [
+          "worlds"
+        ],
         "parameters": [
           {
             "schema": {
@@ -274,6 +457,11 @@
     },
     "/api/admin/worlds/{id}/snapshots/{name}": {
       "delete": {
+        "operationId": "deleteWorldSnapshot",
+        "summary": "删快照",
+        "tags": [
+          "worlds"
+        ],
         "parameters": [
           {
             "schema": {
@@ -301,6 +489,16 @@
     },
     "/api/media/upload": {
       "post": {
+        "operationId": "uploadMedia",
+        "summary": "上传文件",
+        "tags": [
+          "media"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -310,6 +508,11 @@
     },
     "/api/media/from-url": {
       "post": {
+        "operationId": "importMediaFromUrl",
+        "summary": "外链下载入库",
+        "tags": [
+          "media"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -335,6 +538,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -344,6 +552,11 @@
     },
     "/api/media/{id}/file": {
       "get": {
+        "operationId": "getMediaFile",
+        "summary": "媒体文件流",
+        "tags": [
+          "media"
+        ],
         "parameters": [
           {
             "schema": {
@@ -372,6 +585,11 @@
     },
     "/api/media-search": {
       "get": {
+        "operationId": "searchImages",
+        "summary": "关键字搜图",
+        "tags": [
+          "media-search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -406,6 +624,11 @@
             "required": false
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -415,6 +638,16 @@
     },
     "/api/media-search/sources": {
       "get": {
+        "operationId": "listImageSources",
+        "summary": "可用图源",
+        "tags": [
+          "media-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -424,6 +657,11 @@
     },
     "/api/media-search/preview": {
       "get": {
+        "operationId": "previewImageUrl",
+        "summary": "外链预览代理",
+        "tags": [
+          "media-search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -445,6 +683,16 @@
     },
     "/api/media-search/config": {
       "get": {
+        "operationId": "getMediaSearchConfig",
+        "summary": "读搜图配置",
+        "tags": [
+          "media-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -452,6 +700,11 @@
         }
       },
       "patch": {
+        "operationId": "updateMediaSearchConfig",
+        "summary": "改搜图配置",
+        "tags": [
+          "media-search"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -606,6 +859,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -615,6 +873,16 @@
     },
     "/api/media-search/pixiv/login": {
       "post": {
+        "operationId": "pixivLogin",
+        "summary": "Pixiv 引导登录",
+        "tags": [
+          "media-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -624,6 +892,16 @@
     },
     "/api/media-search/pixiv/login/status": {
       "get": {
+        "operationId": "pixivLoginStatus",
+        "summary": "Pixiv 登录态",
+        "tags": [
+          "media-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -633,6 +911,11 @@
     },
     "/api/media-search/pixiv/code": {
       "post": {
+        "operationId": "pixivSubmitCode",
+        "summary": "提交 Pixiv code",
+        "tags": [
+          "media-search"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -654,6 +937,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -663,6 +951,16 @@
     },
     "/api/media-search/bilibili/login": {
       "post": {
+        "operationId": "bilibiliLogin",
+        "summary": "B 站引导登录",
+        "tags": [
+          "media-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -672,6 +970,16 @@
     },
     "/api/media-search/bilibili/login/status": {
       "get": {
+        "operationId": "bilibiliLoginStatus",
+        "summary": "B 站登录态",
+        "tags": [
+          "media-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -681,6 +989,16 @@
     },
     "/api/tools/status": {
       "get": {
+        "operationId": "getToolsStatus",
+        "summary": "安装状态",
+        "tags": [
+          "tools"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -690,6 +1008,16 @@
     },
     "/api/tools/latest": {
       "get": {
+        "operationId": "getLatestToolVersions",
+        "summary": "最新版本",
+        "tags": [
+          "tools"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -699,6 +1027,11 @@
     },
     "/api/tools/{id}/install": {
       "post": {
+        "operationId": "installTool",
+        "summary": "安装工具",
+        "tags": [
+          "tools"
+        ],
         "parameters": [
           {
             "schema": {
@@ -711,6 +1044,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -722,6 +1060,11 @@
     },
     "/api/tools/{id}/install/status": {
       "get": {
+        "operationId": "getToolInstallStatus",
+        "summary": "安装进度",
+        "tags": [
+          "tools"
+        ],
         "parameters": [
           {
             "schema": {
@@ -736,6 +1079,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -745,6 +1093,11 @@
     },
     "/api/video/ingest": {
       "post": {
+        "operationId": "ingestVideo",
+        "summary": "引入视频",
+        "tags": [
+          "video-search"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -774,6 +1127,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -783,6 +1141,16 @@
     },
     "/api/video/sources": {
       "get": {
+        "operationId": "listVideoSources",
+        "summary": "视频源",
+        "tags": [
+          "video-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -792,6 +1160,11 @@
     },
     "/api/video/search": {
       "get": {
+        "operationId": "searchVideos",
+        "summary": "搜视频",
+        "tags": [
+          "video-search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -813,6 +1186,11 @@
             "required": false
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -822,6 +1200,16 @@
     },
     "/api/video/tasks": {
       "get": {
+        "operationId": "listVideoTasks",
+        "summary": "异步任务列表",
+        "tags": [
+          "video-search"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -831,6 +1219,11 @@
     },
     "/api/video/tasks/{id}": {
       "get": {
+        "operationId": "getVideoTask",
+        "summary": "单任务查询",
+        "tags": [
+          "video-search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -843,6 +1236,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -850,6 +1248,11 @@
         }
       },
       "delete": {
+        "operationId": "cancelVideoTask",
+        "summary": "取消任务",
+        "tags": [
+          "video-search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -860,6 +1263,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -871,6 +1279,11 @@
     },
     "/api/media/{id}/stream": {
       "get": {
+        "operationId": "streamVideo",
+        "summary": "流式视频代理",
+        "tags": [
+          "media"
+        ],
         "parameters": [
           {
             "schema": {
@@ -901,6 +1314,11 @@
     },
     "/api/auth/register": {
       "post": {
+        "operationId": "register",
+        "summary": "注册真人账号",
+        "tags": [
+          "auth"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -939,6 +1357,11 @@
     },
     "/api/auth/login": {
       "post": {
+        "operationId": "login",
+        "summary": "登录",
+        "tags": [
+          "auth"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -971,6 +1394,16 @@
     },
     "/api/auth/me": {
       "get": {
+        "operationId": "getMe",
+        "summary": "当前登录用户",
+        "tags": [
+          "auth"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -980,6 +1413,17 @@
     },
     "/api/users/suggested": {
       "get": {
+        "operationId": "listSuggestedUsers",
+        "summary": "推荐关注",
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -989,6 +1433,17 @@
     },
     "/api/users/{handle}": {
       "get": {
+        "operationId": "getUserProfile",
+        "summary": "账号资料",
+        "tags": [
+          "users"
+        ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "parameters": [
           {
             "schema": {
@@ -1008,6 +1463,11 @@
     },
     "/api/users/me": {
       "patch": {
+        "operationId": "updateMyProfile",
+        "summary": "改本人资料",
+        "tags": [
+          "users"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1077,6 +1537,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1086,6 +1551,11 @@
     },
     "/api/posts": {
       "post": {
+        "operationId": "createPost",
+        "summary": "发帖",
+        "tags": [
+          "posts"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1121,6 +1591,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1130,6 +1605,11 @@
     },
     "/api/posts/{id}": {
       "get": {
+        "operationId": "getPostById",
+        "summary": "单帖详情（删除返墓碑）",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1140,6 +1620,12 @@
             "required": true
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1147,6 +1633,11 @@
         }
       },
       "delete": {
+        "operationId": "deletePost",
+        "summary": "删帖（仅本人）",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1155,6 +1646,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1166,6 +1662,11 @@
     },
     "/api/posts/{id}/replies": {
       "get": {
+        "operationId": "listPostReplies",
+        "summary": "某帖的回复",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1194,6 +1695,12 @@
             "required": true
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1203,6 +1710,11 @@
     },
     "/api/users/{handle}/posts": {
       "get": {
+        "operationId": "listUserPosts",
+        "summary": "某账号的帖",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1243,6 +1755,12 @@
             "required": true
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1252,6 +1770,11 @@
     },
     "/api/users/{handle}/likes": {
       "get": {
+        "operationId": "listUserLikes",
+        "summary": "某账号点赞过的帖",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1278,6 +1801,12 @@
             "in": "path",
             "name": "handle",
             "required": true
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1289,6 +1818,11 @@
     },
     "/api/users/{handle}/media": {
       "get": {
+        "operationId": "listUserMedia",
+        "summary": "某账号的含媒体帖",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1317,6 +1851,12 @@
             "required": true
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1326,6 +1866,11 @@
     },
     "/api/posts/{id}/pin": {
       "post": {
+        "operationId": "pinPost",
+        "summary": "置顶",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1336,6 +1881,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1343,6 +1893,11 @@
         }
       },
       "delete": {
+        "operationId": "unpinPost",
+        "summary": "取消置顶",
+        "tags": [
+          "posts"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1351,6 +1906,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1362,6 +1922,11 @@
     },
     "/api/posts/views": {
       "post": {
+        "operationId": "recordPostViews",
+        "summary": "曝光计数上报",
+        "tags": [
+          "posts"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1388,6 +1953,12 @@
             }
           }
         },
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1397,6 +1968,11 @@
     },
     "/api/posts/{id}/like": {
       "post": {
+        "operationId": "likePost",
+        "summary": "赞",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1407,6 +1983,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1414,6 +1995,11 @@
         }
       },
       "delete": {
+        "operationId": "unlikePost",
+        "summary": "取消赞",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1422,6 +2008,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1433,6 +2024,11 @@
     },
     "/api/posts/{id}/repost": {
       "post": {
+        "operationId": "repostPost",
+        "summary": "转",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1443,6 +2039,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1450,6 +2051,11 @@
         }
       },
       "delete": {
+        "operationId": "unrepostPost",
+        "summary": "取消转",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1458,6 +2064,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1469,6 +2080,11 @@
     },
     "/api/posts/{id}/bookmark": {
       "post": {
+        "operationId": "bookmarkPost",
+        "summary": "收藏（私密）",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1479,6 +2095,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1486,6 +2107,11 @@
         }
       },
       "delete": {
+        "operationId": "unbookmarkPost",
+        "summary": "取消收藏（私密）",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1494,6 +2120,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1505,6 +2136,11 @@
     },
     "/api/posts/{id}/hide": {
       "post": {
+        "operationId": "hidePost",
+        "summary": "隐藏（\"不感兴趣\"）",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1515,6 +2151,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1522,6 +2163,11 @@
         }
       },
       "delete": {
+        "operationId": "unhidePost",
+        "summary": "取消隐藏（\"不感兴趣\"）",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1530,6 +2176,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1541,6 +2192,11 @@
     },
     "/api/bookmarks": {
       "get": {
+        "operationId": "listBookmarks",
+        "summary": "本人收藏",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1561,6 +2217,11 @@
             "required": false
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1570,6 +2231,11 @@
     },
     "/api/users/{handle}/interactions": {
       "get": {
+        "operationId": "listUserInteractions",
+        "summary": "某账号互动事件流（赞/转/关注，带发生时间）",
+        "tags": [
+          "interactions"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1598,6 +2264,12 @@
             "required": true
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1607,6 +2279,16 @@
     },
     "/api/users/{handle}/follow": {
       "post": {
+        "operationId": "followUser",
+        "summary": "关注",
+        "tags": [
+          "follows"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "parameters": [
           {
             "schema": {
@@ -1624,6 +2306,16 @@
         }
       },
       "delete": {
+        "operationId": "unfollowUser",
+        "summary": "取关",
+        "tags": [
+          "follows"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "parameters": [
           {
             "schema": {
@@ -1643,6 +2335,11 @@
     },
     "/api/users/{handle}/followers": {
       "get": {
+        "operationId": "listFollowers",
+        "summary": "粉丝",
+        "tags": [
+          "follows"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1680,6 +2377,11 @@
     },
     "/api/users/{handle}/following": {
       "get": {
+        "operationId": "listFollowing",
+        "summary": "关注列表",
+        "tags": [
+          "follows"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1717,6 +2419,16 @@
     },
     "/api/users/{handle}/block": {
       "post": {
+        "operationId": "blockUser",
+        "summary": "屏蔽",
+        "tags": [
+          "blocks"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "parameters": [
           {
             "schema": {
@@ -1734,6 +2446,16 @@
         }
       },
       "delete": {
+        "operationId": "unblockUser",
+        "summary": "取消屏蔽",
+        "tags": [
+          "blocks"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "parameters": [
           {
             "schema": {
@@ -1753,6 +2475,11 @@
     },
     "/api/notifications": {
       "get": {
+        "operationId": "listNotifications",
+        "summary": "通知列表",
+        "tags": [
+          "notifications"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1785,6 +2512,11 @@
             "required": false
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1794,6 +2526,16 @@
     },
     "/api/notifications/unread-count": {
       "get": {
+        "operationId": "getNotificationsUnreadCount",
+        "summary": "通知未读数",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1803,6 +2545,16 @@
     },
     "/api/notifications/read-all": {
       "post": {
+        "operationId": "markAllNotificationsRead",
+        "summary": "全部已读",
+        "tags": [
+          "notifications"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1812,6 +2564,11 @@
     },
     "/api/notifications/read": {
       "post": {
+        "operationId": "markNotificationsRead",
+        "summary": "标部分已读",
+        "tags": [
+          "notifications"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1836,6 +2593,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1845,6 +2607,11 @@
     },
     "/api/messages/conversations": {
       "post": {
+        "operationId": "createConversation",
+        "summary": "发起会话",
+        "tags": [
+          "messages"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1864,6 +2631,11 @@
             }
           }
         },
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1871,6 +2643,11 @@
         }
       },
       "get": {
+        "operationId": "listConversations",
+        "summary": "会话列表",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1905,6 +2682,11 @@
             "required": false
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1914,6 +2696,16 @@
     },
     "/api/messages/unread-count": {
       "get": {
+        "operationId": "getMessagesUnreadCount",
+        "summary": "私信总未读",
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1923,6 +2715,16 @@
     },
     "/api/messages/read-all": {
       "post": {
+        "operationId": "markAllMessagesRead",
+        "summary": "全部已读",
+        "tags": [
+          "messages"
+        ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1932,6 +2734,11 @@
     },
     "/api/messages/search": {
       "get": {
+        "operationId": "searchMessages",
+        "summary": "搜会话/消息",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1944,6 +2751,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1953,6 +2765,11 @@
     },
     "/api/messages/conversations/{id}": {
       "get": {
+        "operationId": "getConversation",
+        "summary": "单会话",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1963,6 +2780,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -1970,6 +2792,11 @@
         }
       },
       "delete": {
+        "operationId": "hideConversation",
+        "summary": "隐藏会话",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -1978,6 +2805,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -1989,6 +2821,11 @@
     },
     "/api/messages/conversations/{id}/messages": {
       "get": {
+        "operationId": "listMessages",
+        "summary": "消息列表",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2017,6 +2854,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2024,6 +2866,11 @@
         }
       },
       "post": {
+        "operationId": "sendMessage",
+        "summary": "发消息",
+        "tags": [
+          "messages"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2061,6 +2908,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2070,6 +2922,11 @@
     },
     "/api/messages/conversations/{id}/read": {
       "post": {
+        "operationId": "markMessagesRead",
+        "summary": "标已读",
+        "tags": [
+          "messages"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2096,6 +2953,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2105,6 +2967,11 @@
     },
     "/api/messages/conversations/{id}/accept": {
       "post": {
+        "operationId": "acceptConversationRequest",
+        "summary": "接受消息请求",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2113,6 +2980,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2124,6 +2996,11 @@
     },
     "/api/messages/conversations/{id}/unread": {
       "post": {
+        "operationId": "markConversationUnread",
+        "summary": "标未读",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2132,6 +3009,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2143,6 +3025,11 @@
     },
     "/api/messages/conversations/{id}/mute": {
       "post": {
+        "operationId": "muteConversation",
+        "summary": "免打扰 开",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2153,6 +3040,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2160,6 +3052,11 @@
         }
       },
       "delete": {
+        "operationId": "unmuteConversation",
+        "summary": "免打扰 关",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2168,6 +3065,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2179,6 +3081,11 @@
     },
     "/api/messages/conversations/{id}/pin": {
       "post": {
+        "operationId": "pinConversation",
+        "summary": "置顶 开",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2189,6 +3096,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2196,6 +3108,11 @@
         }
       },
       "delete": {
+        "operationId": "unpinConversation",
+        "summary": "置顶 关",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2204,6 +3121,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2215,6 +3137,11 @@
     },
     "/api/messages/{messageId}": {
       "delete": {
+        "operationId": "deleteMessage",
+        "summary": "删消息",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2223,6 +3150,11 @@
             "in": "path",
             "name": "messageId",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2234,6 +3166,11 @@
     },
     "/api/messages/{messageId}/reaction": {
       "put": {
+        "operationId": "setMessageReaction",
+        "summary": "设表情回应",
+        "tags": [
+          "messages"
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2272,6 +3209,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2279,6 +3221,11 @@
         }
       },
       "delete": {
+        "operationId": "deleteMessageReaction",
+        "summary": "删表情回应",
+        "tags": [
+          "messages"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2287,6 +3234,11 @@
             "in": "path",
             "name": "messageId",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2298,14 +3250,14 @@
     },
     "/api/messages/stream": {
       "get": {
-        "parameters": [
+        "operationId": "streamMessages",
+        "summary": "私信实时流",
+        "tags": [
+          "messages"
+        ],
+        "security": [
           {
-            "schema": {
-              "type": "string"
-            },
-            "in": "query",
-            "name": "token",
-            "required": true
+            "sseToken": []
           }
         ],
         "responses": {
@@ -2317,6 +3269,11 @@
     },
     "/api/timeline/home": {
       "get": {
+        "operationId": "getHomeTimeline",
+        "summary": "关注流",
+        "tags": [
+          "timeline"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2349,6 +3306,11 @@
             "required": false
           }
         ],
+        "security": [
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2358,6 +3320,11 @@
     },
     "/api/timeline/foryou": {
       "get": {
+        "operationId": "getForYouTimeline",
+        "summary": "推荐流",
+        "tags": [
+          "timeline"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2376,6 +3343,12 @@
             "in": "query",
             "name": "limit",
             "required": false
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2387,6 +3360,11 @@
     },
     "/api/timeline/global": {
       "get": {
+        "operationId": "getGlobalTimeline",
+        "summary": "全站流（firehose）",
+        "tags": [
+          "timeline"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2407,6 +3385,12 @@
             "required": false
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2416,6 +3400,11 @@
     },
     "/api/users/{handle}/timeline": {
       "get": {
+        "operationId": "getUserTimeline",
+        "summary": "某账号主页流（其帖 + 转发）",
+        "tags": [
+          "timeline"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2444,6 +3433,12 @@
             "required": true
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2453,6 +3448,11 @@
     },
     "/api/search/posts": {
       "get": {
+        "operationId": "searchPosts",
+        "summary": "搜索帖子",
+        "tags": [
+          "search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2481,6 +3481,12 @@
             "in": "query",
             "name": "limit",
             "required": false
+          }
+        ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
           }
         ],
         "responses": {
@@ -2492,6 +3498,11 @@
     },
     "/api/search/users": {
       "get": {
+        "operationId": "searchUsers",
+        "summary": "搜索账号",
+        "tags": [
+          "search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2522,6 +3533,12 @@
             "required": false
           }
         ],
+        "security": [
+          {},
+          {
+            "bearerJWT": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2531,6 +3548,11 @@
     },
     "/api/search/trends": {
       "get": {
+        "operationId": "getTrends",
+        "summary": "趋势",
+        "tags": [
+          "search"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2552,6 +3574,49 @@
     },
     "/api/admin/posts": {
       "post": {
+        "operationId": "createAdminPost",
+        "summary": "代理发帖（可建历史/回复/引用）",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "authorId",
+                  "content"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "authorId": {
+                    "type": "integer"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "description": "世界模拟时间（建历史帖时指定）"
+                  },
+                  "replyToId": {
+                    "type": "integer"
+                  },
+                  "quoteOfId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2561,6 +3626,51 @@
     },
     "/api/admin/follows": {
       "post": {
+        "operationId": "bulkFollow",
+        "summary": "批量关注",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "pairs"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "pairs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "followerId",
+                        "followeeId"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "followerId": {
+                          "type": "integer"
+                        },
+                        "followeeId": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2570,6 +3680,40 @@
     },
     "/api/admin/posts/{id}/counts": {
       "post": {
+        "operationId": "updatePostCounts",
+        "summary": "计数注水",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "likeCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "repostCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "replyCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "viewCount": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -2578,6 +3722,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
           }
         ],
         "responses": {
@@ -2589,6 +3738,97 @@
     },
     "/api/admin/import": {
       "post": {
+        "operationId": "bulkImport",
+        "summary": "批量导入（帖/关注/计数）",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "posts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "authorId",
+                        "content"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "authorId": {
+                          "type": "integer"
+                        },
+                        "content": {
+                          "type": "string"
+                        },
+                        "createdAt": {
+                          "type": "integer"
+                        },
+                        "replyToId": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "follows": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "followerId",
+                        "followeeId"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "followerId": {
+                          "type": "integer"
+                        },
+                        "followeeId": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  },
+                  "counts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "postId"
+                      ],
+                      "additionalProperties": false,
+                      "properties": {
+                        "postId": {
+                          "type": "integer"
+                        },
+                        "likeCount": {
+                          "type": "integer"
+                        },
+                        "repostCount": {
+                          "type": "integer"
+                        },
+                        "viewCount": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2598,6 +3838,16 @@
     },
     "/api/admin/lore": {
       "get": {
+        "operationId": "listLore",
+        "summary": "列设定文档",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2607,6 +3857,11 @@
     },
     "/api/admin/lore/{filename}": {
       "get": {
+        "operationId": "readLore",
+        "summary": "读设定文档",
+        "tags": [
+          "admin"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2615,6 +3870,11 @@
             "in": "path",
             "name": "filename",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
           }
         ],
         "responses": {
@@ -2624,6 +3884,30 @@
         }
       },
       "put": {
+        "operationId": "writeLore",
+        "summary": "写设定文档",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "content"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -2634,6 +3918,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2641,6 +3930,11 @@
         }
       },
       "delete": {
+        "operationId": "deleteLore",
+        "summary": "删设定文档",
+        "tags": [
+          "admin"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2649,6 +3943,11 @@
             "in": "path",
             "name": "filename",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
           }
         ],
         "responses": {
@@ -2660,6 +3959,16 @@
     },
     "/api/admin/npc-profiles": {
       "get": {
+        "operationId": "listNpcProfiles",
+        "summary": "列 NPC 档案",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2669,6 +3978,11 @@
     },
     "/api/admin/npc-profiles/{userId}": {
       "get": {
+        "operationId": "getNpcProfile",
+        "summary": "读某账号 NPC 档案",
+        "tags": [
+          "admin"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2677,6 +3991,11 @@
             "in": "path",
             "name": "userId",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
           }
         ],
         "responses": {
@@ -2686,6 +4005,22 @@
         }
       },
       "put": {
+        "operationId": "upsertNpcProfile",
+        "summary": "写某账号 NPC 档案",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -2696,6 +4031,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2703,6 +4043,11 @@
         }
       },
       "delete": {
+        "operationId": "deleteNpcProfile",
+        "summary": "删某账号 NPC 档案",
+        "tags": [
+          "admin"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2711,6 +4056,11 @@
             "in": "path",
             "name": "userId",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
           }
         ],
         "responses": {
@@ -2722,6 +4072,16 @@
     },
     "/api/admin/topics": {
       "get": {
+        "operationId": "listTopics",
+        "summary": "列话题",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2729,6 +4089,47 @@
         }
       },
       "post": {
+        "operationId": "createTopic",
+        "summary": "建话题",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "title"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "heat": {
+                    "type": "number"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2738,6 +4139,22 @@
     },
     "/api/admin/topics/{id}": {
       "patch": {
+        "operationId": "updateTopic",
+        "summary": "改话题",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
         "parameters": [
           {
             "schema": {
@@ -2748,6 +4165,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2755,6 +4177,11 @@
         }
       },
       "delete": {
+        "operationId": "deleteTopic",
+        "summary": "删话题",
+        "tags": [
+          "admin"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2763,6 +4190,11 @@
             "in": "path",
             "name": "id",
             "required": true
+          }
+        ],
+        "security": [
+          {
+            "adminKey": []
           }
         ],
         "responses": {
@@ -2774,6 +4206,16 @@
     },
     "/api/admin/content-pools": {
       "get": {
+        "operationId": "getContentPools",
+        "summary": "读内容池（扁平 string[]）",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2781,6 +4223,46 @@
         }
       },
       "post": {
+        "operationId": "addToContentPool",
+        "summary": "内容池增条目",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "poolType",
+                  "key",
+                  "items"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "poolType": {
+                    "type": "string"
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2790,6 +4272,11 @@
     },
     "/api/admin/content-pools/{poolType}/{key}": {
       "delete": {
+        "operationId": "clearContentPool",
+        "summary": "清某内容池",
+        "tags": [
+          "admin"
+        ],
         "parameters": [
           {
             "schema": {
@@ -2808,6 +4295,11 @@
             "required": true
           }
         ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2817,6 +4309,16 @@
     },
     "/api/admin/users": {
       "get": {
+        "operationId": "listAdminUsers",
+        "summary": "列账号",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2824,6 +4326,44 @@
         }
       },
       "post": {
+        "operationId": "createAdminUser",
+        "summary": "代理建号（设 is_bot=1）",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "handle",
+                  "displayName"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "description": "须拟真，禁止 sim_/bot/npc/序号后缀等暴露虚拟身份的命名"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "description": "不给则随机生成并在响应返回"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2833,6 +4373,35 @@
     },
     "/api/admin/login-as": {
       "post": {
+        "operationId": "loginAs",
+        "summary": "代登录票据（供模拟器驱动）",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "userId"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "userId": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2842,6 +4411,16 @@
     },
     "/api/admin/llm-config": {
       "get": {
+        "operationId": "getLlmConfig",
+        "summary": "读 LLM 配置",
+        "tags": [
+          "admin"
+        ],
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2849,6 +4428,27 @@
         }
       },
       "put": {
+        "operationId": "saveLlmConfig",
+        "summary": "存 LLM 配置",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2858,6 +4458,42 @@
     },
     "/api/admin/llm-config/fetch-models": {
       "post": {
+        "operationId": "fetchLlmModels",
+        "summary": "拉模型列表",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "source",
+                  "apiKey"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  },
+                  "apiKey": {
+                    "type": "string"
+                  },
+                  "baseUrl": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2867,6 +4503,35 @@
     },
     "/api/admin/run-agent": {
       "post": {
+        "operationId": "runAgent",
+        "summary": "拉起 Agent 执行",
+        "tags": [
+          "admin"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "prompt"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "prompt": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "adminKey": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2876,6 +4541,11 @@
     },
     "/api/simulator/status": {
       "get": {
+        "operationId": "getSimulatorStatus",
+        "summary": "模拟器状态（编辑器轮询）",
+        "tags": [
+          "simulator"
+        ],
         "responses": {
           "200": {
             "description": "Default Response"
@@ -2885,6 +4555,55 @@
     },
     "/api/simulator/heartbeat": {
       "post": {
+        "operationId": "postSimulatorHeartbeat",
+        "summary": "模拟器上报心跳（每 loop）",
+        "tags": [
+          "simulator"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "boundWorldId",
+                  "accountCount",
+                  "tickNumber",
+                  "lastFlushedWorldId",
+                  "lastFlushAt"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "boundWorldId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "accountCount": {
+                    "type": "integer"
+                  },
+                  "tickNumber": {
+                    "type": "integer"
+                  },
+                  "lastFlushedWorldId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "lastFlushAt": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Default Response"

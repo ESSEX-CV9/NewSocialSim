@@ -1,4 +1,5 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
+import { REQUIRE_JWT } from '../../core/openapi/swagger.js';
 import { MediaController } from './media.controller.js';
 import type { MediaService } from './media.service.js';
 
@@ -33,16 +34,45 @@ const fromUrlBodySchema = {
 export function registerMediaRoutes(app: FastifyInstance, deps: MediaRoutesDeps): void {
   const controller = new MediaController(deps.mediaService);
 
-  app.post('/api/media/upload', { preHandler: deps.requireAuth }, controller.upload);
+  app.post(
+    '/api/media/upload',
+    {
+      preHandler: deps.requireAuth,
+      schema: {
+        tags: ['media'],
+        summary: '上传文件',
+        operationId: 'uploadMedia',
+        security: REQUIRE_JWT,
+      },
+    },
+    controller.upload,
+  );
   app.post<{ Body: { url: string; source?: string } }>(
     '/api/media/from-url',
-    { preHandler: deps.requireAuth, schema: { body: fromUrlBodySchema } },
+    {
+      preHandler: deps.requireAuth,
+      schema: {
+        tags: ['media'],
+        summary: '外链下载入库',
+        operationId: 'importMediaFromUrl',
+        security: REQUIRE_JWT,
+        body: fromUrlBodySchema,
+      },
+    },
     controller.fromUrl,
   );
   // 公开：<img>/<video> 标签无法携带 Authorization 头
   app.get<{ Params: { id: number }; Querystring: { w: string } }>(
     '/api/media/:id/file',
-    { schema: { params: fileParamsSchema, querystring: fileQuerySchema } },
+    {
+      schema: {
+        tags: ['media'],
+        summary: '媒体文件流',
+        operationId: 'getMediaFile',
+        params: fileParamsSchema,
+        querystring: fileQuerySchema,
+      },
+    },
     controller.file,
   );
 }
