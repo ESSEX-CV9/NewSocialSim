@@ -254,10 +254,10 @@
 
 ### 1.7 NPC 设计器面板 ⬜
 
-- **目标**：编辑器创建账号并编辑人设（factions / poolAffinities / 活跃时段 / 行为概率），写入 NPC 文件并灌进 DB。
+- **目标**：编辑器创建账号并编辑人设（驱动模式 / 降级策略 / factions / poolAffinities / 活跃时段 / 行为概率），写入 NPC 文件并灌进 DB。
 - **改动**：`editor/src/server/`（建号 + npc-profiles 读写透传）、`editor/src/renderer/`（NPC 设计器面板）。
-- **验收**：在面板建号 → DB `is_bot=1` 且命名拟真 → 模拟器下次切世界 / 刷新即驱动该账号按其 factions 发帖。
-- **交接提示**：建号走 `POST /api/admin/users`，人设走 `PUT /api/admin/npc-profiles/:userId`。被驱动账号 = 有 npc 档案者。文件为准、DB 为副本：作者基线写文件，开世界灌 DB。
+- **验收**：在面板建号 → DB `is_bot=1` 且命名拟真 → 模拟器下次切世界 / 刷新即驱动该账号按其驱动模式 / factions 发帖。
+- **交接提示**：建号走 `POST /api/admin/users`，人设走 `PUT /api/admin/npc-profiles/:userId`。被驱动账号 = 有 npc 档案者。文件为准、DB 为副本：作者基线写文件，开世界灌 DB。npc-profile 含驱动模式字段（真人 / 纯 LLM / 半 LLM / 纯模拟器 / 一次性氛围）+ 降级策略（`degrade` / `silent`），账号驱动模型详见 `docs/m5-account-model.md`；本步只设字段，纯 LLM / 半 LLM 的 LLM 路径与降级解析待 LLM 行为层接入。
 
 ### 1.8 时间轴块详情增强 ⬜
 

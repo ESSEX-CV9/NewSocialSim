@@ -35,7 +35,7 @@ NPC 档案与旧内容池的文件本就在世界文件夹内，社交站 server
 | `simulator/src/systems/posting-system.ts` 的 `pickContent`（随机取一条） | 重写接组装引擎；`refreshPoolsIfNeeded` 改直读文件 | 1.4 |
 | `posting-system.ts` 内散落的 `Math.random` 抖动 / 概率字面量 | 抽进 TuningService | 1.0 起 |
 | 话题（`world.db` 表，含 heat / tags / 生命周期） | **不动**（经勘察重新定性，见下）；表保留备用 | 1.1b 押后 |
-| NPC 档案 | 复用并扩字段（加 factions / poolAffinities），读改为直读文件 | 1.7 |
+| NPC 档案 | 复用并扩字段（加驱动模式 / 降级策略 / factions / poolAffinities），读改为直读文件 | 1.7 |
 | lore / llm-config / 快照 / agent 等 admin 端点 | 不动（属后续 LLM / GM 阶段） | — |
 
 Phase 1 顶层帖相关的全部旧件恰好落在以上各步的计划改动内，计划外无遗留依赖。

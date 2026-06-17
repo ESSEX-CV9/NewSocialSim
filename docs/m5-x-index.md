@@ -12,6 +12,7 @@
 - `docs/m5-x-phase1-baseline.md` — Phase 1 基线【约束+现状】：配置范式（模拟器直读世界文件夹配置、social server 不经手）、当前 npc-profiles/内容池/话题的送达现状、各旧件在 1.x 各步的处置、`data/` 目录入 git 约定。
 
 ### 2. NPC 与内容设计
+- `docs/m5-account-model.md` — 【设计】账号驱动模型：账号类型即默认驱动模式（运行时模式非固定身份）、四条轴（归属 / 内容来源 / 互动来源 / 内态）+ 降级地板（degrade / silent）、五命名预设、状态机贯穿底座、纯 LLM 退出确定性互动层、GM 升级与资源降级运行时解析、分库映射。
 - `docs/m5-npc-state-machine.md` — 【设计】NPC 三层数据与存储（一 NPC 一文件夹 / 文件为准·DB 副本）、数值五层（Alignment/Persona/Mood/关系/Activity FSM）、RP 资料层、关系两面与阶段化、内容池 ECS（组件类型→语法→池）。
 - `docs/m5-identity-generation.md` — 【设计】昵称/ID/头像确定性生成（世界级风格分布→语法→词库；handle 不可变故往往正经、displayName 可玩 meme、二者解耦）。
 

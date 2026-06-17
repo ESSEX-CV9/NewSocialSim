@@ -36,7 +36,7 @@ npm workspaces monorepo：
 - `data/worlds/<id>/` — 运行时数据（不入 git）：world.db（该世界全部数据）+ world.json（元数据与时钟状态）+ media/（该世界全部媒体文件）+ lore/（设定文档 .md）+ npc-profiles.json + content-pools.json + snapshots/（轻量快照）。
 - `data/media-search.json` — 实例级搜图配置（不入 git，含 Pixiv refresh token、HTTP 代理、各源 API key）。本机已配置代理 127.0.0.1:7897 与 Pixiv 登录态。
 - `data/llm-config.json` — LLM 多提供商配置（不入 git，含 API key）。每个提供商配置名称/来源/Base URL/Key/模型列表，High/Low-tier 全局选择。
-- 文档：**新会话先读 `docs/m5-x-index.md`（M5-X 文档索引与阅读顺序，含代码进度速查）。** `docs/design.md`（设计决策、架构约束、M5 路线与待办）、`docs/server-api.md`（**全 server HTTP API 速查**，按域分组含方法/路径/鉴权/用途）、`docs/m5-design.md`（M5 模拟器设计独立副本——双层架构/Agent 工具范式/GM 生命周期/编辑器面板/实施顺序，供后续 LLM 直接阅读）、`docs/devlog/<日期>.md`（每日开发日志，新一天的工作结束后按既有格式追加一篇；当日内容多时主日志只留概要/周期一览/数据状态，细节拆到 `<日期>-<主题>.md` 子日志）、`plan.md`（最初的项目计划）。
+- 文档：**新会话先读 `docs/m5-x-index.md`（M5-X 文档索引与阅读顺序，含代码进度速查）。** `docs/design.md`（设计决策、架构约束、M5 路线与待办）、`docs/server-api.md`（**全 server HTTP API 速查**，按域分组含方法/路径/鉴权/用途）、`docs/m5-design.md`（M5 模拟器设计独立副本——双层架构/Agent 工具范式/GM 生命周期/编辑器面板/实施顺序，供后续 LLM 直接阅读）、`docs/m5-account-model.md`（账号驱动模型——账号类型即默认驱动模式/四轴 + 降级地板/五预设/纯 LLM 退出确定性互动层/分库映射）、`docs/devlog/<日期>.md`（每日开发日志，新一天的工作结束后按既有格式追加一篇；当日内容多时主日志只留概要/周期一览/数据状态，细节拆到 `<日期>-<主题>.md` 子日志）、`plan.md`（最初的项目计划）。
 - `参考文件/` — 用户提供的参考项目（Vue 版 X 克隆，借鉴样式用）与其他资料，**只读，不入 git，不要修改**。
 
 ## 关键机制（动代码前必须知道）
