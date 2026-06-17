@@ -239,11 +239,12 @@
 - **结果**：集成层冒烟 12/12——亲和加权选池（偏向池 ≥80%）、轨迹带 poolId/语法/模块/postId/shape=standalone、真实 demo 产出"雷神演出拉满"/"刚刷到本期深渊演出拉满绷不住了"/"今天天气不错"等、无病句。时间线端到端可视验收随 1.9 / 用户人工验收。
 - **交接提示**：每帖一个种子化 RNG（hash(handle) ^ tickNumber），同（账号,tick）可复现。`getActiveTopics` / `getContentPools` 已不再被 PostingSystem 使用（话题见 1.1b 押后）。`exprVarDefault` 当 slangDensity 未接（persona 属状态机层）时的回退值。
 
-### 1.5 氛围号水贴 ⬜
+### 1.5 选池准用门槛（氛围号水贴 / 核心号场景分流）✅
 
-- **目标**：氛围账号从基础原子池发低信息量水贴，承担「人气底噪」。
-- **改动**：`simulator/src/systems/posting-system.ts`（按 tier 区分核心 / 氛围取池）、`data/global-pools/`（通用灌水池）。
-- **验收**：时间线出现通用水贴且形态为 `standalone`，与核心账号的场景帖可区分密度。
+- **目标**：池子由作者显式勾选"哪几类账号（tier）可用"，氛围账号发基础原子池水贴、核心账号发场景池，互不串；底噪与场景帖可区分。
+- **改动**：`shared`（`Pool.tiers` 字段）、`simulator/src/content-pool/pool-loader.ts`（解析 `tiers` + 未勾选告警）、`simulator/src/systems/posting-system.ts`（选池两层：先 tier 门槛筛、再 poolAffinities 权重挑）、`data/global-pools/pools/base.json`（通用水贴池勾 ambient）。
+- **结果**：逻辑冒烟 13/13；demo 人工验收通过——林辰（核心·原神）只发原神、丸子（核心·鸣潮）只发鸣潮、悠悠（氛围）只发水贴。
+- **交接提示**：选池是**两层、缺一不可**（见 `docs/m5-account-model.md`）：① 准用门槛 `Pool.tiers`——作者**显式列举**哪类账号可用，**缺省/空 = 谁都不能用**，绝不靠规则（如按 `模式=灌水`）推断池子归属；② 偏好权重 `poolAffinities`——同 tier 的号准用同一批池，靠各自权重表区分实发什么（原神号把对家池权重设 0 即永不发对家）。`tier` 是账号驱动模式的粗粒度前身（ambient=一次性氛围、core=纯模拟器），1.7 NPC 设计器落驱动模式字段时将其细化。demo 的鸣潮场景池与账号亲和属世界文件夹（不入 git）。
 
 ### 1.6 内容池面板 ⬜
 
