@@ -13,6 +13,10 @@ import { logger } from '../logger.js';
  * standalone 池里选池 → 组装引擎产文 → 发帖 → 吐含 poolId / 语法 / 所选模块的轨迹。
  * 内容池由模拟器直读世界文件夹加载（见 docs/m5-x-phase1-baseline.md），不再经 server API 取。
  * 取不到内容则跳过本次发帖、不崩（降级保留）。
+ *
+ * 1.5：选池加"准用门槛"——池子上由作者显式勾选哪几类账号（tier）可用，没勾的池子排除在该号
+ * 候选外（氛围号只发水贴池、普通号只发场景池，互不串）。门槛是粗粒度准入，poolAffinities 才是
+ * 准用池内的偏好权重，见 docs/m5-account-model.md。
  */
 export class PostingSystem implements System {
   name = 'PostingSystem';
@@ -94,9 +98,15 @@ export class PostingSystem implements System {
     this.scheduleNext(entity, ctx);
   }
 
-  /** 在 standalone 池里按 poolAffinities 加权选一个池；无亲和数据时各池走中性默认权重（≈均匀）。 */
+  /**
+   * 选池两层（见 docs/m5-account-model.md）：
+   * 1. 准用门槛：先按 `形态=standalone` + 池的 `tiers` 勾没勾本号的 tier 筛候选（没勾 = 不准用，排除）。
+   * 2. 偏好权重：在准用池里按 poolAffinities 加权挑——同 tier 的号靠各自权重表区分实际发什么
+   *    （如原神号把对家池权重设 0 → 永不发对家）；无亲和数据时走中性默认权重（≈均匀）。
+   */
   private selectPool(entity: Entity, rng: () => number): Pool | null {
-    const candidates = poolsForShape(this.pools.pools, 'standalone');
+    const tier = entity.profile.tier;
+    const candidates = poolsForShape(this.pools.pools, 'standalone').filter((p) => p.tiers?.includes(tier));
     if (!candidates.length) return null;
     const aff = entity.profile.poolAffinities;
     const fallback = this.tuning.get<number>('pools.defaultAffinity') ?? 0.3;

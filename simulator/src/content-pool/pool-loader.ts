@@ -36,6 +36,8 @@ type RawGrammarFile = Record<string, Grammar>;
 interface RawPoolBody {
   dimensions: PoolDimensions;
   grammars: PoolGrammarRef[];
+  /** 准用门槛：哪几类账号（tier）可用本池；缺省/空 = 谁都不能用（见 Pool.tiers）。 */
+  tiers?: string[];
   /** 池级片段覆盖（混合式）：组件名 → 仅本池生效的候选片段（允许字符串简写）。 */
   fragments?: Record<string, RawFragment[]>;
 }
@@ -64,6 +66,7 @@ export function loadPools(dataDir: string, worldId: string): LoadedPools {
   ]) {
     for (const [id, body] of readPoolDir(dir)) {
       const pool: Pool = { id, dimensions: body.dimensions, grammars: body.grammars };
+      if (Array.isArray(body.tiers)) pool.tiers = body.tiers;
       if (body.fragments) {
         const overrides: ComponentRegistry = {};
         for (const [name, frags] of Object.entries(body.fragments)) {
@@ -141,9 +144,11 @@ function validate(loaded: LoadedPools): void {
   const missingGrammars = new Set<string>();
   const missingComponents = new Set<string>();
   const badShape = new Set<string>();
+  const noTiers = new Set<string>();
   const SHAPES: readonly PoolShape[] = ['standalone', 'reply', 'quote'];
   for (const pool of loaded.pools) {
     if (!SHAPES.includes(pool.dimensions[POOL_DIM_SHAPE] as PoolShape)) badShape.add(pool.id);
+    if (!pool.tiers?.length) noTiers.add(pool.id);
     for (const g of pool.grammars) {
       const grammar = loaded.grammars[g.ref];
       if (!grammar) {
@@ -158,4 +163,5 @@ function validate(loaded: LoadedPools): void {
   if (missingGrammars.size) logger.warn(`内容池：悬空语法引用 ${[...missingGrammars].join(', ')}`);
   if (missingComponents.size) logger.warn(`内容池：悬空组件引用 ${[...missingComponents].join(', ')}`);
   if (badShape.size) logger.warn(`内容池：池缺少/非法 形态 维度（不可被任何动作选中）：${[...badShape].join(', ')}`);
+  if (noTiers.size) logger.warn(`内容池：池未勾选准用账号类型（tiers 缺省/空 = 谁都不能用，不会被选中）：${[...noTiers].join(', ')}`);
 }
