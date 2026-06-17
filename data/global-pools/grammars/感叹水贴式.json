@@ -1,0 +1,18 @@
+{
+  "感叹水贴式": {
+    "slots": [
+      {
+        "components": [
+          "水贴感叹"
+        ]
+      },
+      {
+        "components": [
+          "黑话收尾"
+        ],
+        "optional": true,
+        "prob": "slangDensity"
+      }
+    ]
+  }
+}

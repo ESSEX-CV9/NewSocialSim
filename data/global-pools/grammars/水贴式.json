@@ -1,0 +1,18 @@
+{
+  "水贴式": {
+    "slots": [
+      {
+        "components": [
+          "水贴主体"
+        ]
+      },
+      {
+        "components": [
+          "黑话收尾"
+        ],
+        "optional": true,
+        "prob": "slangDensity"
+      }
+    ]
+  }
+}

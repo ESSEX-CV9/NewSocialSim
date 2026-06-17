@@ -42,16 +42,24 @@ export interface Fragment {
 export type ComponentRegistry = Record<string, Fragment[]>;
 
 /**
- * 语法的一个槽：引用一个组件类型，可标可选或按概率出现。槽位平等——
- * 无 opener / body / tail 之类特权角色，顺序只决定文本左右位置。
+ * 语法的一个槽（canonical 形态，组装引擎消费）。槽位平等——无 opener / body / tail 特权，
+ * 顺序只决定文本左右位置。组合表达力：
+ *   - `components` 1 个 = 固定出现该组件；多个 = **槽内多选一**（随机挑一个，可带 weights）。
+ *   - `optional` + `prob` = 该槽可省（独立判定是否出现）。
+ *   - `group` = **跨槽位互斥组**：同组槽位（可不相邻）只渲染一个，其余跳过。
+ * 盘上旧写法 `{ component: "X" }` 由各加载器归一化为 `{ components: ["X"] }`，canonical 不含 `component`。
  */
 export interface GrammarSlot {
-  /** 引用的组件类型名。 */
-  component: string;
-  /** 独立判定是否出现。 */
+  /** 候选组件类型名：1 个=固定，多个=槽内多选一。 */
+  components: string[];
+  /** 与 components 等长的多选一权重，缺省等权。 */
+  weights?: number[];
+  /** 标可选：独立判定是否出现（入互斥组的槽由组决定出现，忽略此项）。 */
   optional?: boolean;
-  /** 出现概率；数字直用，字符串为 tuning 表达式（如 "slangDensity"），由组装引擎解释（1.2）。 */
+  /** 出现概率；数字直用，字符串为 tuning 表达式（如 "slangDensity"，高级）。 */
   prob?: number | string;
+  /** 互斥组 id：同组槽位只渲染一个（跨槽位互斥，可不相邻）。默认恰好出一个。 */
+  group?: string;
 }
 
 /** 语法（句式骨架）：有序引用一批组件类型。可跨池复用。 */

@@ -1,4 +1,4 @@
-import { POOL_DIM_SHAPE, type Fragment, type LoadedPools, type Pool, type PoolShape } from '@socialsim/shared';
+import { POOL_DIM_SHAPE, type Fragment, type Grammar, type GrammarSlot, type LoadedPools, type Pool, type PoolShape } from '@socialsim/shared';
 
 /**
  * 内容组装引擎（1.2，零 LLM）：给定一个池，按其语法拼出一条文本。
@@ -84,36 +84,51 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
   const fragmentsFor = (name: string): Fragment[] => pool.fragments?.[name] ?? ctx.pools.components[name] ?? [];
   const exprVarDefault = ctx.exprVarDefault ?? NEUTRAL_PROB;
   const optionalProb = ctx.optionalProb ?? NEUTRAL_PROB;
+  const slotFillable = (s: GrammarSlot): boolean => s.components.some((c) => fragmentsFor(c).length > 0);
 
-  // 候选语法：存在于语法库、且每个必填槽（非 optional、无 prob）都有可用片段。
+  // 候选语法：存在于语法库、且每个必填槽可填、每个互斥组至少一个成员可填。
   const candidates = pool.grammars
     .map((g) => ({ ref: g.ref, weight: g.weight ?? 1, grammar: ctx.pools.grammars[g.ref] }))
     .filter((c) => c.grammar && c.weight > 0)
-    .filter((c) =>
-      c.grammar!.slots.every((s) => s.optional || s.prob !== undefined || fragmentsFor(s.component).length > 0),
-    );
+    .filter((c) => grammarViable(c.grammar!, slotFillable));
   if (!candidates.length) return null;
 
   const chosen = weightedPick(candidates, (c) => c.weight, ctx.rng);
   if (!chosen) return null;
+  const slots = chosen.grammar!.slots;
+
+  // 解互斥组：每组在可填成员里挑一个 winner（恰好出一个），其余跳过。
+  const groupWinner = resolveGroups(slots, slotFillable, ctx.rng);
 
   const parts: string[] = [];
   const picked: string[] = [];
-  for (const slot of chosen.grammar!.slots) {
-    // 出现判定：prob 优先；否则 optional 用 optionalProb；否则必出现。
-    const appear =
-      slot.prob !== undefined
-        ? ctx.rng() < evalProb(slot.prob, ctx.vars, exprVarDefault)
-        : slot.optional
-          ? ctx.rng() < optionalProb
-          : true;
-    if (!appear) continue;
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i]!;
+    const skippable = slot.group !== undefined || slot.optional === true || slot.prob !== undefined;
 
-    const slotPick = pickSlot(slot.component, fragmentsFor, ctx);
+    if (slot.group !== undefined) {
+      if (groupWinner.get(slot.group) !== i) continue; // 非 winner：跳过
+      // winner：组已决定出现，不再独立判定 optional/prob
+    } else {
+      const appear =
+        slot.prob !== undefined
+          ? ctx.rng() < evalProb(slot.prob, ctx.vars, exprVarDefault)
+          : slot.optional
+            ? ctx.rng() < optionalProb
+            : true;
+      if (!appear) continue;
+    }
+
+    // 槽内多选一：在可填组件里按权重挑一个。
+    const comp = pickComponent(slot, fragmentsFor, ctx.rng);
+    if (comp === null) {
+      if (skippable) continue; // 可省槽填不上：跳过
+      return null; // 必填槽填不上：整条作废
+    }
+    const slotPick = pickSlot(comp, fragmentsFor, ctx);
     if (slotPick === null) {
-      // 取不到可用片段：必填槽则整条作废，可选槽则跳过。
-      if (!slot.optional && slot.prob === undefined) return null;
-      continue;
+      if (skippable) continue;
+      return null;
     }
     parts.push(slotPick.text);
     picked.push(slotPick.raw);
@@ -122,6 +137,50 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
   const out = parts.join('').trim();
   if (!out.length) return null;
   return { text: out, grammar: chosen.ref, fragments: picked };
+}
+
+/** 语法可行性：每个必填槽（非可选、无 prob、不在互斥组）可填，且每个互斥组至少一个成员可填。 */
+function grammarViable(grammar: Grammar, slotFillable: (s: GrammarSlot) => boolean): boolean {
+  const groups = new Set<string>();
+  for (const s of grammar.slots) {
+    if (s.group !== undefined) {
+      groups.add(s.group);
+      continue;
+    }
+    if (!s.optional && s.prob === undefined && !slotFillable(s)) return false;
+  }
+  for (const g of groups) {
+    if (!grammar.slots.some((s) => s.group === g && slotFillable(s))) return false;
+  }
+  return true;
+}
+
+/** 每个互斥组在可填成员里 uniform 挑一个 winner（slot 下标）。 */
+function resolveGroups(
+  slots: GrammarSlot[],
+  slotFillable: (s: GrammarSlot) => boolean,
+  rng: () => number,
+): Map<string, number> {
+  const byGroup = new Map<string, number[]>();
+  slots.forEach((s, i) => {
+    if (s.group !== undefined && slotFillable(s)) {
+      const arr = byGroup.get(s.group);
+      if (arr) arr.push(i);
+      else byGroup.set(s.group, [i]);
+    }
+  });
+  const winner = new Map<string, number>();
+  for (const [g, idxs] of byGroup) winner.set(g, idxs[Math.floor(rng() * idxs.length)]!);
+  return winner;
+}
+
+/** 槽内多选一：在可填组件里按 weights 加权挑一个组件名；无可填则 null。 */
+function pickComponent(slot: GrammarSlot, fragmentsFor: (name: string) => Fragment[], rng: () => number): string | null {
+  const opts = slot.components
+    .map((c, i) => ({ c, w: slot.weights?.[i] ?? 1 }))
+    .filter((o) => fragmentsFor(o.c).length > 0);
+  const pick = weightedPick(opts, (o) => o.w, rng);
+  return pick ? pick.c : null;
 }
 
 /** 为某组件取一个片段并解析其占位符；返回 { raw 原始片段, text 解析后 }；候选解析不到则丢弃重抽，全失败返回 null。 */

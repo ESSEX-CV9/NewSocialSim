@@ -6,6 +6,7 @@ import {
   type Fragment,
   type Grammar,
   type GrammarRegistry,
+  type GrammarSlot,
   type LoadedPools,
   type Pool,
   type PoolDimensions,
@@ -32,7 +33,16 @@ import { logger } from '../logger.js';
 /** 片段在盘上允许裸字符串简写；加载时归一化为 Fragment。 */
 type RawFragment = string | Fragment;
 type RawComponentFile = Record<string, RawFragment[]>;
-type RawGrammarFile = Record<string, Grammar>;
+/** 盘上槽位允许旧写法 `{ component }` 或新写法 `{ components }`；加载时归一化为 GrammarSlot。 */
+interface RawSlot {
+  component?: string;
+  components?: string[];
+  weights?: number[];
+  optional?: boolean;
+  prob?: number | string;
+  group?: string;
+}
+type RawGrammarFile = Record<string, { slots?: RawSlot[] }>;
 interface RawPoolBody {
   dimensions: PoolDimensions;
   grammars: PoolGrammarRef[];
@@ -115,10 +125,23 @@ function readGrammarDir(dir: string): GrammarRegistry {
   const merged: GrammarRegistry = {};
   for (const file of readJsonFilesInDir<RawGrammarFile>(dir)) {
     for (const [name, grammar] of Object.entries(file)) {
-      if (grammar && Array.isArray(grammar.slots)) merged[name] = grammar;
+      if (grammar && Array.isArray(grammar.slots)) {
+        merged[name] = { slots: grammar.slots.map(normalizeSlot).filter((s) => s.components.length > 0) };
+      }
     }
   }
   return merged;
+}
+
+/** 槽位归一化：旧 `component` → `components:[..]`；保留 weights/optional/prob/group。 */
+function normalizeSlot(raw: RawSlot): GrammarSlot {
+  const components = raw.components ?? (raw.component !== undefined ? [raw.component] : []);
+  const slot: GrammarSlot = { components };
+  if (Array.isArray(raw.weights)) slot.weights = raw.weights;
+  if (raw.optional) slot.optional = true;
+  if (raw.prob !== undefined) slot.prob = raw.prob;
+  if (raw.group !== undefined && raw.group !== '') slot.group = raw.group;
+  return slot;
 }
 
 function readPoolDir(dir: string): Array<[string, RawPoolBody]> {
@@ -156,7 +179,9 @@ function validate(loaded: LoadedPools): void {
         continue;
       }
       for (const slot of grammar.slots) {
-        if (!loaded.components[slot.component]) missingComponents.add(`${g.ref} → ${slot.component}`);
+        for (const comp of slot.components) {
+          if (!loaded.components[comp] && !pool.fragments?.[comp]) missingComponents.add(`${g.ref} → ${comp}`);
+        }
       }
     }
   }

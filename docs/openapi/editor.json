@@ -288,7 +288,7 @@
     "/api/content-pools/save": {
       "post": {
         "operationId": "saveContentPool",
-        "summary": "新建/更新一个条目（缺 scope/file 则落世界层默认文件）",
+        "summary": "新建/更新一个条目（一条一文件，缺 scope 则落世界层）",
         "tags": [
           "pools"
         ],
@@ -302,7 +302,7 @@
     "/api/content-pools/delete": {
       "post": {
         "operationId": "deleteContentPool",
-        "summary": "从来源文件删除一个条目",
+        "summary": "删除一个条目（删其 <名字>.json）",
         "tags": [
           "pools"
         ],

@@ -391,22 +391,22 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
     },
   );
 
-  app.post<{ Body: { layer?: PoolLayer; key?: string; entry?: unknown; scope?: PoolScope; file?: string } }>(
+  app.post<{ Body: { layer?: PoolLayer; key?: string; entry?: unknown; scope?: PoolScope } }>(
     '/api/content-pools/save',
-    { schema: { tags: ['pools'], summary: '新建/更新一个条目（缺 scope/file 则落世界层默认文件）', operationId: 'saveContentPool' } },
+    { schema: { tags: ['pools'], summary: '新建/更新一个条目（一条一文件，缺 scope 则落世界层）', operationId: 'saveContentPool' } },
     async (req, reply) => {
       const id = await activeWorldId();
       if (!id) {
         reply.status(502);
         return { error: 'no active world' };
       }
-      const { layer, key, entry, scope, file } = req.body ?? {};
+      const { layer, key, entry, scope } = req.body ?? {};
       if ((layer !== 'component' && layer !== 'grammar' && layer !== 'pool') || !key) {
         reply.status(400);
         return { error: 'bad layer/key' };
       }
       try {
-        await saveEntry(DATA_DIR, id, { layer, key, entry, scope, file });
+        await saveEntry(DATA_DIR, id, { layer, key, entry, scope });
         return { ok: true };
       } catch (err) {
         reply.status(400);
@@ -415,22 +415,22 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
     },
   );
 
-  app.post<{ Body: { key?: string; scope?: PoolScope; file?: string } }>(
+  app.post<{ Body: { layer?: PoolLayer; key?: string; scope?: PoolScope } }>(
     '/api/content-pools/delete',
-    { schema: { tags: ['pools'], summary: '从来源文件删除一个条目', operationId: 'deleteContentPool' } },
+    { schema: { tags: ['pools'], summary: '删除一个条目（删其 <名字>.json）', operationId: 'deleteContentPool' } },
     async (req, reply) => {
       const id = await activeWorldId();
       if (!id) {
         reply.status(502);
         return { error: 'no active world' };
       }
-      const { key, scope, file } = req.body ?? {};
-      if (!key || (scope !== 'global' && scope !== 'world') || !file) {
+      const { layer, key, scope } = req.body ?? {};
+      if ((layer !== 'component' && layer !== 'grammar' && layer !== 'pool') || !key || (scope !== 'global' && scope !== 'world')) {
         reply.status(400);
-        return { error: 'bad key/scope/file' };
+        return { error: 'bad layer/key/scope' };
       }
       try {
-        await deleteEntry(DATA_DIR, id, { key, scope, file });
+        await deleteEntry(DATA_DIR, id, { layer, key, scope });
         return { ok: true };
       } catch (err) {
         reply.status(400);
