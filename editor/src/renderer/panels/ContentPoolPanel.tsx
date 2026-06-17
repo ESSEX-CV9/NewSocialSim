@@ -94,17 +94,21 @@ function PoolBrowser({ view, defaultTab, onSaved, onPreview }: BrowserProps) {
   }
 
   return (
-    <div className="flex flex-col h-full border-r border-(--border)">
-      <div className="flex border-b border-(--border) shrink-0">
-        {(['pool', 'grammar', 'component'] as Tab[]).map((t) => (
-          <button key={t} className={`flex-1 py-2 text-xs cursor-pointer ${tab === t ? 'text-(--text) border-b-2 border-(--blue)' : 'text-(--dim)'}`} onClick={() => { setTab(t); setSel(null); }}>
-            {t === 'pool' ? '池' : t === 'grammar' ? '语法' : '组件'}
-          </button>
-        ))}
+    <div className="flex h-full">
+      {/* 左栏：tab + 分组列表 */}
+      <div className="w-60 shrink-0 border-r border-(--border) flex flex-col min-h-0">
+        <div className="flex border-b border-(--border) shrink-0">
+          {(['pool', 'grammar', 'component'] as Tab[]).map((t) => (
+            <button key={t} className={`flex-1 py-2 text-xs cursor-pointer ${tab === t ? 'text-(--text) border-b-2 border-(--blue)' : 'text-(--dim)'}`} onClick={() => { setTab(t); setSel(null); }}>
+              {t === 'pool' ? '池' : t === 'grammar' ? '语法' : '组件'}
+            </button>
+          ))}
+        </div>
+        <GroupedList items={items} layer={layer} sel={sel} onSelect={setSel} onMove={moveTo} />
       </div>
-      <GroupedList items={items} layer={layer} sel={sel} onSelect={setSel} onMove={moveTo} />
-      <div className="flex-1 overflow-y-auto border-t border-(--border) min-h-0">
-        {sel === null && <p className="text-(--dim) text-xs p-3">选一项编辑，或点上方「新建」。</p>}
+      {/* 右栏：编辑器 */}
+      <div className="flex-1 overflow-y-auto min-w-0">
+        {sel === null && <p className="text-(--dim) text-xs p-3">选一项编辑，或点左侧「新建」。</p>}
         {sel !== null && tab === 'pool' && <PoolEditor view={view} sel={sel} onSaved={onSaved} onSelect={setSel} onPreview={onPreview} />}
         {sel !== null && tab === 'grammar' && <GrammarEditor view={view} sel={sel} onSaved={onSaved} onSelect={setSel} onPreview={onPreview} />}
         {sel !== null && tab === 'component' && <ComponentEditor view={view} sel={sel} onSaved={onSaved} onSelect={setSel} />}
@@ -132,7 +136,7 @@ function GroupedList({ items, layer, sel, onSelect, onMove }: {
   }
 
   return (
-    <div className="overflow-y-auto px-2 py-2 space-y-1 shrink-0" style={{ maxHeight: '38%' }}>
+    <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 min-h-0">
       <button className={`${btn} w-full mb-1`} onClick={() => onSelect(NEW)}><i className="ri-add-line" /> 新建</button>
       {groups.map((g) => (
         <div key={g}>
