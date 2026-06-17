@@ -15,7 +15,7 @@ import { type TimelineBlock, interactionKey, interactionToBlock, postToBlock, bl
  */
 
 const RULER_H = 26;
-const ROSTER_W = 160;
+const ROSTER_W = 200;
 const LABEL_W = 96;
 const LANE_DIV = '#26292e';
 const SUBROW_H = 26;
@@ -131,6 +131,10 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const [scrollX, setScrollX] = useState(0);
   const [viewW, setViewW] = useState(800);
   const [editingTime, setEditingTime] = useState<string | null>(null);
+  // 轨道筛选（T.6）：null = 全部账号；非空集 = 只看选中账号的轨道（纯视图过滤，数据已在内存）。
+  const [laneFilter, setLaneFilter] = useState<Set<string> | null>(null);
+  const [laneSearch, setLaneSearch] = useState(''); // 轨道管理面板的账号搜索词（昵称/@handle）
+  const [showInactive, setShowInactive] = useState(false); // 是否展开"未活跃账号"分组
   // 横轴左界（模拟时间）：稳定、独立于已加载内容，使可拖滚到任意时段、内容按需加载。
   const [axisFrom, setAxisFrom] = useState<number | null>(null);
   const worldRef = useRef<string | null>(null);
@@ -360,8 +364,8 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     [posts, acts, names],
   );
 
-  const { lanes, minTime, maxTime } = useMemo(() => {
-    // 轨道 = 内容里出现的账号 ∪ 全部账号 roster（含从未发帖者）
+  const { allLanes, minTime, maxTime } = useMemo(() => {
+    // 全部轨道 = 内容里出现的账号 ∪ 全部账号 roster（含从未发帖者）
     const ls = [...new Set([...blocks.map((b) => b.entity), ...roster.map((r) => r.handle)])].sort();
     let lo = Infinity;
     let hi = 0;
@@ -369,8 +373,40 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       if (b.time < lo) lo = b.time;
       if (b.time > hi) hi = b.time;
     }
-    return { lanes: ls, minTime: Number.isFinite(lo) ? lo : 0, maxTime: hi };
+    return { allLanes: ls, minTime: Number.isFinite(lo) ? lo : 0, maxTime: hi };
   }, [blocks, roster]);
+  // 实际渲染的轨道：有筛选则取交集（保留 allLanes 顺序）。excluded 账号的块因不在 lane 内自然不渲染。
+  const lanes = useMemo(
+    () => (laneFilter ? allLanes.filter((l) => laneFilter.has(l)) : allLanes),
+    [allLanes, laneFilter],
+  );
+
+  /** 切换某账号在筛选中的选中态；从"全部"切换即以全集为起点去掉它，回到全集则归零为 null。 */
+  function toggleLane(handle: string): void {
+    setLaneFilter((prev) => {
+      const next = new Set(prev ?? allLanes);
+      if (next.has(handle)) next.delete(handle);
+      else next.add(handle);
+      if (next.size === allLanes.length) return null; // 全选 = 无筛选
+      return next;
+    });
+  }
+  const isLaneOn = (h: string): boolean => (laneFilter ? laneFilter.has(h) : true);
+
+  // 有内容的账号（出现在 blocks 里）；其余为"未活跃"（roster 里从未发帖/互动）。
+  const activeSet = useMemo(() => new Set(blocks.map((b) => b.entity)), [blocks]);
+  // 轨道管理面板：按搜索词过滤后分"有内容 / 未活跃"两组（昵称或 @handle 命中即留）。
+  const manager = useMemo(() => {
+    const q = laneSearch.trim().toLowerCase();
+    const hit = (h: string): boolean => !q || h.toLowerCase().includes(q) || (names[h] || '').toLowerCase().includes(q);
+    const active: string[] = [];
+    const inactive: string[] = [];
+    for (const h of allLanes) {
+      if (!hit(h)) continue;
+      (activeSet.has(h) ? active : inactive).push(h);
+    }
+    return { active, inactive };
+  }, [allLanes, activeSet, laneSearch, names]);
 
   // 横轴起点用稳定的 axisFrom（独立于已加载内容），故可拖滚到任意时段；未就绪前回退到 minTime。
   const originSim = (axisFrom ?? minTime) - 2 * 60_000;
@@ -385,7 +421,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   }
   const now = simNow();
   const trackWidth = Math.max(ax(maxTime), ax(now)) + RIGHT_PAD;
-  const ready = lanes.length > 0; // 有轨道（账号）即铺轴；内容按可见窗口加载，空时段显空轨道
+  const ready = allLanes.length > 0; // 有账号即铺轴；内容按可见窗口加载，空时段显空轨道
 
   /** 跳转视图到某时间（停止跟随）：加载目标前后一个 step 的完整窗口（含该时段回复/互动），再滚到目标。 */
   async function jumpToTime(t: number): Promise<void> {
@@ -528,7 +564,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           title="输入模拟时间跳转（格式 2026-06-17 14:30:00，世界模拟时间非系统时间）"
           className="w-38 bg-(--chip) border border-(--border) rounded px-1.5 py-0.5 text-(--amber) font-mono tabular-nums cursor-text focus:border-(--amber) outline-none"
         />
-        <span className="text-(--dim)">{worldId ?? '—'} · {blocks.length} 块</span>
+        <span className="text-(--dim)">
+          {worldId ?? '—'} · {blocks.length} 块{laneFilter ? ` · 轨道 ${lanes.length}/${allLanes.length}` : ''}
+        </span>
         {!following && (
           <button
             onClick={() => setFollowing(true)}
@@ -564,26 +602,69 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       {!error && !ready && (
         <p className="px-3 py-4 text-(--dim) text-sm">该世界还没有账号。建号后，其帖子与互动会在此按时间排布。</p>
       )}
-
       {ready && (
         <div className="flex flex-1 min-h-0">
-          {/* 左侧轨道栏 */}
-          <div className="shrink-0 border-r border-(--border) bg-(--panel2) overflow-y-auto" style={{ width: ROSTER_W }}>
-            <div className="px-3 py-2 text-xs font-semibold text-(--dim) border-b border-(--border) sticky top-0 bg-(--panel2)">
-              轨道
+          {/* 左：轨道管理面板（常驻；搜索 + 多选只看选中账号的轨道，可扩展到大量账号） */}
+          <div className="shrink-0 flex flex-col border-r border-(--border) bg-(--panel2)" style={{ width: ROSTER_W }}>
+            <div className="flex items-center gap-1.5 px-3 py-2 border-b border-(--border) text-xs font-semibold text-(--dim)">
+              <span>轨道</span>
+              <span><span className="text-(--blue)">{lanes.length}</span>/{allLanes.length}</span>
+              <button onClick={() => setLaneFilter(null)} className="ml-auto text-(--blue) hover:underline cursor-pointer" title="显示全部账号">
+                全选
+              </button>
+              <button onClick={() => setLaneFilter(new Set())} className="text-(--dim) hover:underline cursor-pointer" title="清空选择">
+                清空
+              </button>
             </div>
-            {lanes.map((l) => (
-              <div key={l} className="flex items-center gap-2 px-3 py-2 border-b border-[#15171b] text-xs">
-                <Avatar handle={l} name={nameOf(l)} size={28} />
-                <div className="min-w-0 leading-tight">
-                  <div className="font-semibold truncate">{nameOf(l)}</div>
-                  <div className="text-(--dim) text-[11px] truncate">@{l}</div>
-                </div>
+            <div className="px-2 py-1.5 border-b border-(--border)">
+              <div className="flex items-center gap-1.5 bg-(--panel) border border-(--border) rounded-md px-2 py-1">
+                <i className="ri-search-line text-(--dim)" />
+                <input
+                  type="text"
+                  value={laneSearch}
+                  onChange={(e) => setLaneSearch(e.target.value)}
+                  placeholder="筛选账号…"
+                  spellCheck={false}
+                  className="flex-1 min-w-0 bg-transparent outline-none text-xs"
+                />
+                {laneSearch && (
+                  <button onClick={() => setLaneSearch('')} className="text-(--dim) hover:text-(--text) cursor-pointer" title="清除搜索">
+                    <i className="ri-close-line" />
+                  </button>
+                )}
               </div>
-            ))}
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              {manager.active.map((l) => (
+                <LaneRow key={l} handle={l} name={nameOf(l)} on={isLaneOn(l)} onToggle={() => toggleLane(l)} />
+              ))}
+              {manager.inactive.length > 0 && (
+                <>
+                  <button
+                    onClick={() => setShowInactive((v) => !v)}
+                    className="flex items-center gap-1.5 w-full px-3 py-1.5 text-left text-[11px] text-(--dim) bg-(--panel) border-y border-[#15171b] hover:text-(--text) cursor-pointer"
+                  >
+                    <i className={showInactive ? 'ri-arrow-down-s-line' : 'ri-arrow-right-s-line'} />
+                    未活跃账号 {manager.inactive.length}
+                  </button>
+                  {showInactive &&
+                    manager.inactive.map((l) => (
+                      <LaneRow key={l} handle={l} name={nameOf(l)} on={isLaneOn(l)} onToggle={() => toggleLane(l)} muted />
+                    ))}
+                </>
+              )}
+              {manager.active.length === 0 && manager.inactive.length === 0 && (
+                <p className="px-3 py-3 text-(--dim) text-[11px]">无匹配账号。</p>
+              )}
+            </div>
           </div>
 
-          {/* 时间轴：可横向滚动 */}
+          {/* 右：时间轴画布；无可见轨道（全部取消）时给提示 */}
+          {lanes.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center p-4 text-(--dim) text-sm text-center">
+              已隐藏全部轨道——在左侧勾选要查看的账号，或点「全选」。
+            </div>
+          ) : (
           <div ref={tlRef} onScroll={onScroll} className="tl-scroll flex-1 overflow-auto">
             <div className="flex" style={{ width: LABEL_W + trackWidth, minHeight: '100%' }}>
               {/* lane 标签列 */}
@@ -666,8 +747,41 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+/** 轨道管理面板的一行账号：勾选框 + 头像 + 昵称/@handle，点击切换该账号轨道是否显示。 */
+function LaneRow({
+  handle,
+  name,
+  on,
+  onToggle,
+  muted,
+}: {
+  handle: string;
+  name: string;
+  on: boolean;
+  onToggle: () => void;
+  muted?: boolean;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`flex items-center gap-2 w-full px-3 py-1.5 text-left border-b border-[#15171b] hover:bg-[#1a1d22] cursor-pointer ${
+        on ? '' : 'opacity-45'
+      }`}
+      title={on ? '点击隐藏此账号轨道' : '点击显示此账号轨道'}
+    >
+      <i className={on ? 'ri-checkbox-fill text-(--blue)' : 'ri-checkbox-blank-line text-(--dim)'} />
+      <Avatar handle={handle} name={name} size={22} />
+      <div className="min-w-0 leading-tight">
+        <div className={`truncate text-xs ${muted ? 'text-(--dim)' : 'font-semibold'}`}>{name}</div>
+        <div className="text-(--dim) text-[11px] truncate">@{handle}</div>
+      </div>
+    </button>
   );
 }
