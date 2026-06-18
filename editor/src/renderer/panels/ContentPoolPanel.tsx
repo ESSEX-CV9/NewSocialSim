@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
-import type { Fragment, GrammarSlot, PoolGrammarRef } from '@socialsim/shared';
+import type { GrammarSlot } from '@socialsim/shared';
 import { runPreview } from '../state/preview-bus.js';
+import { usePoolsView, reloadPools, type PoolsView, type Scope } from '../state/pools-bus.js';
 
 /**
  * 内容池面板（单一面板）：一个内容池浏览器——可切 池/语法/组件 tab，分组列表 + 编辑器。
@@ -13,12 +14,7 @@ import { runPreview } from '../state/preview-bus.js';
  * 默认 tab 可由 dockview 面板参数 `params.tab` 指定（预设用它让右侧那格默认组件 tab）。
  */
 
-type Scope = 'global' | 'world';
 type Tab = 'pool' | 'grammar' | 'component';
-interface ComponentEntry { name: string; fragments: Fragment[]; scope: Scope; group: string }
-interface GrammarEntry { name: string; slots: GrammarSlot[]; scope: Scope; group: string }
-interface PoolEntry { id: string; dimensions: Record<string, string>; tiers?: string[]; grammars: PoolGrammarRef[]; fragments?: Record<string, Fragment[]>; scope: Scope; group: string }
-interface PoolsView { components: ComponentEntry[]; grammars: GrammarEntry[]; pools: PoolEntry[] }
 
 const TIERS = ['core', 'ambient'];
 const NEW = ' new';
@@ -41,24 +37,15 @@ function colorOf(s: string): string {
 }
 
 export function ContentPoolPanel(props: IDockviewPanelProps) {
-  const [view, setView] = useState<PoolsView | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { view, error } = usePoolsView(); // 跨面板共享：任何面板保存后所有面板同步刷新
   const defaultTab = ((props.params as { tab?: Tab } | undefined)?.tab) ?? 'grammar';
 
-  const load = useCallback(async () => {
-    try {
-      const res = await api('/api/content-pools');
-      if (!res.ok) throw new Error(`backend ${res.status}`);
-      setView((await res.json()) as PoolsView);
-      setError(null);
-    } catch (e) { setError(String(e)); }
-  }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void reloadPools(); }, []);
 
-  if (error) return <div className="p-3.5"><p className="text-(--pink) text-sm">编辑器后端不可达：{error}</p></div>;
+  if (error && !view) return <div className="p-3.5"><p className="text-(--pink) text-sm">编辑器后端不可达：{error}</p></div>;
   if (!view) return <div className="p-3.5"><p className="text-(--dim) text-sm">加载中…</p></div>;
 
-  return <PoolBrowser view={view} defaultTab={defaultTab} onSaved={load} onPreview={runPreview} />;
+  return <PoolBrowser view={view} defaultTab={defaultTab} onSaved={reloadPools} onPreview={runPreview} />;
 }
 
 // ============ 内容池浏览器 ============
