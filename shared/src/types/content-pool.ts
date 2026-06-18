@@ -124,11 +124,13 @@ export interface PoolPreviewRequest {
   grammars?: GrammarRegistry;
 }
 
-/** 预览的一条样例：成文 + 所用语法 + 所选片段（追溯）。 */
+/** 预览的一条样例：成文 + 所用语法 + 所选片段（追溯）+ 按槽位拆解的片段（供预览器可视化）。
+ *  segments：按出现顺序，每个出现的槽一段——{ component 所选组件名, text 解析后文本 }。 */
 export interface PoolPreviewSample {
   text: string;
   grammar: string;
   fragments: string[];
+  segments: { component: string; text: string }[];
 }
 
 /** 内容池预览响应。`failed` = 组装失败（无可用语法/必填槽填不上）的次数。 */

@@ -67,11 +67,13 @@ export function seededRng(seed: number): () => number {
   };
 }
 
-/** 组装结果（轨迹用）：成文 + 所用语法名 + 各 present 槽所选片段原始 text（「所选模块」）。 */
+/** 组装结果（轨迹用）：成文 + 所用语法名 + 各 present 槽所选片段原始 text（「所选模块」）。
+ *  segments：按出现顺序，每个出现的槽贡献一段——{ component 所选组件名, text 解析后文本 }，供预览器按槽位拆解可视化。 */
 export interface AssembleResult {
   text: string;
   grammar: string;
   fragments: string[];
+  segments: { component: string; text: string }[];
 }
 
 /** 组装一条内容（只要成文）；无可用语法或必填槽无法填充时返回 null（调用方降级：跳过本次发帖）。 */
@@ -110,6 +112,7 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
 
   const parts: string[] = [];
   const picked: string[] = [];
+  const segments: { component: string; text: string }[] = [];
   for (let i = 0; i < slots.length; i++) {
     const slot = slots[i]!;
     const skippable = slot.group !== undefined || slot.optional === true || slot.prob !== undefined;
@@ -134,11 +137,12 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
     }
     parts.push(slotPick.text);
     picked.push(slotPick.raw);
+    segments.push({ component: comp, text: slotPick.text });
   }
 
   const out = parts.join('').trim();
   if (!out.length) return null;
-  return { text: out, grammar: chosen.ref, fragments: picked };
+  return { text: out, grammar: chosen.ref, fragments: picked, segments };
 }
 
 /** 语法可行性：每个必填槽（非可选、无 prob、不在互斥组）可填，且每个互斥组至少一个成员可填。 */
