@@ -8,6 +8,9 @@ data/*
 *.log
 .env
 
+# 本机 Claude Code 配置，不入 git
+.claude/
+
 # 与本项目无关的旧项目
 image_searcher/
 参考文件/
