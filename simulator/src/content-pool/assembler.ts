@@ -104,8 +104,9 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
   if (!chosen) return null;
   const slots = chosen.grammar!.slots;
 
-  // 解互斥组：每组在「可填 且 掷概率通过」的成员里挑一个 winner（至多出一个；成员全 100% 时即恰好一个）。
-  const groupWinner = resolveGroups(slots, slotFillable, appears, ctx.rng);
+  // 解互斥组：组内按槽位顺序，首个「可填 且 掷概率通过」的成为 winner（前者中了后者因互斥不出）；
+  // 都没中则该组不出。例：夸赞70%+贬低100% → 70% 夸赞 / 30% 贬低；贬低改 50% 则有 15% 两者都不出。
+  const groupWinner = resolveGroups(slots, slotFillable, appears);
 
   const parts: string[] = [];
   const picked: string[] = [];
@@ -156,24 +157,21 @@ function grammarViable(grammar: Grammar, slotFillable: (s: GrammarSlot) => boole
   return true;
 }
 
-/** 每个互斥组在「可填 且 掷概率通过」的成员里 uniform 挑一个 winner（slot 下标）；无人通过则该组不出。
- *  成员各自的出现概率因此仍生效——全 100% 时退化为恰好出一个。 */
+/** 互斥组顺序优先：组内按槽位顺序，首个「可填 且 掷概率通过」的成员胜出（slot 下标）；
+ *  更靠前的中了，靠后的因互斥不出；组内都没中则该组不出。成员各自出现概率因此仍生效——
+ *  全 100% 时退化为恰好出第一个（即列在前的优先级最高）。 */
 function resolveGroups(
   slots: GrammarSlot[],
   slotFillable: (s: GrammarSlot) => boolean,
   appears: (s: GrammarSlot) => boolean,
-  rng: () => number,
 ): Map<string, number> {
-  const byGroup = new Map<string, number[]>();
-  slots.forEach((s, i) => {
-    if (s.group !== undefined && slotFillable(s) && appears(s)) {
-      const arr = byGroup.get(s.group);
-      if (arr) arr.push(i);
-      else byGroup.set(s.group, [i]);
-    }
-  });
   const winner = new Map<string, number>();
-  for (const [g, idxs] of byGroup) winner.set(g, idxs[Math.floor(rng() * idxs.length)]!);
+  for (let i = 0; i < slots.length; i++) {
+    const s = slots[i]!;
+    if (s.group === undefined || winner.has(s.group)) continue; // 该组已有更靠前的 winner
+    if (!slotFillable(s)) continue;
+    if (appears(s)) winner.set(s.group, i);
+  }
   return winner;
 }
 

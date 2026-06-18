@@ -424,7 +424,7 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
             {slots[editing]!.group && <span className="text-(--dim) text-[11px]">（互斥组里也按各自概率掷，至多出一个）</span>}
           </div>
           <div>
-            <div className="text-(--dim) text-[11px] mb-1">与哪些槽位互斥（同组至多出一个）</div>
+            <div className="text-(--dim) text-[11px] mb-1">与哪些槽位互斥（同组按槽位顺序，靠前的先掷、中了靠后的就不出）</div>
             <div className="flex flex-wrap gap-1.5">
               {slots.map((s, j) => {
                 if (j === editing) return null;
@@ -442,10 +442,6 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
               {slots.length < 2 && <span className="text-(--dim) text-[11px]">至少两个槽位才能组互斥</span>}
             </div>
           </div>
-          <details>
-            <summary className="text-(--dim) text-[11px] cursor-pointer">高级：概率表达式</summary>
-            <input className={`${input} w-72 mt-1`} value={slots[editing]!.expr} placeholder="如 slangDensity（覆盖上面的百分比）" onChange={(e) => setSlot(editing, { expr: e.target.value })} />
-          </details>
         </div>
       )}
 
