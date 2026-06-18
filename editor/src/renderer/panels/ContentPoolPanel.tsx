@@ -292,7 +292,7 @@ function PoolEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps & {
 
 // ============ 语法编辑器（卡片条 + 拖入 + 槽位详情）============
 
-interface EditSlot { components: string[]; pct: number; group: string; expr: string }
+interface EditSlot { components: string[]; weights: Record<string, number>; pct: number; group: string; expr: string }
 
 function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps & { onPreview: PreviewFn }) {
   const existing = sel === NEW ? null : view.grammars.find((g) => g.name === sel) ?? null;
@@ -307,13 +307,17 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
     setMsg(null); setEditing(null); setPicker(false);
     if (existing) {
       setName(existing.name); setGroup(existing.group);
-      setSlots(existing.slots.map((s) => ({ components: s.components, group: s.group ?? '', expr: typeof s.prob === 'string' ? s.prob : '', pct: typeof s.prob === 'number' ? Math.round(s.prob * 100) : s.optional ? 50 : 100 })));
+      setSlots(existing.slots.map((s) => {
+        const weights: Record<string, number> = {};
+        (s.weights ?? []).forEach((w, i) => { const c = s.components[i]; if (c !== undefined) weights[c] = w; });
+        return { components: s.components, weights, group: s.group ?? '', expr: typeof s.prob === 'string' ? s.prob : '', pct: typeof s.prob === 'number' ? Math.round(s.prob * 100) : s.optional ? 50 : 100 };
+      }));
     } else { setName(''); setGroup(''); setSlots([]); }
   }, [sel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function setSlot(i: number, patch: Partial<EditSlot>) { setSlots((arr) => arr.map((s, j) => (j === i ? { ...s, ...patch } : s))); }
   function move(i: number, d: number) { const j = i + d; if (j < 0 || j >= slots.length) return; const a = [...slots]; [a[i], a[j]] = [a[j]!, a[i]!]; setSlots(a); setEditing(j); }
-  function addSlot(comp?: string) { setSlots((a) => [...a, { components: comp ? [comp] : [], pct: 100, group: '', expr: '' }]); }
+  function addSlot(comp?: string) { setSlots((a) => [...a, { components: comp ? [comp] : [], weights: {}, pct: 100, group: '', expr: '' }]); }
   function dropOnSlot(i: number, e: React.DragEvent) {
     const c = e.dataTransfer.getData(DND_COMPONENT); if (!c) return; e.preventDefault();
     setSlot(i, { components: slots[i]!.components.includes(c) ? slots[i]!.components : [...slots[i]!.components, c] });
@@ -337,6 +341,8 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
   function buildSlots(): GrammarSlot[] {
     return slots.filter((s) => s.components.length).map((s) => {
       const slot: GrammarSlot = { components: s.components };
+      const ws = s.components.map((c) => s.weights[c] ?? 1);
+      if (s.components.length > 1 && ws.some((w) => w !== 1)) slot.weights = ws; // 等权则省略
       if (s.group.trim()) slot.group = s.group.trim();
       if (s.expr.trim()) slot.prob = s.expr.trim();
       else if (s.pct < 100) slot.prob = Number((s.pct / 100).toFixed(3));
@@ -411,14 +417,23 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
             <span className="text-(--dim) text-[11px]">组件：</span>
             {slots[editing]!.components.map((c) => (
               <span key={c} className="px-2 py-0.5 rounded-full text-xs bg-(--blue) text-white flex items-center gap-1">
-                {c}<button onClick={() => setSlot(editing, { components: slots[editing]!.components.filter((x) => x !== c) })}><i className="ri-close-line" /></button>
+                {c}
+                {slots[editing]!.components.length > 1 && (
+                  <input
+                    type="number" min={0} step="0.1" title="权重（越大越常被选中）"
+                    value={slots[editing]!.weights[c] ?? 1}
+                    onChange={(e) => setSlot(editing, { weights: { ...slots[editing]!.weights, [c]: Number(e.target.value) } })}
+                    className="w-10 bg-white/20 rounded px-1 text-white text-[11px] outline-none"
+                  />
+                )}
+                <button onClick={() => setSlot(editing, { components: slots[editing]!.components.filter((x) => x !== c) })}><i className="ri-close-line" /></button>
               </span>
             ))}
             <button className={btn} onClick={() => setPicker(true)}><i className="ri-add-line" /> 选组件</button>
-            {slots[editing]!.components.length > 1 && <span className="text-(--dim) text-[11px]">（多个 = 多选一）</span>}
+            {slots[editing]!.components.length > 1 && <span className="text-(--dim) text-[11px]">（多个 = 多选一；数字 = 被选中权重）</span>}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-(--dim) text-[11px] w-16">出现概率</span>
+            <span className="text-(--dim) text-[11px] w-24">槽位出现概率</span>
             <input type="range" min={0} max={100} value={slots[editing]!.pct} onChange={(e) => setSlot(editing, { pct: Number(e.target.value) })} />
             <span className="text-xs w-10 text-right">{slots[editing]!.pct}%</span>
             {slots[editing]!.group && <span className="text-(--dim) text-[11px]">（互斥组里也按各自概率掷，至多出一个）</span>}
