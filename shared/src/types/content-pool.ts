@@ -124,13 +124,26 @@ export interface PoolPreviewRequest {
   grammars?: GrammarRegistry;
 }
 
-/** 预览的一条样例：成文 + 所用语法 + 所选片段（追溯）+ 按槽位拆解的片段（供预览器可视化）。
- *  segments：按出现顺序，每个出现的槽一段——{ component 所选组件名, text 解析后文本 }。 */
+/**
+ * 预览拆解的一个槽（覆盖语法的全部槽位，按顺序，供预览器可视化）：
+ * - `shown`：该槽出现了，`component` 为所选组件、`text` 为解析后文本。
+ * - `prob`：概率落选（掷出现概率没中）。
+ * - `excluded`：被互斥（同互斥组里更靠前的成员已中，本槽因互斥未出）。
+ * `components` 为该槽的候选组件（标签用，跳过时也能看出是哪个槽）。
+ */
+export interface PreviewSegment {
+  status: 'shown' | 'prob' | 'excluded';
+  components: string[];
+  component?: string;
+  text?: string;
+}
+
+/** 预览的一条样例：成文 + 所用语法 + 所选片段（追溯）+ 按槽位拆解（含未出现的槽及原因）。 */
 export interface PoolPreviewSample {
   text: string;
   grammar: string;
   fragments: string[];
-  segments: { component: string; text: string }[];
+  segments: PreviewSegment[];
 }
 
 /** 内容池预览响应。`failed` = 组装失败（无可用语法/必填槽填不上）的次数。 */

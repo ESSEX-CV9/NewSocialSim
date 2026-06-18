@@ -36,12 +36,25 @@ export function PreviewerPanel(_props: IDockviewPanelProps) {
           <div className="text-[11px] text-(--dim) mb-2">本次语法：<span className="text-(--text)">{st.sample.grammar}</span></div>
           <div className="flex flex-wrap gap-2 items-start">
             {st.sample.segments.map((seg, i) => {
-              const c = colorOf(seg.component);
+              if (seg.status === 'shown') {
+                const c = colorOf(seg.component ?? '');
+                return (
+                  <div key={i} className="flex flex-col items-center">
+                    <div className="border border-dashed rounded px-2 py-1 text-sm" style={{ borderColor: c, background: `${c}22` }}>{seg.text}</div>
+                    <div className="w-px h-3" style={{ background: c }} />
+                    <div className="text-[10px] whitespace-nowrap" style={{ color: c }}>{seg.component}</div>
+                  </div>
+                );
+              }
+              // 未出现的槽：红色虚线框 + 候选组件（划掉）+ 原因
+              const reason = seg.status === 'excluded' ? '被互斥' : '概率落选';
               return (
-                <div key={i} className="flex flex-col items-center">
-                  <div className="border border-dashed rounded px-2 py-1 text-sm" style={{ borderColor: c, background: `${c}22` }}>{seg.text}</div>
-                  <div className="w-px h-3" style={{ background: c }} />
-                  <div className="text-[10px] whitespace-nowrap" style={{ color: c }}>{seg.component}</div>
+                <div key={i} className="flex flex-col items-center opacity-80">
+                  <div className="border border-dashed rounded px-2 py-1 text-sm line-through" style={{ borderColor: 'var(--pink)', background: 'rgba(255,123,114,0.12)', color: 'var(--dim)' }}>
+                    {seg.components.join('/') || '—'}
+                  </div>
+                  <div className="w-px h-3" style={{ background: 'var(--pink)' }} />
+                  <div className="text-[10px] whitespace-nowrap" style={{ color: 'var(--pink)' }}>{reason}</div>
                 </div>
               );
             })}

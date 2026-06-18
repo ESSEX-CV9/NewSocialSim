@@ -1,4 +1,4 @@
-import { POOL_DIM_SHAPE, type Fragment, type Grammar, type GrammarSlot, type LoadedPools, type Pool, type PoolShape } from '@socialsim/shared';
+import { POOL_DIM_SHAPE, type Fragment, type Grammar, type GrammarSlot, type LoadedPools, type Pool, type PoolShape, type PreviewSegment } from '@socialsim/shared';
 
 /**
  * 内容组装引擎（1.2，零 LLM）：给定一个池，按其语法拼出一条文本。
@@ -68,12 +68,12 @@ export function seededRng(seed: number): () => number {
 }
 
 /** 组装结果（轨迹用）：成文 + 所用语法名 + 各 present 槽所选片段原始 text（「所选模块」）。
- *  segments：按出现顺序，每个出现的槽贡献一段——{ component 所选组件名, text 解析后文本 }，供预览器按槽位拆解可视化。 */
+ *  segments：覆盖语法**全部**槽位（按顺序），含未出现的槽及其原因（prob 概率落选 / excluded 被互斥），供预览器可视化。 */
 export interface AssembleResult {
   text: string;
   grammar: string;
   fragments: string[];
-  segments: { component: string; text: string }[];
+  segments: PreviewSegment[];
 }
 
 /** 组装一条内容（只要成文）；无可用语法或必填槽无法填充时返回 null（调用方降级：跳过本次发帖）。 */
@@ -108,36 +108,45 @@ export function assembleDetailed(pool: Pool, ctx: AssembleContext): AssembleResu
 
   // 解互斥组：组内按槽位顺序，首个「可填 且 掷概率通过」的成为 winner（前者中了后者因互斥不出）；
   // 都没中则该组不出。例：夸赞70%+贬低100% → 70% 夸赞 / 30% 贬低；贬低改 50% 则有 15% 两者都不出。
-  const groupWinner = resolveGroups(slots, slotFillable, appears);
+  const groupRes = resolveGroups(slots, slotFillable, appears);
 
   const parts: string[] = [];
   const picked: string[] = [];
-  const segments: { component: string; text: string }[] = [];
+  const segments: PreviewSegment[] = [];
   for (let i = 0; i < slots.length; i++) {
     const slot = slots[i]!;
     const skippable = slot.group !== undefined || slot.optional === true || slot.prob !== undefined;
 
+    // 决定本槽是否出现（互斥组成员的概率已在 resolveGroups 掷过，这里不再重掷）。
+    let show: boolean;
+    let skipStatus: 'prob' | 'excluded' = 'prob';
     if (slot.group !== undefined) {
-      if (groupWinner.get(slot.group) !== i) continue; // 非 winner（含整组都没掷过）：跳过
-      // winner：概率已在 resolveGroups 掷过，这里直接出
-    } else if (!appears(slot)) {
+      const r = groupRes.get(slot.group)!;
+      show = r.winner === i;
+      if (!show) skipStatus = r.failed.has(i) ? 'prob' : 'excluded'; // 掷过没中=概率落选；没掷=被互斥
+    } else {
+      show = appears(slot);
+    }
+
+    if (!show) {
+      segments.push({ status: skipStatus, components: slot.components });
       continue;
     }
 
     // 槽内多选一：在可填组件里按权重挑一个。
     const comp = pickComponent(slot, fragmentsFor, ctx.rng);
     if (comp === null) {
-      if (skippable) continue; // 可省槽填不上：跳过
+      if (skippable) { segments.push({ status: 'prob', components: slot.components }); continue; }
       return null; // 必填槽填不上：整条作废
     }
     const slotPick = pickSlot(comp, fragmentsFor, ctx);
     if (slotPick === null) {
-      if (skippable) continue;
+      if (skippable) { segments.push({ status: 'prob', components: slot.components }); continue; }
       return null;
     }
     parts.push(slotPick.text);
     picked.push(slotPick.raw);
-    segments.push({ component: comp, text: slotPick.text });
+    segments.push({ status: 'shown', components: slot.components, component: comp, text: slotPick.text });
   }
 
   const out = parts.join('').trim();
@@ -161,22 +170,32 @@ function grammarViable(grammar: Grammar, slotFillable: (s: GrammarSlot) => boole
   return true;
 }
 
-/** 互斥组顺序优先：组内按槽位顺序，首个「可填 且 掷概率通过」的成员胜出（slot 下标）；
- *  更靠前的中了，靠后的因互斥不出；组内都没中则该组不出。成员各自出现概率因此仍生效——
- *  全 100% 时退化为恰好出第一个（即列在前的优先级最高）。 */
+interface GroupResolution {
+  /** 胜出槽下标（null = 组内都没中、该组不出）。 */
+  winner: number | null;
+  /** 掷过出现概率但没中的成员下标（= 概率落选；其余非 winner 成员为被互斥）。 */
+  failed: Set<number>;
+}
+
+/** 互斥组顺序优先：组内按槽位顺序，首个「可填 且 掷概率通过」的成员胜出；更靠前的中了，靠后的不再掷（被互斥）；
+ *  掷过没中的记为 failed（概率落选）。成员各自出现概率仍生效——全 100% 时退化为恰好出列在最前的那个。 */
 function resolveGroups(
   slots: GrammarSlot[],
   slotFillable: (s: GrammarSlot) => boolean,
   appears: (s: GrammarSlot) => boolean,
-): Map<string, number> {
-  const winner = new Map<string, number>();
+): Map<string, GroupResolution> {
+  const res = new Map<string, GroupResolution>();
   for (let i = 0; i < slots.length; i++) {
     const s = slots[i]!;
-    if (s.group === undefined || winner.has(s.group)) continue; // 该组已有更靠前的 winner
-    if (!slotFillable(s)) continue;
-    if (appears(s)) winner.set(s.group, i);
+    if (s.group === undefined) continue;
+    let r = res.get(s.group);
+    if (!r) { r = { winner: null, failed: new Set<number>() }; res.set(s.group, r); }
+    if (r.winner !== null) continue; // 已有 winner：后续成员不掷（被互斥）
+    if (!slotFillable(s)) continue; // 不可填：跳过（视为被互斥）
+    if (appears(s)) r.winner = i;
+    else r.failed.add(i);
   }
-  return winner;
+  return res;
 }
 
 /** 槽内多选一：在可填组件里按 weights 加权挑一个组件名；无可填则 null。 */
