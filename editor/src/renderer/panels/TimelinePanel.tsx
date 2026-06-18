@@ -26,6 +26,7 @@ const LANE_PAD = 8;
 const LANE_MIN_H = 46;
 const MIN_PPM = 0.2; // 像素/分钟下限：足够低，使宽窗口（如数天）也能整窗铺满视口
 const MAX_PPM = 120;
+const H_MIN_THUMB = 44; // 自定义横向滚动条拉手最小宽度（px），高缩放下也不会缩成小点
 const VBUF = 400;
 const POLL_WORLD_MS = 3000;
 const TICK_MS = 250;
@@ -420,6 +421,38 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const windowPx = ((windowTo - windowFrom) / 60_000) * pxPerMin;
   const trackWidth = Math.max(windowPx, viewW);
 
+  // 自定义横向滚动条：原生拉手在高缩放下会缩成一个小点（尺寸 ∝ 视口/内容，对缩放呈双曲），
+  // 故隐藏原生横向条、自绘一条带最小拉手宽度的条（拉手永不缩成点）。
+  const scrollW = LABEL_W + trackWidth;
+  const maxScrollX = Math.max(0, scrollW - viewW);
+  const hasHScroll = maxScrollX > 1;
+  const hThumbW = hasHScroll ? Math.max(H_MIN_THUMB, (viewW / scrollW) * viewW) : viewW;
+  const hThumbLeft = hasHScroll ? (scrollX / maxScrollX) * (viewW - hThumbW) : 0;
+  /** 把拉手左缘像素映射回 scrollLeft 并应用。 */
+  function setScrollFromThumb(thumbLeftPx: number): void {
+    const el = tlRef.current;
+    if (!el) return;
+    const denom = Math.max(1, viewW - hThumbW);
+    el.scrollLeft = clamp((thumbLeftPx / denom) * maxScrollX, 0, maxScrollX);
+  }
+  function onHThumbDown(e: React.MouseEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startLeft = hThumbLeft;
+    const onMove = (ev: MouseEvent) => setScrollFromThumb(startLeft + (ev.clientX - startX));
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+  function onHTrackDown(e: React.MouseEvent): void {
+    const rect = e.currentTarget.getBoundingClientRect();
+    setScrollFromThumb(clamp(e.clientX - rect.left - hThumbW / 2, 0, viewW - hThumbW));
+  }
+
   /** 跳转中轴到某时间（冻结、停跟随）：自动铺满 + 加载该窗口 + 居中。 */
   function jumpToCenter(t: number): void {
     setFollowing(false);
@@ -719,7 +752,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
               已隐藏全部轨道——在左侧勾选要查看的账号，或点「全选」。
             </div>
           ) : (
-          <div ref={tlRef} onScroll={onScroll} className="tl-scroll flex-1 overflow-auto">
+          <div className="flex-1 flex flex-col min-w-0">
+          {/* 横向用自定义滚动条（下方）：隐藏原生横向条，纵向保留原生 */}
+          <div ref={tlRef} onScroll={onScroll} className="tl-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
             <div className="flex" style={{ width: LABEL_W + trackWidth, minHeight: '100%' }}>
               {/* lane 标签列 */}
               <div className="sticky left-0 z-20 bg-(--panel2) border-r border-(--border) shrink-0" style={{ width: LABEL_W }}>
@@ -802,6 +837,21 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
                 })}
               </div>
             </div>
+          </div>
+          {/* 自定义横向滚动条：拉手带最小宽度，高缩放下也不缩成点 */}
+          {hasHScroll && (
+            <div
+              onMouseDown={onHTrackDown}
+              style={{ width: viewW }}
+              className="relative h-3 shrink-0 bg-(--panel2) border-t border-(--border) cursor-pointer select-none"
+            >
+              <div
+                onMouseDown={onHThumbDown}
+                style={{ left: hThumbLeft, width: hThumbW }}
+                className="absolute top-0.5 bottom-0.5 rounded bg-[#454c55] hover:bg-[#58616c] cursor-grab active:cursor-grabbing"
+              />
+            </div>
+          )}
           </div>
           )}
         </div>

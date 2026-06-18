@@ -48,7 +48,7 @@ export function App() {
   const [savedNames, setSavedNames] = useState<string[]>([]);
   const [showSave, setShowSave] = useState(false);
   const [saveName, setSaveName] = useState('');
-  const [activeLabel, setActiveLabel] = useState<string>(DEFAULT_PRESET.name); // 状态条显示"当前布局"
+  const [active, setActiveDisplay] = useState<Active>(DEFAULT_ACTIVE); // 渲染用：状态条「当前布局」+ 下拉回显
   const world = useActiveWorld();
   const backend = window.editor.backendUrl;
 
@@ -94,10 +94,10 @@ export function App() {
   function labelOf(a: Active): string {
     return a.kind === 'saved' ? `存档·${a.name}` : PRESETS.find((p) => p.id === a.id)?.name ?? a.id;
   }
-  /** 设活动布局：写 ref（供保存逻辑）+ 更新状态条标签。 */
+  /** 设活动布局：写 ref（供保存逻辑）+ 触发渲染（状态条 / 下拉回显）。 */
   function setActive(a: Active): void {
     activeRef.current = a;
-    setActiveLabel(labelOf(a));
+    setActiveDisplay(a);
   }
 
   /** 从 doc 推断活动布局（含旧 lastPresetId 迁移）。 */
@@ -360,14 +360,13 @@ export function App() {
           </button>
         </div>
 
-        {/* 已存布局 */}
+        {/* 已存布局：选中后回显当前布局名（活动是命名存档时显示其名，否则显示占位） */}
         {savedNames.length > 0 && (
           <select
             className="text-xs bg-(--chip) border border-(--border) rounded-lg px-2 py-1 text-(--text) outline-none cursor-pointer"
-            value=""
+            value={active.kind === 'saved' ? active.name : ''}
             onChange={(e) => {
               if (e.target.value) void applySaved(e.target.value);
-              e.currentTarget.selectedIndex = 0;
             }}
           >
             <option value="">已存布局…</option>
@@ -435,7 +434,7 @@ export function App() {
         )}
         <span className="ml-auto flex items-center gap-1.5">
           <i className="ri-layout-grid-line" />
-          当前布局：<b className="text-(--text)">{activeLabel}</b>
+          当前布局：<b className="text-(--text)">{labelOf(active)}</b>
         </span>
       </footer>
     </div>
