@@ -12,8 +12,13 @@ export interface PreviewState {
   loading: boolean;
 }
 
+/** 预览请求：待预览的池（含未保存草稿）+ 可选的未保存语法/组件覆盖。 */
+export interface PreviewReq { pool: unknown; grammars?: Record<string, unknown> }
+
 let state: PreviewState = { sample: null, msg: null, loading: false };
-let lastReq: { pool: unknown; grammars?: Record<string, unknown> } | null = null;
+/** 当前预览来源：一个**实时读取**当前编辑器草稿的函数（点「预览」时由该编辑器注册）。
+ *  「再来一个」通过它取此刻最新草稿，而非某次快照——保证改了设置直接重掷即用新设置。 */
+let source: (() => PreviewReq | null) | null = null;
 const listeners = new Set<() => void>();
 
 function set(s: PreviewState): void {
@@ -21,9 +26,13 @@ function set(s: PreviewState): void {
   for (const l of listeners) l();
 }
 
+/** 注册当前预览来源（编辑器点「预览」时调；传入实时取草稿的函数）。 */
+export function setPreviewSource(fn: () => PreviewReq | null): void {
+  source = fn;
+}
+
 /** 随机模拟一条（经模拟器活引擎），结果发布到总线供预览器面板展示。 */
 export async function runPreview(pool: unknown, grammars?: Record<string, unknown>): Promise<void> {
-  lastReq = grammars ? { pool, grammars } : { pool };
   set({ sample: null, msg: null, loading: true });
   const body: Record<string, unknown> = { pool, count: 1 };
   if (grammars) body.grammars = grammars;
@@ -43,9 +52,11 @@ export async function runPreview(pool: unknown, grammars?: Record<string, unknow
   }
 }
 
-/** 用上次的请求再随机模拟一条（预览器「再来一个」）。 */
+/** 「再来一个」：实时取当前来源的最新草稿再随机模拟一条（反映未点预览的现场改动）。 */
 export function reroll(): void {
-  if (lastReq) void runPreview(lastReq.pool, lastReq.grammars);
+  const req = source?.();
+  if (req) void runPreview(req.pool, req.grammars);
+  else set({ sample: null, msg: '没有可重掷的预览来源，先在某个池/语法点「预览」。', loading: false });
 }
 
 export function usePreview(): PreviewState {

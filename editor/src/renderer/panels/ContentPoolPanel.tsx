@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { IDockviewPanelProps } from 'dockview';
 import type { GrammarSlot } from '@socialsim/shared';
-import { runPreview } from '../state/preview-bus.js';
+import { runPreview, setPreviewSource, type PreviewReq } from '../state/preview-bus.js';
 import { usePoolsView, reloadPools, type PoolsView, type Scope } from '../state/pools-bus.js';
 
 /**
@@ -216,6 +216,15 @@ function PoolEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps & {
     for (const [k, v] of dims) if (k.trim()) dimensions[k.trim()] = v;
     return { id: id.trim(), dimensions, tiers, grammars: grammars.filter((g) => g.ref.trim()).map((g) => ({ ref: g.ref.trim(), weight: g.weight })) };
   }
+  function buildReq(): PreviewReq | null { const p = build(); return p.grammars.length ? { pool: p } : null; }
+  const buildReqRef = useRef(buildReq);
+  buildReqRef.current = buildReq; // 每次渲染更新，使预览器「再来一个」实时取最新草稿
+  function doPreview() {
+    const req = buildReq();
+    if (!req) { setMsg('先加至少一个语法再预览。'); return; }
+    setPreviewSource(() => buildReqRef.current());
+    onPreview(req.pool);
+  }
   async function save() {
     const p = build();
     if (!p.id) { setMsg('请填池子名。'); return; }
@@ -268,7 +277,7 @@ function PoolEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps & {
         <button className={btn} onClick={() => setGrammars([...grammars, { ref: '', weight: 1 }])}><i className="ri-add-line" /> 加语法</button>
       </Field>
       <div className="flex items-center gap-2 pt-1">
-        <button className={btnPrimary} onClick={() => { const p = build(); if (!p.grammars.length) { setMsg('先加至少一个语法再预览。'); return; } onPreview(p); }}><i className="ri-eye-line" /> 预览</button>
+        <button className={btnPrimary} onClick={doPreview}><i className="ri-eye-line" /> 预览</button>
         <button className={btn} onClick={() => void save()}><i className="ri-save-line" /> 保存</button>
         {existing && <button className={`${btn} text-(--pink)`} onClick={() => void remove()}><i className="ri-delete-bin-line" /> 删除</button>}
       </div>
@@ -348,10 +357,18 @@ function GrammarEditor({ view, sel, onSaved, onSelect, onPreview }: EditorProps 
     const res = await api('/api/content-pools/delete', { layer: 'grammar', key: existing.name, scope: existing.scope, group: existing.group });
     if (res.ok) { await onSaved(); onSelect(NEW); } else setMsg(`删除失败：${res.status}`);
   }
-  function doPreview() {
-    const built = buildSlots(); if (!built.length) { setMsg('先加至少一个有组件的槽位。'); return; }
+  function buildReq(): PreviewReq | null {
+    const built = buildSlots(); if (!built.length) return null;
     const gname = name.trim() || '_preview_g';
-    onPreview({ id: '_preview', dimensions: { 形态: 'standalone' }, grammars: [{ ref: gname }] }, { [gname]: { slots: built } });
+    return { pool: { id: '_preview', dimensions: { 形态: 'standalone' }, grammars: [{ ref: gname }] }, grammars: { [gname]: { slots: built } } };
+  }
+  const buildReqRef = useRef(buildReq);
+  buildReqRef.current = buildReq; // 每次渲染更新，使预览器「再来一个」实时取最新草稿
+  function doPreview() {
+    const req = buildReq();
+    if (!req) { setMsg('先加至少一个有组件的槽位。'); return; }
+    setPreviewSource(() => buildReqRef.current());
+    onPreview(req.pool, req.grammars);
   }
 
   return (
