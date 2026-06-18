@@ -76,12 +76,15 @@ function buildObserve(api: DockviewApi): void {
   });
 
   api.addPanel(base('pane-1', 'console'));
-  // 时间轴在控制台正下方撑满底部整行；below 拆分默认 50/50，下半即总高一半。
+  // 时间轴在控制台正下方撑满底部整行；默认要占总高 3/5（控制台占 2/5）。
   const timeline = api.addPanel({ ...base('pane-2', 'timeline'), position: { referencePanel: 'pane-1', direction: 'below' } });
   // 检视器贴在时间轴右侧，较窄。
   const inspector = api.addPanel({ ...base('pane-3', 'inspector'), position: { referencePanel: timeline.id, direction: 'right' } });
   try {
     inspector.api.setSize({ width: 300 }); // 检视器窄栏
+    // 时间轴占总高 3/5：容器高用 dockview 测得的高度，未就绪则退回视口高减去顶栏/状态条。
+    const totalH = api.height > 0 ? api.height : window.innerHeight - 72;
+    timeline.api.setSize({ height: Math.round(totalH * 0.6) });
   } catch {
     /* 容器尺寸未就绪时忽略，用默认比例 */
   }

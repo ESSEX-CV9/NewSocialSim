@@ -9,9 +9,12 @@ import { type TimelineBlock, interactionKey, interactionToBlock, postToBlock, bl
 /**
  * 时间轴面板（Premiere 范式，见 docs/m5-design.md）：横轴为时间、纵轴每行一个账号，
  * 块 = 世界真实内容（帖子/回复/引用/转发/赞/关注）、**独立于模拟器**（读 world.db，模拟器关也能用）。
- * 取数走编辑器后端单一聚合端点 GET /api/timeline（roster + 顶层帖 + 各账号回复/互动），
- * 按**可见时间窗口**加载：初始取最新内容，向左滚/跳转/轮询各取一个时间窗（含该时段全部互动）。
- * 顶层时间为可输入的时间修改器，改时间即跳转视图。
+ *
+ * 有界窗口模型：顶部三件套「左偏移｜中轴时间｜右偏移」+ 单位下拉（分/时/天）定义可见时间范围
+ * = [中轴 − 左, 中轴 + 右]。横轴/滚动条**恰好覆盖这段**，滚到头即窗口边缘——想看更早/更远，
+ * 改中轴或拉大左右偏移。改边界/单位/中轴时自动把缩放调到「整窗铺满视口」，再 Ctrl+滚轮放大看细节。
+ * 中轴只有点「回到现在」后才跟随流速前进，否则冻结在当前值。
+ * 取数走编辑器后端单一聚合端点 GET /api/timeline，按当前窗口区间加载（含该时段全部回复/互动）。
  */
 
 const RULER_H = 26;
@@ -21,22 +24,18 @@ const LANE_DIV = '#26292e';
 const SUBROW_H = 26;
 const LANE_PAD = 8;
 const LANE_MIN_H = 46;
-const MIN_PPM = 1;
+const MIN_PPM = 0.2; // 像素/分钟下限：足够低，使宽窗口（如数天）也能整窗铺满视口
 const MAX_PPM = 120;
-const RIGHT_PAD = 300;
 const VBUF = 400;
 const POLL_WORLD_MS = 3000;
 const TICK_MS = 250;
 const FEED_LIMIT = 50;
 const DAY_MS = 86_400_000;
-const INITIAL_AXIS_SPAN = 7 * DAY_MS; // 初始横轴左界 = 最新内容前 7 天（可自由拖滚到此范围）
-const AXIS_EXTEND = 3 * DAY_MS; // 拖到左边缘时再往更早扩 3 天
-const AXIS_EDGE_PX = 600; // 距左边缘多少像素内触发扩展
-const PREFETCH_CHUNK_MS = 12 * 3_600_000; // 后台预取每块 12 小时
-const PREFETCH_GAP_MS = 40; // 预取块之间让步间隔，避免占满
-const sleep = (ms: number): Promise<void> => new Promise((r) => window.setTimeout(r, ms));
+const UNIT_MS: Record<Unit, number> = { m: 60_000, h: 3_600_000, d: DAY_MS };
+const SPAN_DEFAULT = 12; // 左右默认各 12（单位 h）→ 默认看「现在」前后各 12 小时、共 24h 窗口
 const NICE_STEPS = [1, 2, 5, 10, 15, 30, 60, 120, 240, 360, 720, 1440];
 
+type Unit = 'm' | 'h' | 'd';
 interface Anchor {
   scale: number;
   paused: boolean;
@@ -85,8 +84,13 @@ function blockColor(b: TimelineBlock): string {
   return b.kind === 'post' ? ACTION_COLOR[b.action] : ACTION_COLOR[b.kind];
 }
 
-function computeLayout(blocks: TimelineBlock[], lanes: string[], originSim: number, pxPerMin: number): Layout {
-  const ax = (t: number) => ((t - originSim) / 60_000) * pxPerMin;
+/**
+ * 计算每个块的子行堆叠与各 lane 高度。**与传入 origin 无关**——堆叠只看块间相对间隔（取决于 pxPerMin
+ * 与块集），origin 的平移对所有块一致、不改变重叠关系。故传一个稳定 origin（minTime）即可让 memo
+ * 在「跟随」时不随每 tick 的窗口滑动重算（渲染时的绝对 x 另用实时 origin 算）。
+ */
+function computeLayout(blocks: TimelineBlock[], lanes: string[], stackOrigin: number, pxPerMin: number): Layout {
+  const ax = (t: number) => ((t - stackOrigin) / 60_000) * pxPerMin;
   const byLane = new Map<string, TimelineBlock[]>(lanes.map((l) => [l, []]));
   for (const b of blocks) byLane.get(b.entity)?.push(b);
 
@@ -131,34 +135,45 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
   const [scrollX, setScrollX] = useState(0);
   const [viewW, setViewW] = useState(800);
   const [editingTime, setEditingTime] = useState<string | null>(null);
+  // 中轴时间：following 时用实时 now（跟随流速前进）；冻结时用此固定值。
+  const [centerMs, setCenterMs] = useState<number | null>(null);
+  const [spanLeft, setSpanLeft] = useState(SPAN_DEFAULT); // 左偏移（单位 unit）
+  const [spanRight, setSpanRight] = useState(SPAN_DEFAULT); // 右偏移（单位 unit）
+  const [unit, setUnit] = useState<Unit>('h');
   // 轨道筛选（T.6）：null = 全部账号；非空集 = 只看选中账号的轨道（纯视图过滤，数据已在内存）。
   const [laneFilter, setLaneFilter] = useState<Set<string> | null>(null);
   const [laneSearch, setLaneSearch] = useState(''); // 轨道管理面板的账号搜索词（昵称/@handle）
   const [showInactive, setShowInactive] = useState(false); // 是否展开"未活跃账号"分组
-  // 横轴左界（模拟时间）：稳定、独立于已加载内容，使可拖滚到任意时段、内容按需加载。
-  const [axisFrom, setAxisFrom] = useState<number | null>(null);
   const worldRef = useRef<string | null>(null);
   const anchorRef = useRef<Anchor | null>(null);
   const tlRef = useRef<HTMLDivElement | null>(null);
   const expectedLeftRef = useRef(0);
   const postIdsRef = useRef<Set<number>>(new Set());
   const actKeysRef = useRef<Set<string>>(new Set());
-  const coverToRef = useRef<number | null>(null); // 已加载到的最新时间（轮询据此向"现在"续接）
-  // 最近一次按可见窗口加载的区间；可见窗口落在其内则跳过重复加载。
-  const lastLoadFromRef = useRef(Infinity);
-  const lastLoadToRef = useRef(-Infinity);
-  const originSimRef = useRef(0); // 当前 originSim（时间↔x 映射），供滚动时由像素反推可见时间
-  const scrollLoadTimerRef = useRef<number | null>(null);
-  const prevAxisFromRef = useRef<number | null>(null); // axisFrom 减小（左扩）时补偿 scrollLeft
-  const prefetchTokenRef = useRef(0); // 后台预取取消令牌（切世界/刷新即作废旧循环）
+  const coverToRef = useRef<number | null>(null); // 已加载到的最新时间（跟随时轮询据此向"现在"续接）
+  const originSimRef = useRef(0); // 当前实时 origin（时间↔x 映射），供滚动/缩放时由像素反推时间
   const ppmRef = useRef(pxPerMin);
   ppmRef.current = pxPerMin;
-  const viewWRef = useRef(viewW); // 供 poll useEffect 的陈旧闭包里读到当前视宽
+  const viewWRef = useRef(viewW); // 供陈旧闭包读到当前视宽
   viewWRef.current = viewW;
-  const pendingJumpRef = useRef<number | null>(null);
+  const followingRef = useRef(following);
+  followingRef.current = following;
+  const centerMsRef = useRef(centerMs);
+  centerMsRef.current = centerMs;
+  const spanLeftRef = useRef(spanLeft);
+  spanLeftRef.current = spanLeft;
+  const spanRightRef = useRef(spanRight);
+  spanRightRef.current = spanRight;
+  const unitRef = useRef(unit);
+  unitRef.current = unit;
+  const readyRef = useRef(false);
+  const zoomAnchorRef = useRef<{ t: number; px: number } | null>(null); // 缩放后把该时间对齐回该像素，使缩放点不漂
   const [, rerender] = useState(0);
 
   const backend = window.editor.backendUrl;
+
+  const leftMsOf = (): number => spanLeftRef.current * UNIT_MS[unitRef.current];
+  const rightMsOf = (): number => spanRightRef.current * UNIT_MS[unitRef.current];
 
   // T.3：renderer 的单一取数接口——编辑器后端聚合 roster + 顶层帖 + 各账号回复/互动。
   interface TimelineResult {
@@ -177,8 +192,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return (await r.json()) as TimelineResult;
   }
 
-  /** 加载某时间窗口的完整内容（顶层帖 + 回复 + 互动 + roster），并入既有数据（按 id/key 去重）。
-   *  不加互斥——用户滚动取数与后台预取可并发（结果幂等去重），互斥会让用户取数被后台挤掉。 */
+  /** 加载某时间窗口的完整内容（顶层帖 + 回复 + 互动 + roster），并入既有数据（按 id/key 去重）。 */
   async function loadWindow(from: number, to: number): Promise<void> {
     try {
       const r = await fetchTimeline({ from, to });
@@ -190,27 +204,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       setError(String(e));
     }
   }
-
-  /** 后台预取：初始秒显后，由近及远把 [fromTime, toTime] 按 12h 一块悄悄拉完，
-   *  使拖滚到该范围任意时段时数据已在内存、瞬间出现。切世界/刷新令牌作废即停。 */
-  function startPrefetch(fromTime: number, toTime: number): void {
-    const token = ++prefetchTokenRef.current;
-    void (async () => {
-      let cursor = toTime;
-      while (cursor > fromTime) {
-        if (prefetchTokenRef.current !== token) return; // 已作废
-        const from = Math.max(fromTime, cursor - PREFETCH_CHUNK_MS);
-        await loadWindow(from, cursor);
-        cursor = from;
-        await sleep(PREFETCH_GAP_MS);
-      }
-    })();
-  }
-
-  /** 一次加载的时间跨度：至少 1.5 个可见屏宽或 6 小时（缩得越远一次取越多）。 */
-  function loadStepMs(): number {
-    const visMs = (viewWRef.current / Math.max(0.1, ppmRef.current)) * 60_000;
-    return Math.max(visMs * 1.5, 6 * 3_600_000);
+  /** 加载以 center 为中轴的当前窗口 [center−左, center+右] 的内容。 */
+  function loadAround(center: number): void {
+    void loadWindow(center - leftMsOf(), center + rightMsOf());
   }
 
   function addPosts(views: PostView[]): void {
@@ -231,14 +227,42 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     if (fresh.length) setActs((prev) => [...prev, ...fresh]);
   }
 
-  /** 初始/刷新：取最新实际内容（非窗口、最新在前）——世界时钟可能远超内容（模拟器停了时钟仍走），
-   *  故不能假设内容在"现在"附近。时钟明显领先内容时把视图落到最新内容、停跟随。 */
+  /** 把缩放调到「整窗恰好铺满视口」：pxPerMin = 视宽 / 窗口分钟数（夹到 [MIN,MAX]）。 */
+  function fitZoom(): void {
+    const mins = (leftMsOf() + rightMsOf()) / 60_000;
+    if (mins <= 0) return;
+    setPxPerMin(clamp(+(viewWRef.current / mins).toFixed(3), MIN_PPM, MAX_PPM));
+  }
+
+  /** 缩放（滑块/Ctrl+滚轮共用）：记下锚点像素处对应的时间，缩放后把它对齐回原像素，缩放点不漂（②）。 */
+  function applyZoom(next: number, anchorPx?: number): void {
+    const el = tlRef.current;
+    if (el) {
+      const px = anchorPx ?? el.clientWidth / 2; // 默认锚视口中心
+      const t = originSimRef.current + ((el.scrollLeft - LABEL_W + px) / Math.max(0.0001, ppmRef.current)) * 60_000;
+      zoomAnchorRef.current = { t, px };
+    }
+    setPxPerMin(clamp(+next.toFixed(3), MIN_PPM, MAX_PPM));
+  }
+
+  /** 把某时间滚到视口中央（跳转/冻结态下改边界后用）。 */
+  function scrollCenter(t: number): void {
+    requestAnimationFrame(() => {
+      const el = tlRef.current;
+      if (!el) return;
+      const x = ((t - originSimRef.current) / 60_000) * ppmRef.current;
+      const target = clamp(LABEL_W + x - el.clientWidth / 2, 0, Math.max(0, el.scrollWidth - el.clientWidth));
+      el.scrollLeft = target;
+      expectedLeftRef.current = target;
+      setScrollX(target);
+    });
+  }
+
+  /** 初始/刷新：取最新实际内容定位——世界时钟可能远超内容（模拟器停了时钟仍走），
+   *  内容明显落后于"现在"时把中轴冻结到最新内容、停跟随，否则跟随现在。 */
   async function loadInitial(): Promise<void> {
     postIdsRef.current = new Set();
     actKeysRef.current = new Set();
-    prevAxisFromRef.current = null;
-    lastLoadFromRef.current = Infinity;
-    lastLoadToRef.current = -Infinity;
     setPosts([]);
     setActs([]);
     setRoster([]);
@@ -250,59 +274,21 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
       ingestInteractions(r.interactions);
       const times = r.posts.map((p) => p.createdAt);
       const latest = times.length ? Math.max(...times) : now;
-      const oldest = times.length ? Math.min(...times) : now;
-      lastLoadFromRef.current = oldest; // 初始非窗口取回的内容时间跨度
-      lastLoadToRef.current = now;
-      coverToRef.current = now; // 轮询从 now 续接新内容
-      setAxisFrom(latest - INITIAL_AXIS_SPAN); // 稳定横轴左界（可拖滚回最新内容前 7 天）
-      if (now - latest > 30 * 60_000) {
-        // 时钟领先内容超 30 分钟（模拟器空闲）：落到最新内容、停跟随，否则播放头在空白处
-        setFollowing(false);
-        pendingJumpRef.current = latest;
-      }
+      coverToRef.current = now; // 跟随时从 now 续接新内容
+      const idle = now - latest > 30 * 60_000; // 时钟领先内容超 30 分钟：内容落后，冻结到最新内容
+      const center = idle ? latest : now;
+      setFollowing(!idle);
+      setCenterMs(idle ? latest : null);
+      fitZoom();
+      loadAround(center);
+      if (idle) scrollCenter(center); // 跟随分支由 following-effect 滚到 now
       setError(null);
-      // 后台把整条初始轴（最新内容前 7 天）预取完，使拖滚到任意时段都即时
-      if (times.length) startPrefetch(latest - INITIAL_AXIS_SPAN, latest);
     } catch (e) {
       setError(String(e));
     }
   }
 
-  /** 按当前可见时间窗口加载（滚动/拖动滚动条到任意位置后调用）：由滚动像素反推可见时间，
-   *  加载该窗口前后各一个 step 的完整内容（含历史回复/互动）。可见窗口落在上次加载区间内则跳过。 */
-  function loadVisibleWindow(): void {
-    const el = tlRef.current;
-    if (!el) return;
-    const ppm = Math.max(0.1, ppmRef.current);
-    const origin = originSimRef.current;
-    const xLeft = el.scrollLeft - LABEL_W;
-    const vFrom = origin + (xLeft / ppm) * 60_000;
-    const vTo = origin + ((xLeft + viewWRef.current) / ppm) * 60_000;
-    const half = Math.max(loadStepMs(), vTo - vFrom); // 至少一个 step 或一屏，作半宽
-    const from = (vFrom + vTo) / 2 - half;
-    const to = (vFrom + vTo) / 2 + half;
-    if (from >= lastLoadFromRef.current && to <= lastLoadToRef.current) return; // 已在上次加载窗口内
-    lastLoadFromRef.current = from;
-    lastLoadToRef.current = to;
-    void loadWindow(from, to);
-  }
-
-  /** 滚动停下后（防抖）按可见窗口加载。 */
-  function scheduleVisibleLoad(): void {
-    if (scrollLoadTimerRef.current != null) window.clearTimeout(scrollLoadTimerRef.current);
-    scrollLoadTimerRef.current = window.setTimeout(() => loadVisibleWindow(), 200);
-  }
-
-  /** 轮询：把覆盖区间往"现在"扩，拉入新产生的内容。 */
-  async function loadNewer(): Promise<void> {
-    const now = simNow();
-    const from = coverToRef.current ?? now - loadStepMs();
-    if (now - from < 1000) return; // 暂停或无新内容
-    coverToRef.current = now;
-    await loadWindow(from, now);
-  }
-
-  // 轮询活动世界：拾取时钟锚点；切世界则重载，否则拉最新页实时更新。
+  // 轮询活动世界：拾取时钟锚点；切世界则重载，否则向"现在"续接新内容。
   useEffect(() => {
     let alive = true;
     async function pollWorld(): Promise<void> {
@@ -325,10 +311,15 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
           worldRef.current = id;
           setWorldId(id);
           setSelectedBlock(null);
-          setFollowing(true);
           await loadInitial();
-        } else {
-          if (alive) await loadNewer();
+        } else if (alive && followingRef.current) {
+          // 跟随时把覆盖区间往"现在"扩，拉入新产生的内容。
+          const now = simNow();
+          const from = coverToRef.current ?? now - rightMsOf();
+          if (now - from >= 1000) {
+            coverToRef.current = now;
+            await loadWindow(from, now);
+          }
         }
       } catch {
         /* 后端暂不可达，下个周期重试 */
@@ -339,7 +330,6 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     const tid = setInterval(() => rerender((t) => t + 1), TICK_MS);
     return () => {
       alive = false;
-      prefetchTokenRef.current++; // 卸载即停后台预取
       clearInterval(pid);
       clearInterval(tid);
     };
@@ -375,7 +365,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     }
     return { allLanes: ls, minTime: Number.isFinite(lo) ? lo : 0, maxTime: hi };
   }, [blocks, roster]);
-  // 实际渲染的轨道：有筛选则取交集（保留 allLanes 顺序）。excluded 账号的块因不在 lane 内自然不渲染。
+  // 实际渲染的轨道：有筛选则取交集（保留 allLanes 顺序）。
   const lanes = useMemo(
     () => (laneFilter ? allLanes.filter((l) => laneFilter.has(l)) : allLanes),
     [allLanes, laneFilter],
@@ -408,62 +398,83 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return { active, inactive };
   }, [allLanes, activeSet, laneSearch, names]);
 
-  // 横轴起点用稳定的 axisFrom（独立于已加载内容），故可拖滚到任意时段；未就绪前回退到 minTime。
-  const originSim = (axisFrom ?? minTime) - 2 * 60_000;
-  originSimRef.current = originSim; // 供滚动时由像素反推可见时间
-  const ax = (t: number) => ((t - originSim) / 60_000) * pxPerMin;
-  const layout = useMemo(() => computeLayout(blocks, lanes, originSim, pxPerMin), [blocks, lanes, originSim, pxPerMin]);
-
   function simNow(): number {
     const a = anchorRef.current;
     if (!a) return maxTime;
     return a.paused ? a.simAnchorMs : a.simAnchorMs + (Date.now() - a.realAnchorMs) * a.scale;
   }
   const now = simNow();
-  const trackWidth = Math.max(ax(maxTime), ax(now)) + RIGHT_PAD;
-  const ready = allLanes.length > 0; // 有账号即铺轴；内容按可见窗口加载，空时段显空轨道
+  const ready = allLanes.length > 0; // 有账号即铺轴；空时段显空轨道
+  readyRef.current = ready;
 
-  /** 跳转视图到某时间（停止跟随）：加载目标前后一个 step 的完整窗口（含该时段回复/互动），再滚到目标。 */
-  async function jumpToTime(t: number): Promise<void> {
+  // 当前窗口与坐标系：中轴 = 跟随时 now，否则冻结值；窗口 = [中轴−左, 中轴+右]。
+  const center = following ? now : centerMs ?? now;
+  const windowFrom = center - spanLeft * UNIT_MS[unit];
+  const windowTo = center + spanRight * UNIT_MS[unit];
+  const originSim = windowFrom;
+  originSimRef.current = originSim;
+  const ax = (t: number) => ((t - originSim) / 60_000) * pxPerMin;
+  // 堆叠用稳定 origin（minTime）算（与 origin 无关，见 computeLayout），避免跟随时每 tick 重算。
+  const layout = useMemo(() => computeLayout(blocks, lanes, minTime, pxPerMin), [blocks, lanes, minTime, pxPerMin]);
+  // 轨道宽 = 窗口像素宽，但至少铺满视口（③：轨道分割线不会在右侧断掉）。
+  const windowPx = ((windowTo - windowFrom) / 60_000) * pxPerMin;
+  const trackWidth = Math.max(windowPx, viewW);
+
+  /** 跳转中轴到某时间（冻结、停跟随）：自动铺满 + 加载该窗口 + 居中。 */
+  function jumpToCenter(t: number): void {
     setFollowing(false);
-    const s = loadStepMs();
-    lastLoadFromRef.current = t - s; // 记为已加载窗口，避免落定后又重复加载
-    lastLoadToRef.current = t + s;
-    await loadWindow(t - s, t + s);
-    pendingJumpRef.current = t;
-    rerender((x) => x + 1);
+    setCenterMs(t);
+    fitZoom();
+    loadAround(t);
+    scrollCenter(t);
   }
   function commitTimeEdit(): void {
-    if (editingTime) {
+    if (editingTime != null) {
       const t = parseSimTime(editingTime);
-      if (t != null) void jumpToTime(t);
+      if (t != null) jumpToCenter(t);
     }
     setEditingTime(null);
   }
-
-  // 处理跳转：窗口已并入后，滚到目标时间居中并清除待跳转。
+  /** 回到现在：恢复跟随、铺满、加载现在窗口（following-effect 负责把播放头居中）。 */
+  function backToNow(): void {
+    setFollowing(true);
+    setCenterMs(null);
+    fitZoom();
+    const n = simNow();
+    coverToRef.current = n;
+    loadAround(n);
+  }
+  /** 改左/右偏移或单位：保持当前中轴，重铺满 + 重载窗口 + 居中。 */
+  function changeSpan(side: 'left' | 'right', raw: string): void {
+    const n = Math.round(Number(raw));
+    if (!Number.isFinite(n) || n < 0) return;
+    if (side === 'left') setSpanLeft(n);
+    else setSpanRight(n);
+  }
+  // 左右偏移 / 单位变化后：自动铺满 + 重载 + 居中（用最新值，故放 effect 里）。
   useEffect(() => {
-    const t = pendingJumpRef.current;
-    if (t == null) return;
-    const el = tlRef.current;
-    if (!el) return;
-    const target = clamp(LABEL_W + ax(t) - el.clientWidth / 2, 0, Math.max(0, el.scrollWidth - el.clientWidth));
-    el.scrollLeft = target;
-    expectedLeftRef.current = target;
-    setScrollX(target);
-    pendingJumpRef.current = null;
-  });
+    if (!readyRef.current) return;
+    fitZoom();
+    const c = followingRef.current ? simNow() : centerMsRef.current ?? simNow();
+    loadAround(c);
+    if (!followingRef.current) scrollCenter(c);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spanLeft, spanRight, unit]);
 
-  // axisFrom 左扩（减小）→ 所有 x 右移；非跟随且非跳转中时补偿 scrollLeft 保持视图不跳。
+  // 处理缩放锚点：pxPerMin 变化后把锚点时间对齐回锚点像素（②，缩放点不漂）。
   useLayoutEffect(() => {
     const el = tlRef.current;
-    const prev = prevAxisFromRef.current;
-    if (el && prev != null && axisFrom != null && axisFrom < prev && !following && pendingJumpRef.current == null) {
-      el.scrollLeft += ((prev - axisFrom) / 60_000) * ppmRef.current;
+    const anchor = zoomAnchorRef.current;
+    if (el && anchor) {
+      const x = ((anchor.t - originSimRef.current) / 60_000) * ppmRef.current;
+      const target = clamp(LABEL_W + x - anchor.px, 0, Math.max(0, el.scrollWidth - el.clientWidth));
+      el.scrollLeft = target;
+      expectedLeftRef.current = target;
+      setScrollX(target);
     }
-    prevAxisFromRef.current = axisFrom;
+    zoomAnchorRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [axisFrom]);
+  }, [pxPerMin]);
 
   useEffect(() => {
     const el = tlRef.current;
@@ -479,9 +490,10 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       if (e.ctrlKey) {
-        // Ctrl+滚轮：缩放
+        // Ctrl+滚轮：缩放，锚到光标位置（该处时间缩放前后不动）。
         e.preventDefault();
-        setPxPerMin((p) => clamp(+(p * (e.deltaY < 0 ? 1.12 : 1 / 1.12)).toFixed(2), MIN_PPM, MAX_PPM));
+        const px = e.clientX - el.getBoundingClientRect().left;
+        applyZoom(ppmRef.current * (e.deltaY < 0 ? 1.12 : 1 / 1.12), px);
         return;
       }
       if (e.altKey) {
@@ -495,6 +507,7 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     return () => el.removeEventListener('wheel', onWheel);
   }, [ready]);
 
+  // 跟随时把播放头（现在）保持居中——窗口随时钟滑动、内容在固定播放头下左移。
   useEffect(() => {
     if (!following) return;
     const el = tlRef.current;
@@ -508,14 +521,12 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     const el = tlRef.current;
     if (!el) return;
     const userScrolled = Math.abs(el.scrollLeft - expectedLeftRef.current) > 3;
-    if (userScrolled) setFollowing(false);
-    setScrollX(el.scrollLeft);
-    // 用户滚动/拖动滚动条到任意位置后，按可见窗口取数（含该时段历史互动）。程序性滚动不触发。
-    if (userScrolled) {
-      scheduleVisibleLoad();
-      // 拖到左边缘：把横轴左界再往更早扩，使能继续向更早拖滚。
-      if (el.scrollLeft < AXIS_EDGE_PX) setAxisFrom((a) => (a == null ? a : a - AXIS_EXTEND));
+    if (userScrolled && followingRef.current) {
+      // 用户手动滚动：停跟随、把中轴冻结在当前 now，窗口停在原地（数据已在窗口内，无需再取）。
+      setFollowing(false);
+      setCenterMs(simNow());
     }
+    setScrollX(el.scrollLeft);
   }
 
   const stepMin = niceStepMin(pxPerMin);
@@ -531,28 +542,51 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
     const kEnd = Math.ceil((gxMax - ax(alignedStart)) / stepPx);
     for (let k = kStart; k <= kEnd; k++) {
       const ms = alignedStart + k * stepMs;
+      if (ms < windowFrom || ms > windowTo) continue; // 只在窗口内出刻度——否则窗口外的绝对刻度会撑大
+      // scrollWidth、抬高 gxMax、再生成更靠右的刻度……自我喂养致「往右无限前进」（#1 真凶）。
       const withDate = stepMin >= 1440 || Math.abs(ms - now) > DAY_MS;
       ticks.push({ x: ax(ms), label: formatTick(ms, withDate) });
     }
   }
 
   const nowX = ax(now);
+  // 「现在」标记只在窗口内显示——否则冻结到过去时，实时播放头会随时钟一路右移、
+  // 撑大滚动区使「往右无限前进」（#1）。窗口外（如冻结于过去）就不画它。
+  const showNow = now >= windowFrom && now <= windowTo;
   const visible = blocks.filter((b) => {
+    if (b.time < windowFrom || b.time > windowTo) return false; // 窗口外不渲染，防溢出撑大滚动区
     const x = ax(b.time);
     return x >= gxMin - 240 && x <= gxMax;
   });
 
+  // 中轴时间框显示值：编辑中用草稿，否则显示当前中轴（跟随时即 now，实时走）。
+  const centerLabel = formatSimTime(center);
+
+  const numInput = 'w-12 bg-(--chip) border border-(--border) rounded px-1 py-0.5 text-center tabular-nums outline-none focus:border-(--blue)';
+
   return (
     <div className="flex flex-col h-full text-(--text)">
       {/* 工具条 */}
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-(--border) text-xs">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-(--border) text-xs">
         <i className="ri-time-line text-(--blue)" />
         <span className="font-semibold">时间轴</span>
+
+        {/* 左偏移 ｜ 中轴时间 ｜ 右偏移 ｜ 单位 */}
+        <span className="text-(--dim) ml-1">窗口</span>
+        <input
+          type="number"
+          min={0}
+          value={spanLeft}
+          onChange={(e) => changeSpan('left', e.target.value)}
+          title="左边界：中轴往前看多久"
+          className={numInput}
+        />
+        <i className="ri-arrow-left-line text-(--dim)" />
         <input
           type="text"
           spellCheck={false}
-          value={editingTime ?? formatSimTime(now)}
-          onFocus={() => setEditingTime(formatSimTime(now))}
+          value={editingTime ?? centerLabel}
+          onFocus={() => setEditingTime(centerLabel)}
           onChange={(e) => setEditingTime(e.target.value)}
           onBlur={commitTimeEdit}
           onKeyDown={(e) => {
@@ -561,15 +595,35 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
               e.currentTarget.blur();
             }
           }}
-          title="输入模拟时间跳转（格式 2026-06-17 14:30:00，世界模拟时间非系统时间）"
-          className="w-38 bg-(--chip) border border-(--border) rounded px-1.5 py-0.5 text-(--amber) font-mono tabular-nums cursor-text focus:border-(--amber) outline-none"
+          title="中轴时间（格式 2026-06-17 14:30:00，世界模拟时间非系统时间）；改它即跳转窗口"
+          className="w-36 bg-(--chip) border border-(--border) rounded px-1.5 py-0.5 text-(--amber) font-mono tabular-nums cursor-text focus:border-(--amber) outline-none"
         />
-        <span className="text-(--dim)">
+        <i className="ri-arrow-right-line text-(--dim)" />
+        <input
+          type="number"
+          min={0}
+          value={spanRight}
+          onChange={(e) => changeSpan('right', e.target.value)}
+          title="右边界：中轴往后看多久"
+          className={numInput}
+        />
+        <select
+          value={unit}
+          onChange={(e) => setUnit(e.target.value as Unit)}
+          title="边界单位"
+          className="bg-(--chip) border border-(--border) rounded px-1 py-0.5 text-(--text) outline-none cursor-pointer"
+        >
+          <option value="m">分</option>
+          <option value="h">时</option>
+          <option value="d">天</option>
+        </select>
+
+        <span className="text-(--dim) ml-1">
           {worldId ?? '—'} · {blocks.length} 块{laneFilter ? ` · 轨道 ${lanes.length}/${allLanes.length}` : ''}
         </span>
         {!following && (
           <button
-            onClick={() => setFollowing(true)}
+            onClick={backToNow}
             className="px-1.5 py-0.5 rounded border border-(--amber) text-(--amber) cursor-pointer hover:bg-[#2a2418]"
             title="回到当前模拟时间并恢复跟随"
           >
@@ -584,9 +638,9 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
             max={MAX_PPM}
             step={0.5}
             value={pxPerMin}
-            onChange={(e) => setPxPerMin(Number(e.target.value))}
+            onChange={(e) => applyZoom(Number(e.target.value))}
             style={{ accentColor: 'var(--blue)' }}
-            className="w-28 cursor-pointer"
+            className="w-24 cursor-pointer"
           />
           <i className="ri-zoom-in-line" />
         </span>
@@ -695,12 +749,14 @@ export function TimelinePanel(_props: IDockviewPanelProps) {
                   <div key={l} style={{ height: layout.laneHeights[i], borderBottom: `1px solid ${LANE_DIV}` }} />
                 ))}
 
-                <div
-                  className="absolute top-0 bottom-0 pointer-events-none z-10"
-                  style={{ left: nowX, width: 2, background: 'var(--amber)', opacity: 0.75, transform: 'translateX(-1px)' }}
-                >
-                  <span className="absolute top-0.5 left-1 text-[10px] font-semibold text-(--amber) whitespace-nowrap">现在</span>
-                </div>
+                {showNow && (
+                  <div
+                    className="absolute top-0 bottom-0 pointer-events-none z-10"
+                    style={{ left: nowX, width: 2, background: 'var(--amber)', opacity: 0.75, transform: 'translateX(-1px)' }}
+                  >
+                    <span className="absolute top-0.5 left-1 text-[10px] font-semibold text-(--amber) whitespace-nowrap">现在</span>
+                  </div>
+                )}
 
                 {visible.map((b) => {
                   const pl = layout.place.get(b.key);

@@ -65,6 +65,30 @@
         }
       }
     },
+    "/api/posts/{id}": {
+      "get": {
+        "operationId": "getPost",
+        "summary": "按 id 取单帖（代理）",
+        "tags": [
+          "timeline"
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
     "/api/users/{handle}": {
       "get": {
         "operationId": "getUser",
@@ -215,10 +239,52 @@
             "description": "Default Response"
           }
         }
-      },
+      }
+    },
+    "/api/layouts/saved": {
       "put": {
-        "operationId": "saveLayouts",
-        "summary": "写当前世界编辑器布局",
+        "operationId": "saveNamedLayout",
+        "summary": "保存/更新一条命名布局（合并）",
+        "tags": [
+          "layouts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteNamedLayout",
+        "summary": "删除一条命名布局（合并）",
+        "tags": [
+          "layouts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/layouts/preset": {
+      "put": {
+        "operationId": "savePresetLayout",
+        "summary": "保存某预设的自定义布局（合并）",
+        "tags": [
+          "layouts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Default Response"
+          }
+        }
+      }
+    },
+    "/api/layouts/last": {
+      "put": {
+        "operationId": "saveLastLayout",
+        "summary": "保存当前(last)布局与活动预设（合并）",
         "tags": [
           "layouts"
         ],

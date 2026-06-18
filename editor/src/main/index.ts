@@ -68,7 +68,7 @@ function watchBackendForReload(): void {
 function createWindow(): void {
   const win = new BrowserWindow({
     width: 1440,
-    height: 900,
+    height: 1080, // 宽高比 4:3（保持当前宽度 1440 → 高 1080），比早先更高且不溢出屏幕
     title: 'SocialSim Studio',
     backgroundColor: '#0f0f0f',
     webPreferences: {

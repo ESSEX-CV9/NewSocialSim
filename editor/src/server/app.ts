@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import fastifySwagger from '@fastify/swagger';
 import fastifySwaggerUi from '@fastify/swagger-ui';
 import Fastify, { type FastifyInstance, type FastifyReply } from 'fastify';
@@ -26,8 +26,13 @@ export const SIM_CONTROL = (process.env.SOCIALSIM_CONTROL_URL ?? 'http://127.0.0
 interface LayoutsDoc {
   saved: Array<{ name: string; layout: unknown }>;
   last: unknown | null;
+  /** 每个预设的自定义版本（按预设 id），使对预设的修改跨切换保留。 */
+  presets?: Record<string, unknown>;
+  /** 上次活动布局（{kind:'preset',id} | {kind:'saved',name}），供重开恢复到正确的槽。 */
+  lastActive?: unknown | null;
+  /** 旧字段，仅保留供迁移读取。 */
+  lastPresetId?: string | null;
 }
-const EMPTY_LAYOUTS: LayoutsDoc = { saved: [], last: null };
 
 /** 在路由注册前 await：挂 OpenAPI 文档生成器与 /docs UI（编辑器后端自己的契约面，无鉴权、localhost）。 */
 async function registerEditorSwagger(app: FastifyInstance): Promise<void> {
@@ -97,6 +102,55 @@ function layoutsFile(worldId: string): string {
   return path.join(DATA_DIR, 'worlds', worldId, 'editor-layouts.json');
 }
 
+/**
+ * 读该世界布局存档（BOM 容错）。**区分两种"读不到"**：
+ * - 文件不存在（ENOENT）→ 返回空 doc（正常新建场景）。
+ * - 文件存在但读/解析失败（如并发写到一半被读到半截）→ **抛错**，让调用方中止本次写，
+ *   绝不返回空 doc 把好数据覆盖成空（这是 #3 被并发冲空的真凶）。
+ */
+async function readLayouts(worldId: string): Promise<LayoutsDoc> {
+  let raw: string;
+  try {
+    raw = (await readFile(layoutsFile(worldId), 'utf-8')).replace(/^﻿/, '');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') {
+      return { saved: [], last: null, presets: {}, lastActive: null, lastPresetId: null };
+    }
+    throw err; // 其它读错误：上抛、不冲数据
+  }
+  const doc = JSON.parse(raw) as Partial<LayoutsDoc>; // 解析失败上抛（半截文件）→ 中止写
+  return {
+    saved: Array.isArray(doc.saved) ? doc.saved : [],
+    last: doc.last ?? null,
+    presets: doc.presets && typeof doc.presets === 'object' ? doc.presets : {},
+    lastActive: doc.lastActive ?? null,
+    lastPresetId: doc.lastPresetId ?? null,
+  };
+}
+
+/** 原子写：先写 .tmp 再 rename 覆盖（同目录 rename 原子）。读者永远看到完整旧/新文件，杜绝半截读。 */
+async function writeLayouts(worldId: string, doc: LayoutsDoc): Promise<void> {
+  const file = layoutsFile(worldId);
+  await mkdir(path.dirname(file), { recursive: true });
+  const tmp = `${file}.tmp`;
+  await writeFile(tmp, JSON.stringify(doc, null, 2), 'utf-8'); // 无 BOM（给 Node 读的 JSON）
+  await rename(tmp, file);
+}
+
+/**
+ * 串行化所有布局 read-modify-write：单进程一条 Promise 链，保证一个端点的"读→改→写"整段完成后
+ * 下一个才开始。消除并发交错导致的 lost update 与冲空。GET 只读、配合原子写无需入锁。
+ */
+let layoutsChain: Promise<unknown> = Promise.resolve();
+function lockLayouts<T>(fn: () => Promise<T>): Promise<T> {
+  const run = layoutsChain.then(fn, fn);
+  layoutsChain = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 /** 组装编辑器后端 app（不监听）。swagger 须在路由前 await 注册。 */
 export async function buildEditorApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
@@ -153,6 +207,22 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
     '/api/users',
     { schema: { tags: ['timeline'], summary: '列全部账号（代理）', operationId: 'listUsers' } },
     (req, reply) => proxyGet('/api/users', req.query, ['cursor', 'limit'], reply),
+  );
+
+  // 单帖：按 id 取一条帖（供检视器展示回复/引用块的原帖内容）。
+  app.get<{ Params: { id: string } }>(
+    '/api/posts/:id',
+    { schema: { tags: ['timeline'], summary: '按 id 取单帖（代理）', operationId: 'getPost' } },
+    async (req, reply) => {
+      try {
+        const res = await fetch(`${SOCIAL_API}/api/posts/${encodeURIComponent(req.params.id)}`);
+        reply.status(res.status);
+        return await res.json();
+      } catch {
+        reply.status(502);
+        return { error: 'social server unreachable' };
+      }
+    },
   );
 
   // 账号资料：转发社交站按 handle 取单账号（供时间轴显示昵称）。
@@ -261,6 +331,8 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
   );
 
   // --- 编辑器布局：跟随活动世界，落该世界文件夹的 editor-layouts.json（编辑器 UI 配置，不进 world.db） ---
+  // 后端是权威源：每个变更端点都 read-modify-write **单个字段**，绝不让前端用本地副本整体覆盖——
+  // 否则前端 doc 未加载好/为空时的一次写会冲掉其它字段（命名布局/预设自定义），且形成"读空→写空"死循环。
 
   app.get(
     '/api/layouts',
@@ -271,32 +343,122 @@ export async function buildEditorApp(): Promise<FastifyInstance> {
         reply.status(502);
         return { error: 'no active world' };
       }
+      // 只读展示：读/解析失败也别 500 进重试死循环，退回空 doc（原子写下基本不会发生）。
       try {
-        const raw = (await readFile(layoutsFile(id), 'utf-8')).replace(/^﻿/, '');
-        return JSON.parse(raw) as LayoutsDoc;
+        return await readLayouts(id);
       } catch {
-        return EMPTY_LAYOUTS;
+        return { saved: [], last: null, presets: {}, lastActive: null, lastPresetId: null };
       }
     },
   );
 
-  app.put<{ Body: LayoutsDoc }>(
-    '/api/layouts',
-    { schema: { tags: ['layouts'], summary: '写当前世界编辑器布局', operationId: 'saveLayouts' } },
+  /** 取活动世界 id；无则回 502。供下列各布局合并端点统一前置。 */
+  async function requireWorld(reply: FastifyReply): Promise<string | null> {
+    const id = await activeWorldId();
+    if (!id) {
+      reply.status(502);
+      return null;
+    }
+    return id;
+  }
+
+  // 合并写一条命名布局（按 name 替换或追加）——不触碰 presets/last/其它命名布局。
+  app.put<{ Body: { name?: string; layout?: unknown } }>(
+    '/api/layouts/saved',
+    { schema: { tags: ['layouts'], summary: '保存/更新一条命名布局（合并）', operationId: 'saveNamedLayout' } },
     async (req, reply) => {
-      const id = await activeWorldId();
-      if (!id) {
-        reply.status(502);
-        return { error: 'no active world' };
+      const id = await requireWorld(reply);
+      if (!id) return { error: 'no active world' };
+      const name = req.body?.name;
+      if (typeof name !== 'string' || !name.trim()) {
+        reply.status(400);
+        return { error: 'bad name' };
       }
-      const doc: LayoutsDoc = {
-        saved: Array.isArray(req.body?.saved) ? req.body.saved : [],
-        last: req.body?.last ?? null,
-      };
-      const file = layoutsFile(id);
-      await mkdir(path.dirname(file), { recursive: true });
-      await writeFile(file, JSON.stringify(doc, null, 2), 'utf-8');
-      return { ok: true };
+      try {
+        return await lockLayouts(async () => {
+          const doc = await readLayouts(id);
+          doc.saved = [...doc.saved.filter((s) => s.name !== name), { name, layout: req.body!.layout }];
+          await writeLayouts(id, doc);
+          return { ok: true, saved: doc.saved.map((s) => s.name) };
+        });
+      } catch (e) {
+        reply.status(500);
+        return { error: String(e) }; // 读到半截/读错 → 中止写、不冲数据
+      }
+    },
+  );
+
+  // 删除一条命名布局——不触碰其它字段。
+  app.delete<{ Body: { name?: string } }>(
+    '/api/layouts/saved',
+    { schema: { tags: ['layouts'], summary: '删除一条命名布局（合并）', operationId: 'deleteNamedLayout' } },
+    async (req, reply) => {
+      const id = await requireWorld(reply);
+      if (!id) return { error: 'no active world' };
+      const name = req.body?.name;
+      if (typeof name !== 'string') {
+        reply.status(400);
+        return { error: 'bad name' };
+      }
+      try {
+        return await lockLayouts(async () => {
+          const doc = await readLayouts(id);
+          doc.saved = doc.saved.filter((s) => s.name !== name);
+          await writeLayouts(id, doc);
+          return { ok: true, saved: doc.saved.map((s) => s.name) };
+        });
+      } catch (e) {
+        reply.status(500);
+        return { error: String(e) };
+      }
+    },
+  );
+
+  // 合并写某预设的自定义版本——不触碰 saved/last/其它预设。
+  app.put<{ Body: { id?: string; layout?: unknown } }>(
+    '/api/layouts/preset',
+    { schema: { tags: ['layouts'], summary: '保存某预设的自定义布局（合并）', operationId: 'savePresetLayout' } },
+    async (req, reply) => {
+      const id = await requireWorld(reply);
+      if (!id) return { error: 'no active world' };
+      const presetId = req.body?.id;
+      if (typeof presetId !== 'string' || !presetId) {
+        reply.status(400);
+        return { error: 'bad preset id' };
+      }
+      try {
+        return await lockLayouts(async () => {
+          const doc = await readLayouts(id);
+          doc.presets = { ...doc.presets, [presetId]: req.body!.layout };
+          await writeLayouts(id, doc);
+          return { ok: true };
+        });
+      } catch (e) {
+        reply.status(500);
+        return { error: String(e) };
+      }
+    },
+  );
+
+  // 合并写 last + lastActive（"重启恢复哪个布局" = 恢复 last）——不触碰 saved/presets。
+  app.put<{ Body: { last?: unknown; lastActive?: unknown } }>(
+    '/api/layouts/last',
+    { schema: { tags: ['layouts'], summary: '保存当前(last)布局与活动布局描述（合并）', operationId: 'saveLastLayout' } },
+    async (req, reply) => {
+      const id = await requireWorld(reply);
+      if (!id) return { error: 'no active world' };
+      try {
+        return await lockLayouts(async () => {
+          const doc = await readLayouts(id);
+          doc.last = req.body?.last ?? null;
+          doc.lastActive = req.body?.lastActive ?? null;
+          await writeLayouts(id, doc);
+          return { ok: true };
+        });
+      } catch (e) {
+        reply.status(500);
+        return { error: String(e) };
+      }
     },
   );
 

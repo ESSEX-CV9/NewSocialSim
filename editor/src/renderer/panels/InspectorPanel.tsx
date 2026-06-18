@@ -139,7 +139,58 @@ function PostDetail({ block }: { block: PostBlock }) {
       {p.replyToId != null && <Field k="回复对象"><span className="font-mono">#{p.replyToId}</span></Field>}
       {p.quoteOfId != null && <Field k="引用对象"><span className="font-mono">#{p.quoteOfId}</span></Field>}
       <Field k="帖子 id"><span className="font-mono">#{p.id}</span></Field>
+      {/* 原帖内容：回复→被回复帖；引用→被引用帖。拉取并展示其正文，而非只给一个 id。 */}
+      {p.replyToId != null && <RelatedPost id={p.replyToId} label="被回复帖" icon="ri-reply-line" />}
+      {p.quoteOfId != null && <RelatedPost id={p.quoteOfId} label="被引用帖" icon="ri-double-quotes-l" />}
     </>
+  );
+}
+
+/** 按 id 拉取并展示一条原帖（被回复 / 被引用帖）的内容。 */
+function RelatedPost({ id, label, icon }: { id: number; label: string; icon: string }) {
+  const [post, setPost] = useState<PostView | null>(null);
+  const [state, setState] = useState<'loading' | 'ok' | 'gone'>('loading');
+  useEffect(() => {
+    let alive = true;
+    setState('loading');
+    setPost(null);
+    const backend = window.editor.backendUrl;
+    void (async () => {
+      try {
+        const r = await fetch(`${backend}/api/posts/${id}`);
+        if (!r.ok) throw new Error(String(r.status));
+        const j = (await r.json()) as { post?: PostView };
+        if (!alive) return;
+        if (j.post && !j.post.deleted) {
+          setPost(j.post);
+          setState('ok');
+        } else {
+          setState('gone'); // 已删除返墓碑 / 取不到
+        }
+      } catch {
+        if (alive) setState('gone');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  return (
+    <div className="mt-1">
+      <div className="flex items-center gap-1.5 px-3 py-2 border-b border-(--border) bg-(--panel2)">
+        <i className={`${icon} text-(--blue)`} />
+        <b className="text-[12px]">{label}</b>
+        <span className="text-(--dim) font-mono ml-auto">#{id}</span>
+      </div>
+      {state === 'loading' ? (
+        <p className="px-3 py-2 text-(--dim)">查询中…</p>
+      ) : state === 'gone' || !post ? (
+        <p className="px-3 py-2 text-(--dim)">原帖不可用（已删除或取不到）。</p>
+      ) : (
+        <PostCard post={post} />
+      )}
+    </div>
   );
 }
 

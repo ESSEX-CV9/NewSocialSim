@@ -78,6 +78,20 @@ body {
   --dv-tabs-and-actions-container-background-color: var(--panel2);
   --dv-activegroup-visiblepanel-tab-background-color: var(--panel);
   --dv-inactivegroup-visiblepanel-tab-background-color: var(--panel2);
-  --dv-separator-border: var(--border);
+  /* 分隔线设透明：否则它会在每个圆角窗格外再画一圈细方分隔线（双框）。窗格间距由 theme.gap 的黑色间隙承担。 */
+  --dv-separator-border: transparent;
   --dv-paneview-active-outline-color: var(--blue);
+}
+
+/* 每个窗格（dockview group）= 小圆角 + 较粗边框的"可移动窗口"，让用户一眼看出
+   这是独立、可拖动、边界可交互的面板。配合 theme.gap（App.tsx 传入）拉开窗格间距，
+   黑色间隙把各圆角窗口分隔开。不做选中高亮——所有窗格一致。 */
+.dockview-theme-abyss .dv-groupview {
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+/* 圆角窗格外层的尺寸容器同样抹圆角，避免其方角在圆角缺口处露出。 */
+.dockview-theme-abyss .dv-resize-container {
+  border-radius: 10px;
 }
